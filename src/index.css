@@ -1,0 +1,723 @@
+/* =====================================================
+   TAILWIND + FUENTES
+   ===================================================== */
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* =====================================================
+   TOKENS (LIGHT / DARK) — SÓLIDOS, SIN GLASS
+   ===================================================== */
+@layer base {
+  :root {
+    /* Paleta clara - Mejorada con más contraste */
+    --background: 0 0% 98%;
+    --foreground: 222 47% 11%;
+    --muted: 220 16% 94%;
+    --muted-foreground: 215 16% 46%;
+    --surface: 0 0% 100%;
+    --surface-foreground: 222 47% 11%;
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 217 91% 60%;
+    --brand: 217 91% 60%;
+
+    /* Colores semánticos */
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --danger: 0 84% 60%;
+    --info: 199 89% 48%;
+
+    --radius: 10px;
+
+    /* Sombras - Ajustadas para más profundidad */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow-lg: 0 12px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
+
+    --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-size-base: 16px;
+  }
+
+  /* Tema oscuro - Mejorado con colores más cálidos */
+  :root[data-theme="dark"] {
+    --background: 222 14% 8%;
+    --foreground: 210 20% 96%;
+    --muted: 220 14% 14%;
+    --muted-foreground: 220 10% 65%;
+    --surface: 222 14% 11%;
+    --surface-foreground: 210 20% 96%;
+    --border: 220 14% 22%;
+    --input: 220 14% 22%;
+    --ring: 217 91% 60%;
+    --brand: 217 91% 60%;
+
+    /* Sombras más sutiles en dark mode */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+    --shadow: 0 2px 8px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.2);
+    --shadow-lg: 0 12px 24px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.3);
+  }
+
+  /* Tema opcional (ejemplo) */
+  :root[data-theme="greenapple"] {
+    --brand: 172 49% 56%;
+  }
+
+  /* Mapeo corto para variables CSS personalizadas */
+  :root {
+    --bg: hsl(var(--background));
+    --fg: hsl(var(--foreground));
+    --surface: hsl(var(--surface));
+    --surface-soft: hsl(var(--muted));
+    --text: hsl(var(--foreground));
+    --text-muted: hsl(var(--muted-foreground));
+  }
+
+  html, body, #root { 
+    height: 100%; 
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Encabezados con mejor jerarquía visual */
+  h1, h2, h3, h4, h5, h6 { 
+    color: var(--text); 
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  h1 { font-size: 2.25rem; }
+  h2 { font-size: 1.875rem; }
+  h3 { font-size: 1.5rem; }
+  h4 { font-size: 1.25rem; }
+
+  /* Links con mejor UX */
+  a {
+    color: hsl(var(--brand));
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+  a:hover {
+    color: color-mix(in oklab, hsl(var(--brand)) 80%, #000 20%);
+    text-decoration: underline;
+  }
+
+  /* Scrollbar elegante */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  *::-webkit-scrollbar { 
+    width: 8px; 
+    height: 8px; 
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+
+  /* Animaciones para Radix y transiciones globales */
+  @keyframes scaleIn {
+    from { 
+      opacity: 0; 
+      transform: translateY(-4px) scale(0.96); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0) scale(1); 
+    }
+  }
+  
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* =====================================================
+   COMPONENTES (OPT-IN)
+   ===================================================== */
+@layer components {
+  /* Card mejorada con hover sutil */
+  .card {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .card:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Etiquetas */
+  .label {
+    display: block;
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.375rem;
+  }
+  .label-muted {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+
+  /* Input moderno */
+  .input {
+    width: 100%;
+    height: 2.5rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input::placeholder { 
+    color: var(--text-muted); 
+  }
+  .input:focus {
+    outline: none;
+    border-color: hsl(var(--brand));
+    box-shadow: 0 0 0 3px color-mix(in oklab, hsl(var(--ring)) 20%, transparent);
+  }
+  .input[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--surface-soft);
+  }
+  .input-error {
+    border-color: hsl(var(--danger));
+  }
+  .input-error:focus {
+    border-color: hsl(var(--danger));
+    box-shadow: 0 0 0 3px color-mix(in oklab, hsl(var(--danger)) 20%, transparent);
+  }
+
+  /* Textarea */
+  textarea.input {
+    height: auto;
+    padding: 0.625rem 0.75rem;
+    min-height: 5rem;
+    resize: vertical;
+  }
+
+  /* Select personalizado (Radix) */
+  .select-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 2.5rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  }
+  .select-trigger:hover {
+    background: color-mix(in oklab, var(--surface) 85%, var(--surface-soft) 15%);
+  }
+  .select-trigger:focus {
+    outline: none;
+    border-color: hsl(var(--brand));
+    box-shadow: 0 0 0 3px color-mix(in oklab, hsl(var(--ring)) 20%, transparent);
+  }
+  .select-trigger[data-placeholder] {
+    color: var(--text-muted);
+  }
+
+  /* Botones base */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.25;
+    padding: 0 1rem;
+    height: 2.5rem;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s ease;
+    user-select: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px hsl(var(--brand));
+  }
+  .btn:active { 
+    transform: scale(0.98); 
+  }
+  .btn[disabled] { 
+    opacity: 0.5; 
+    cursor: not-allowed; 
+    pointer-events: none;
+  }
+
+  /* Variantes de botones */
+  .btn-primary {
+    background: hsl(var(--brand));
+    color: #fff;
+    border: 1px solid hsl(var(--brand));
+  }
+  .btn-primary:hover { 
+    background: color-mix(in oklab, hsl(var(--brand)) 85%, #000 15%);
+    border-color: color-mix(in oklab, hsl(var(--brand)) 85%, #000 15%);
+  }
+
+  .btn-secondary {
+    background: var(--surface-soft);
+    color: var(--text);
+    border: 1px solid hsl(var(--border));
+  }
+  .btn-secondary:hover {
+    background: color-mix(in oklab, var(--surface-soft) 80%, var(--text) 10%);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid transparent;
+    box-shadow: none;
+  }
+  .btn-ghost:hover {
+    background: var(--surface-soft);
+  }
+
+  .btn-danger {
+    background: hsl(var(--danger));
+    color: #fff;
+    border: 1px solid hsl(var(--danger));
+  }
+  .btn-danger:hover {
+    background: color-mix(in oklab, hsl(var(--danger)) 85%, #000 15%);
+  }
+
+  /* Tamaños de botones */
+  .btn-sm {
+    height: 2rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+  }
+  .btn-lg {
+    height: 3rem;
+    padding: 0 1.5rem;
+    font-size: 1rem;
+  }
+
+  /* Badge/Chip */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge-default {
+    background: var(--surface-soft);
+    color: var(--text);
+  }
+  .badge-success {
+    background: color-mix(in oklab, hsl(var(--success)) 15%, transparent);
+    color: hsl(var(--success));
+  }
+  .badge-warning {
+    background: color-mix(in oklab, hsl(var(--warning)) 15%, transparent);
+    color: color-mix(in oklab, hsl(var(--warning)) 80%, #000 20%);
+  }
+  .badge-danger {
+    background: color-mix(in oklab, hsl(var(--danger)) 15%, transparent);
+    color: hsl(var(--danger));
+  }
+  .badge-info {
+    background: color-mix(in oklab, hsl(var(--info)) 15%, transparent);
+    color: hsl(var(--info));
+  }
+
+  /* Dark mode adjustments para badges */
+  :root[data-theme="dark"] .badge-success {
+    background: color-mix(in oklab, hsl(var(--success)) 20%, transparent);
+    color: color-mix(in oklab, hsl(var(--success)) 100%, #fff 30%);
+  }
+  :root[data-theme="dark"] .badge-warning {
+    background: color-mix(in oklab, hsl(var(--warning)) 20%, transparent);
+    color: color-mix(in oklab, hsl(var(--warning)) 100%, #fff 20%);
+  }
+  :root[data-theme="dark"] .badge-danger {
+    background: color-mix(in oklab, hsl(var(--danger)) 20%, transparent);
+    color: color-mix(in oklab, hsl(var(--danger)) 100%, #fff 30%);
+  }
+  :root[data-theme="dark"] .badge-info {
+    background: color-mix(in oklab, hsl(var(--info)) 20%, transparent);
+    color: color-mix(in oklab, hsl(var(--info)) 100%, #fff 30%);
+  }
+
+  /* Alert/Notification */
+  .alert {
+    padding: 1rem;
+    border-radius: var(--radius);
+    border: 1px solid;
+    font-size: 0.875rem;
+  }
+  .alert-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .alert-info {
+    background: color-mix(in oklab, hsl(var(--info)) 8%, transparent);
+    border-color: color-mix(in oklab, hsl(var(--info)) 30%, transparent);
+    color: color-mix(in oklab, hsl(var(--info)) 100%, #000 20%);
+  }
+  .alert-success {
+    background: color-mix(in oklab, hsl(var(--success)) 8%, transparent);
+    border-color: color-mix(in oklab, hsl(var(--success)) 30%, transparent);
+    color: color-mix(in oklab, hsl(var(--success)) 100%, #000 30%);
+  }
+  .alert-warning {
+    background: color-mix(in oklab, hsl(var(--warning)) 8%, transparent);
+    border-color: color-mix(in oklab, hsl(var(--warning)) 30%, transparent);
+    color: color-mix(in oklab, hsl(var(--warning)) 100%, #000 30%);
+  }
+  .alert-danger {
+    background: color-mix(in oklab, hsl(var(--danger)) 8%, transparent);
+    border-color: color-mix(in oklab, hsl(var(--danger)) 30%, transparent);
+    color: color-mix(in oklab, hsl(var(--danger)) 100%, #000 20%);
+  }
+
+  /* Dark mode alerts */
+  :root[data-theme="dark"] .alert-info {
+    background: color-mix(in oklab, hsl(var(--info)) 12%, transparent);
+    color: color-mix(in oklab, hsl(var(--info)) 100%, #fff 40%);
+  }
+  :root[data-theme="dark"] .alert-success {
+    background: color-mix(in oklab, hsl(var(--success)) 12%, transparent);
+    color: color-mix(in oklab, hsl(var(--success)) 100%, #fff 40%);
+  }
+  :root[data-theme="dark"] .alert-warning {
+    background: color-mix(in oklab, hsl(var(--warning)) 12%, transparent);
+    color: color-mix(in oklab, hsl(var(--warning)) 100%, #fff 30%);
+  }
+  :root[data-theme="dark"] .alert-danger {
+    background: color-mix(in oklab, hsl(var(--danger)) 12%, transparent);
+    color: color-mix(in oklab, hsl(var(--danger)) 100%, #fff 40%);
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: hsl(var(--border));
+    margin: 1rem 0;
+    border: none;
+  }
+
+  /* Header de app */
+  .app-header {
+    background: var(--surface);
+    border-bottom: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  /* Tabla moderna */
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .table thead {
+    background: var(--surface-soft);
+    border-bottom: 2px solid hsl(var(--border));
+  }
+  .table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .table tbody tr {
+    transition: background-color 0.15s ease;
+  }
+  .table tbody tr:hover {
+    background: var(--surface-soft);
+  }
+
+  /* Skeleton loader (para estados de carga) */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--surface-soft) 25%,
+      color-mix(in oklab, var(--surface-soft) 70%, var(--surface) 30%) 50%,
+      var(--surface-soft) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+    border-radius: var(--radius);
+  }
+  @keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Tooltip simple (si necesitas) */
+  .tooltip {
+    position: relative;
+    display: inline-block;
+  }
+  .tooltip-content {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    background: hsl(var(--foreground));
+    color: hsl(var(--background));
+    font-size: 0.75rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 50;
+  }
+  .tooltip:hover .tooltip-content {
+    opacity: 1;
+  }
+  .tooltip-content::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: hsl(var(--foreground));
+  }
+
+  /* Switch (Toggle) - si usas Radix Switch */
+  .switch-root {
+    width: 2.75rem;
+    height: 1.5rem;
+    background: var(--surface-soft);
+    border: 1px solid hsl(var(--border));
+    border-radius: 9999px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  .switch-root[data-state="checked"] {
+    background: hsl(var(--brand));
+    border-color: hsl(var(--brand));
+  }
+  .switch-thumb {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+    background: white;
+    border-radius: 9999px;
+    transition: transform 0.2s ease;
+    transform: translateX(1px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .switch-root[data-state="checked"] .switch-thumb {
+    transform: translateX(1.375rem);
+  }
+
+  /* Checkbox personalizado (si usas Radix) */
+  .checkbox-root {
+    width: 1.25rem;
+    height: 1.25rem;
+    background: var(--surface);
+    border: 1px solid hsl(var(--border));
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .checkbox-root:hover {
+    border-color: hsl(var(--brand));
+  }
+  .checkbox-root[data-state="checked"] {
+    background: hsl(var(--brand));
+    border-color: hsl(var(--brand));
+  }
+  .checkbox-indicator {
+    color: white;
+  }
+}
+
+/* =====================================================
+   UTILITIES
+   ===================================================== */
+@layer utilities {
+  /* Focus ring consistente */
+  .focus-ring {
+    outline: none !important;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px hsl(var(--brand)) !important;
+  }
+
+  /* Ocultar visualmente (accesibilidad) */
+  .visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Text truncate con ellipsis */
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Animations helpers para Radix */
+  .animate-scaleIn { 
+    animation: scaleIn 150ms cubic-bezier(0.16, 1, 0.3, 1); 
+  }
+  .animate-fadeOut { 
+    animation: fadeOut 100ms ease-in; 
+  }
+  .animate-slideDown { 
+    animation: slideDown 200ms cubic-bezier(0.16, 1, 0.3, 1); 
+  }
+  .animate-slideUp { 
+    animation: slideUp 200ms cubic-bezier(0.16, 1, 0.3, 1); 
+  }
+
+  /* Responsive helpers */
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  @media (min-width: 640px) {
+    .container { max-width: 640px; }
+  }
+  @media (min-width: 768px) {
+    .container { max-width: 768px; }
+  }
+  @media (min-width: 1024px) {
+    .container { max-width: 1024px; }
+  }
+  @media (min-width: 1280px) {
+    .container { max-width: 1280px; }
+  }
+
+  /* Preferencias de movimiento reducido */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Dark mode automático (fallback) */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      color-scheme: dark;
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    body {
+      background: #fff;
+      color: #000;
+    }
+    .app-header,
+    .btn,
+    .actions,
+    button {
+      display: none !important;
+    }
+    .card {
+      background: #fff;
+      box-shadow: none;
+      border: 1px solid #ccc;
+      page-break-inside: avoid;
+    }
+    .table {
+      border: 1px solid #ccc;
+    }
+    .table th,
+    .table td {
+      border: 1px solid #ccc;
+    }
+  }
+}
