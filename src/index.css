@@ -14,12 +14,13 @@
     --foreground: 222 47% 11%;
     --muted: 220 16% 94%;
     --muted-foreground: 215 16% 46%;
-    --surface: 0 0% 100%;
+    --surface: 0 0% 100%/1;
     --surface-foreground: 222 47% 11%;
     --border: 220 13% 88%;
     --input: 220 13% 88%;
     --ring: 217 91% 60%;
     --brand: 217 91% 60%;
+    --focus: 0 0% 46%;
 
     /* Colores semánticos */
     --success: 142 71% 45%;
@@ -68,8 +69,8 @@
   :root {
     --bg: hsl(var(--background));
     --fg: hsl(var(--foreground));
-    --surface: hsl(var(--surface));
-    --surface-soft: hsl(var(--muted));
+    --surfac-bg: hsl(var(--surface));
+    --surface-soft-bg: hsl(var(--muted));
     --text: hsl(var(--foreground));
     --text-muted: hsl(var(--muted-foreground));
   }
@@ -78,6 +79,7 @@
     height: 100%; 
     margin: 0;
     padding: 0;
+    font-size: var(--font-size-base, 16px);
   }
 
   body {
@@ -100,8 +102,10 @@
   }
   h1 { font-size: 2.25rem; }
   h2 { font-size: 1.875rem; }
-  h3 { font-size: 1.5rem; }
+  h3 { font-size: 1.2rem; }
   h4 { font-size: 1.25rem; }
+
+  
 
   /* Links con mejor UX */
   a {
@@ -181,12 +185,12 @@
 @layer components {
   /* Card mejorada con hover sutil */
   .card {
-    background: var(--surface);
+    background: var(--surface-bg);
     color: var(--text);
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, background-color .2s ease;
   }
   .card:hover {
     box-shadow: var(--shadow-md);
@@ -210,7 +214,7 @@
   .input {
     width: 100%;
     height: 2.5rem;
-    background: var(--surface);
+    background: var(--surface-bg);
     color: var(--text);
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
@@ -229,7 +233,7 @@
   .input[disabled] {
     opacity: 0.6;
     cursor: not-allowed;
-    background: var(--surface-soft);
+    background: var(--surface-soft-bg);
   }
   .input-error {
     border-color: hsl(var(--danger));
@@ -239,40 +243,22 @@
     box-shadow: 0 0 0 3px color-mix(in oklab, hsl(var(--danger)) 20%, transparent);
   }
 
+  .select-trigger {
+    display:inline-flex; align-items:center; justify-content:space-between; width:100%; height:2.5rem;
+    background:var(--surface-bg); color:var(--text); border:1px solid hsl(var(--border));
+    border-radius:var(--radius); padding:0 .75rem; font-size:.875rem; cursor:pointer;
+    transition:border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+  }
+  .select-trigger:hover { background: color-mix(in oklab, var(--surface-bg) 88%, var(--surface-soft-bg) 12%); }
+  .select-trigger:focus { outline:none; border-color:hsl(var(--brand)); box-shadow:0 0 0 3px color-mix(in oklab, hsl(var(--ring)) 20%, transparent); }
+  .select-trigger[data-placeholder] { color: var(--text-muted); }
+
   /* Textarea */
   textarea.input {
     height: auto;
     padding: 0.625rem 0.75rem;
     min-height: 5rem;
     resize: vertical;
-  }
-
-  /* Select personalizado (Radix) */
-  .select-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    height: 2.5rem;
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius);
-    padding: 0 0.75rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
-  }
-  .select-trigger:hover {
-    background: color-mix(in oklab, var(--surface) 85%, var(--surface-soft) 15%);
-  }
-  .select-trigger:focus {
-    outline: none;
-    border-color: hsl(var(--brand));
-    box-shadow: 0 0 0 3px color-mix(in oklab, hsl(var(--ring)) 20%, transparent);
-  }
-  .select-trigger[data-placeholder] {
-    color: var(--text-muted);
   }
 
   /* Botones base */
@@ -470,7 +456,7 @@
 
   /* Header de app */
   .app-header {
-    background: var(--surface);
+    background: var(--surface-bg);
     border-bottom: 1px solid hsl(var(--border));
     box-shadow: var(--shadow);
     position: sticky;
@@ -590,7 +576,7 @@
   .checkbox-root {
     width: 1.25rem;
     height: 1.25rem;
-    background: var(--surface);
+    background: var(--surface-bg);
     border: 1px solid hsl(var(--border));
     border-radius: 4px;
     display: flex;
@@ -720,4 +706,24 @@
       border: 1px solid #ccc;
     }
   }
+}
+
+.stagger-item {
+  /* Aplicar la animación definida en el keyframe */
+  animation: staggeredIn 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0; /* Ocultar por defecto */
+}
+
+/* Retardos escalonados */
+.stagger-item-1 {
+  animation-delay: 100ms;
+}
+.stagger-item-2 {
+  animation-delay: 150ms;
+}
+.stagger-item-3 {
+  animation-delay: 200ms;
+}
+.stagger-item-4 {
+  animation-delay: 250ms;
 }

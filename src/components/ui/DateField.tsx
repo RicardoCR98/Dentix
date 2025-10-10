@@ -10,7 +10,7 @@ export const DateField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLIn
       className={cn(
         "w-full h-10 px-3 rounded-md border border-[hsl(var(--border))] bg-surface-soft",
         "text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))]",
-        "appearance-none", // evita estilos nativos raros
+        "appearance-none ",
         className
       )}
       {...props}

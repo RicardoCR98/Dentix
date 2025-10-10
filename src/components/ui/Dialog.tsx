@@ -1,64 +1,125 @@
-import * as Dialog from '@radix-ui/react-dialog';
-import { cn } from '../../lib/cn';
-import { X } from 'lucide-react';
-export const DialogRoot = Dialog.Root;
-export const DialogTrigger = Dialog.Trigger;
-export const DialogClose = Dialog.Close;
-export const DialogPortal = Dialog.Portal;
+// src/components/ui/Dialog.tsx
+import { useEffect, useRef } from "react";
+import { X } from "lucide-react";
+import { cn } from "../../lib/cn";
 
-export function DialogOverlay({ className, ...props }: Dialog.DialogOverlayProps) {
-  return (
-    <Dialog.Overlay
-      className={cn(
-        'fixed inset-0 z-50 bg-black/50',
-        'data-[state=open]:animate-[fadeIn_150ms_ease-out]',
-        'data-[state=closed]:animate-[fadeOut_100ms_ease-in]',
-        className
-      )}
-      {...props}
-    />
-  );
+interface DialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: React.ReactNode;
+  title?: string;
+  description?: string;
+  size?: "sm" | "md" | "lg" | "xl" | "4xl" |"full";
+  spotlight?: boolean;
 }
 
-export function DialogContent({ 
-  className, 
+export function Dialog({
+  open,
+  onOpenChange,
   children,
   title,
   description,
-  ...props 
-}: Dialog.DialogContentProps & { title?: string; description?: string }) {
+  size = "md",
+  spotlight = false,
+}: DialogProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) {
+        onOpenChange(false);
+      }
+    };
+
+    if (open) {
+      document.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    };
+  }, [open, onOpenChange]);
+
+  if (!open) return null;
+
+  const sizeClasses = {
+    sm: "max-w-sm",
+    md: "max-w-md",
+    lg: "max-w-lg",
+    xl: "max-w-xl",
+    "4xl": "max-w-4xl",
+    full: "max-w-7xl",
+  };
+
   return (
-    <DialogPortal>
-      <DialogOverlay />
-      <Dialog.Content
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4 sm:pt-[15vh]">
+      {/* Backdrop con blur */}
+      <div
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
-          'w-full max-w-lg max-h-[90vh] overflow-y-auto',
-          'bg-[hsl(var(--surface))] rounded-xl shadow-lg border border-[hsl(var(--border))]',
-          'data-[state=open]:animate-[scaleIn_200ms_cubic-bezier(0.16,1,0.3,1)]',
-          'data-[state=closed]:animate-[fadeOut_100ms_ease-in]',
-          'focus:outline-none',
-          className
+          "fixed inset-0 transition-all duration-300",
+          spotlight
+            ? "bg-black/60 backdrop-blur-xl"
+            : "bg-black/50 backdrop-blur-sm"
         )}
-        {...props}
+        onClick={() => onOpenChange(false)}
+      />
+
+      {/* Content */}
+      <div
+        ref={contentRef}
+        className={cn(
+          "relative w-full bg-[hsl(var(--surface))] rounded-2xl shadow-2xl",
+          "transform transition-all duration-300 ease-out",
+          "animate-in fade-in-0 zoom-in-95 slide-in-from-top-4",
+          spotlight && "ring-1 ring-white/20 shadow-[0_0_80px_rgba(255,255,255,0.1)]",
+          sizeClasses[size]
+        )}
+        onClick={(e) => e.stopPropagation()}
       >
-        {title && (
-          <Dialog.Title className="text-xl font-bold px-6 pt-6 pb-2">
-            {title}
-          </Dialog.Title>
+        {/* Header */}
+        {(title || description) && (
+          <div className="flex items-start justify-between p-6 pb-4">
+            <div className="flex-1">
+              {title && (
+                <h2 className="text-2xl font-bold text-[hsl(var(--foreground))] mb-1">
+                  {title}
+                </h2>
+              )}
+              {description && (
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                  {description}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="ml-4 rounded-lg p-2 hover:bg-[hsl(var(--muted))] transition-colors"
+            >
+              <X size={20} className="text-[hsl(var(--muted-foreground))]" />
+            </button>
+          </div>
         )}
-        {description && (
-          <Dialog.Description className="text-sm text-[hsl(var(--muted-foreground))] px-6 pb-4">
-            {description}
-          </Dialog.Description>
-        )}
-        <div className={title || description ? 'px-6 pb-6' : 'p-6'}>
+
+        {/* Body */}
+        <div className={cn("px-6", title || description ? "pb-6" : "py-6")}>
           {children}
         </div>
-        <Dialog.Close className="absolute right-4 top-4 rounded-md p-1 hover:bg-[hsl(var(--muted))] transition-colors">
-          <X size={20} />
-        </Dialog.Close>
-      </Dialog.Content>
-    </DialogPortal>
+      </div>
+    </div>
+  );
+}
+
+// Componente auxiliar para contenido del diálogo
+export function DialogContent({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn("space-y-4", className)}>{children}</div>;
+}
+
+export function DialogFooter({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[hsl(var(--border))]", className)}>
+      {children}
+    </div>
   );
 }

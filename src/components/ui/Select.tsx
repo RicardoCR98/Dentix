@@ -11,7 +11,7 @@ export function SelectTrigger({ className, ...props }: RSelect.SelectTriggerProp
       {...props}
     >
       <RSelect.Value placeholder="Selecciona…" />
-      <RSelect.Icon className="ml-2 opacity-80">
+      <RSelect.Icon className="ml-2 opacity-80 ">
         <ChevronDown size={16} />
       </RSelect.Icon>
     </RSelect.Trigger>
@@ -27,7 +27,7 @@ export function SelectContent(
         className={cn(
           "z-50 min-w-[var(--radix-select-trigger-width)] rounded-lg",
           "border border-[hsl(var(--border))] bg-[hsl(var(--surface))] text-[hsl(var(--foreground))]",
-          "shadow-lg overflow-hidden",
+          "shadow-lg overflow-hidden ",
           // micro-animación respetando preferencias de movimiento
           "motion-safe:data-[state=open]:animate-[scaleIn_120ms_ease-out] motion-safe:data-[state=closed]:animate-[fadeOut_90ms_ease-in]",
           className

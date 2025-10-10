@@ -5,53 +5,56 @@ import type { ToothDx } from "../lib/types";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
 import { CheckboxRoot } from "./ui/Checkbox";
-import { X, Check, AlertCircle } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { cn } from "../lib/cn";
 
 const DIAG_LIST = [
-  { id: "Caries", label: "Caries", color: "danger" },
-  { id: "Gingivitis", label: "Gingivitis", color: "warning" },
-  { id: "Fractura", label: "Fractura", color: "danger" },
-  { id: "Pérdida", label: "Pérdida", color: "default" },
-  { id: "Obturación", label: "Obturación", color: "info" },
+  { id: "Caries", label: "Caries", color: "success" },
+  { id: "Gingivitis", label: "Gingivitis", color: "success" },
+  { id: "Fractura", label: "Fractura", color: "success" },
+  { id: "Pérdida", label: "Pérdida", color: "success" },
+  { id: "Obturación", label: "Obturación", color: "success" },
   { id: "Endodoncia", label: "Endodoncia", color: "success" },
 ] as const;
 
-type Props = { 
-  value: ToothDx; 
-  onChange: (next: ToothDx) => void; 
+type Props = {
+  value: ToothDx;
+  onChange: (next: ToothDx) => void;
 };
 
 export default function Odontogram({ value, onChange }: Props) {
   const [openTooth, setOpenTooth] = useState<string | null>(null);
 
-  const arches = useMemo(() => ([
-    { 
-      title: "Cuadrante Superior Derecho", 
-      range: "18 → 11",
-      teeth: Array.from({length: 8}, (_, i) => (18 - i).toString()) 
-    },
-    { 
-      title: "Cuadrante Superior Izquierdo", 
-      range: "21 → 28",
-      teeth: Array.from({length: 8}, (_, i) => (21 + i).toString()) 
-    },
-    { 
-      title: "Cuadrante Inferior Izquierdo", 
-      range: "38 → 31",
-      teeth: Array.from({length: 8}, (_, i) => (38 - i).toString()) 
-    },
-    { 
-      title: "Cuadrante Inferior Derecho", 
-      range: "41 → 48",
-      teeth: Array.from({length: 8}, (_, i) => (41 + i).toString()) 
-    },
-  ]), []);
+  const arches = useMemo(
+    () => [
+      {
+        title: "Cuadrante Superior Derecho",
+        range: "18 → 11",
+        teeth: Array.from({ length: 8 }, (_, i) => (18 - i).toString()),
+      },
+      {
+        title: "Cuadrante Superior Izquierdo",
+        range: "21 → 28",
+        teeth: Array.from({ length: 8 }, (_, i) => (21 + i).toString()),
+      },
+      {
+        title: "Cuadrante Inferior Izquierdo",
+        range: "38 → 31",
+        teeth: Array.from({ length: 8 }, (_, i) => (38 - i).toString()),
+      },
+      {
+        title: "Cuadrante Inferior Derecho",
+        range: "41 → 48",
+        teeth: Array.from({ length: 8 }, (_, i) => (41 + i).toString()),
+      },
+    ],
+    []
+  );
 
   const toggleDx = (tooth: string, dx: string) => {
     const prev = value[tooth] || [];
     const exists = prev.includes(dx);
-    const nextList = exists ? prev.filter(d => d !== dx) : [...prev, dx];
+    const nextList = exists ? prev.filter((d) => d !== dx) : [...prev, dx];
     onChange({ ...value, [tooth]: nextList });
   };
 
@@ -65,103 +68,121 @@ export default function Odontogram({ value, onChange }: Props) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Resumen */}
-      <div className="flex items-center justify-between p-4 rounded-lg bg-[hsl(var(--muted))] border border-[hsl(var(--border))]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold">
+      <div className='flex items-center justify-between p-4 rounded-lg bg-[hsl(var(--muted))] border border-[hsl(var(--border))]'>
+        <div className='flex items-center gap-3'>
+          <div className='w-10 h-10 rounded-lg bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold'>
             {getDiagnosisCount()}
           </div>
           <div>
-            <div className="font-semibold text-[hsl(var(--foreground))]">
+            <div className='font-semibold text-[hsl(var(--foreground))]'>
               Diagnósticos registrados
             </div>
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">
-              {Object.keys(value).filter(k => value[k]?.length).length} piezas dentales afectadas
+            <div className='text-sm text-[hsl(var(--muted-foreground))]'>
+              {Object.keys(value).filter((k) => value[k]?.length).length} piezas
+              dentales afectadas
             </div>
           </div>
         </div>
-        
+
         {getDiagnosisCount() > 0 && (
           <Button 
             variant="ghost" 
             size="sm"
             onClick={() => onChange({})}
+            className="cursor-pointer border border-[hsl(var(--border))] hover:bg-[hsl(var(--surface))]"
           >
             <X size={14} />
             Limpiar todo
           </Button>
         )}
+        
       </div>
 
       {/* Odontograma por cuadrantes */}
-      {arches.map(arch => {
-        const affectedTeeth = arch.teeth.filter(n => (value[n] || []).length > 0);
-        
-        return (
-          <div key={arch.title} className="card p-4">
-            {/* Header del cuadrante */}
-            <div className="flex items-center justify-between mb-3 pb-3 border-b border-[hsl(var(--border))]">
-              <div>
-                <h3 className="font-semibold text-[hsl(var(--foreground))]">
-                  {arch.title}
-                </h3>
-                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
-                  Piezas {arch.range}
-                </p>
-              </div>
-              {affectedTeeth.length > 0 && (
-                <Badge variant="info">
-                  {affectedTeeth.length} afectada{affectedTeeth.length !== 1 ? 's' : ''}
-                </Badge>
-              )}
-            </div>
 
-            {/* Grid de dientes */}
-            <div className="grid grid-cols-8 gap-2">
-              {arch.teeth.map(toothNum => {
-                const diagnoses = value[toothNum] || [];
-                const hasDiagnoses = diagnoses.length > 0;
-                const isOpen = openTooth === toothNum;
-                
-                return (
-                  <Popover.Root 
-                    key={toothNum} 
-                    open={isOpen}
-                    onOpenChange={(open) => setOpenTooth(open ? toothNum : null)}
-                  >
-                    <Popover.Trigger asChild>
-                      <button
-                        type="button"
-                        className={cn(
-                          "relative h-14 rounded-lg text-center border-2 transition-all",
-                          "flex flex-col items-center justify-center gap-1",
-                          "hover:scale-105 hover:shadow-md",
-                          "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))] focus:ring-offset-2",
-                          hasDiagnoses
-                            ? "border-[hsl(var(--brand))] bg-[color-mix(in_oklab,hsl(var(--brand))_15%,transparent)] font-semibold"
-                            : "border-[hsl(var(--border))] bg-[hsl(var(--surface))] hover:border-[hsl(var(--brand))]"
-                        )}
-                        title={hasDiagnoses ? `Diente ${toothNum}: ${diagnoses.join(", ")}` : `Diente ${toothNum}`}
-                      >
-                        <span className={cn(
-                          "text-sm font-bold",
-                          hasDiagnoses ? "text-[hsl(var(--brand))]" : "text-[hsl(var(--foreground))]"
-                        )}>
-                          {toothNum}
-                        </span>
-                        {hasDiagnoses && (
-                          <div className="flex gap-0.5">
-                            {diagnoses.slice(0, 3).map((_, i) => (
-                              <div 
-                                key={i}
-                                className="w-1 h-1 rounded-full bg-[hsl(var(--brand))]"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </button>
-                    </Popover.Trigger>
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+        {arches.map((arch) => {
+          const affectedTeeth = arch.teeth.filter(
+            (n) => (value[n] || []).length > 0
+          );
+
+          return (
+            <div key={arch.title} className='card p-3 sm:p-4'>
+              {/* Header del cuadrante (compacto) */}
+              <div className='flex items-center justify-between mb-2 pb-2 border-b border-[hsl(var(--border))]'>
+                <div>
+                  <h3 className='font-semibold text-sm text-[hsl(var(--foreground))]'>
+                    {arch.title}
+                  </h3>
+                  <p className='text-[10px] text-[hsl(var(--muted-foreground))] mt-0.5'>
+                    Piezas {arch.range}
+                  </p>
+                </div>
+                {affectedTeeth.length > 0 && (
+                  <Badge variant='info'>
+                    {affectedTeeth.length} afectada
+                    {affectedTeeth.length !== 1 ? "s" : ""}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Grid de dientes (ligeramente más compacto) */}
+              <div className='grid grid-cols-8 gap-2 '>
+                {arch.teeth.map((toothNum) => {
+                  const diagnoses = value[toothNum] || [];
+                  const hasDiagnoses = diagnoses.length > 0;
+                  const isOpen = openTooth === toothNum;
+
+                  return (
+                    <Popover.Root
+                      key={toothNum}
+                      open={isOpen}
+                      onOpenChange={(open) =>
+                        setOpenTooth(open ? toothNum : null)
+                      }
+                    >
+                      <Popover.Trigger asChild>
+                        <button
+                          type='button'
+                          className={cn(
+                            "relative h-12 rounded-lg text-center border-2 transition-all",
+                            "flex flex-col items-center justify-center gap-1",
+                            "hover:scale-105 hover:shadow-md cursor-pointer",
+                            "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))] focus:ring-offset-2",
+                            hasDiagnoses
+                              ? "border-[hsl(var(--brand))] bg-[color-mix(in_oklab,hsl(var(--brand))_15%,transparent)] font-semibold"
+                              : "border-[hsl(var(--border))] bg-[hsl(var(--surface))] hover:border-[hsl(var(--brand))]"
+                          )}
+                          title={
+                            hasDiagnoses
+                              ? `Diente ${toothNum}: ${diagnoses.join(", ")}`
+                              : `Diente ${toothNum}`
+                          }
+                        >
+                          <span
+                            className={cn(
+                              "text-[11px] font-bold leading-none",
+                              hasDiagnoses
+                                ? "text-[hsl(var(--brand))]"
+                                : "text-[hsl(var(--foreground))]"
+                            )}
+                          >
+                            {toothNum}
+                          </span>
+                          {hasDiagnoses && (
+                            <div className='flex gap-0.5'>
+                              {diagnoses.slice(0, 3).map((_, i) => (
+                                <div
+                                  key={i}
+                                  className='w-1 h-1 rounded-full bg-[hsl(var(--brand))]'
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      </Popover.Trigger>
 
                     <Popover.Portal>
                       <Popover.Content
@@ -173,7 +194,7 @@ export default function Odontogram({ value, onChange }: Props) {
                           "rounded-lg border border-[hsl(var(--border))]",
                           "bg-[hsl(var(--surface))] shadow-lg",
                           "w-[320px] p-4 z-50",
-                          "data-[state=open]:animate-[scaleIn_150ms_ease-out]"
+                          "data-[state=open]:animate-[scaleIn_150ms_ease-out] "
                         )}
                       >
                         {/* Header */}
@@ -258,37 +279,13 @@ export default function Odontogram({ value, onChange }: Props) {
                         <Popover.Arrow className="fill-[hsl(var(--border))]" />
                       </Popover.Content>
                     </Popover.Portal>
-                  </Popover.Root>
-                );
-              })}
+                    </Popover.Root>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
-
-      {/* Leyenda */}
-      <div className="p-4 rounded-lg bg-[hsl(var(--muted))] border border-[hsl(var(--border))]">
-        <div className="flex items-start gap-2 mb-2">
-          <AlertCircle size={16} className="text-[hsl(var(--brand))] mt-0.5 flex-shrink-0" />
-          <div>
-            <div className="font-semibold text-sm mb-1">Leyenda de diagnósticos</div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-              {DIAG_LIST.map(diag => (
-                <div key={diag.id} className="flex items-center gap-2">
-                  <div className={cn(
-                    "w-3 h-3 rounded-full",
-                    diag.color === 'danger' && "bg-red-500",
-                    diag.color === 'warning' && "bg-yellow-500",
-                    diag.color === 'success' && "bg-green-500",
-                    diag.color === 'info' && "bg-blue-500",
-                    diag.color === 'default' && "bg-[hsl(var(--muted-foreground))]"
-                  )} />
-                  <span className="text-[hsl(var(--foreground))]">{diag.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
     </div>
   );
