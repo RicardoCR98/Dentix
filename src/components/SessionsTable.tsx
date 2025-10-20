@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Trash2,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import type { SessionRow, ProcItem } from "../lib/types";
@@ -65,8 +66,6 @@ export default function SessionsTable({
   const [internalActiveId, setInternalActiveId] = useState<string | null>(null);
   const currentActiveId = activeId ?? internalActiveId;
 
-  // Mantengo el colapsable de “procedimientos” por fila (independiente de expandir card)
-  const [expandedProcs, setExpandedProcs] = useState<Set<string>>(new Set());
 
   // Orden y paginado
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // desc = más reciente primero
@@ -81,6 +80,7 @@ export default function SessionsTable({
 
   const newRow = (): SessionRow => {
     const baseItems: ProcItem[] = DEFAULT_PROCS.map((name) => ({
+      id: crypto.randomUUID(),
       name,
       unit: 0,
       qty: 0,
@@ -93,6 +93,7 @@ export default function SessionsTable({
       items: baseItems,
       auto: true,
       budget: 0,
+      discount: 0,
       payment: 0,
       balance: 0,
       signer: "",
@@ -142,15 +143,6 @@ export default function SessionsTable({
 
   // —— Ya no se elimina por requerimiento legal; quitamos UI de borrado —— //
 
-  const toggleProcs = (id: string) => {
-    setExpandedProcs((prev) => {
-      const next = new Set(prev);
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
   // Recalcular montos (no toca fecha)
   const recalcRow = (idxOriginal: number, mutate?: (r: SessionRow) => void) => {
     const next = [...sessions];
@@ -162,8 +154,9 @@ export default function SessionsTable({
     }));
     const totalProcs = r.items.reduce((sum, it) => sum + it.sub, 0);
     r.budget = r.auto ? totalProcs : toInt(r.budget);
-    r.payment = Math.min(toInt(r.payment), r.budget);
-    r.balance = Math.max(r.budget - r.payment, 0);
+    const maxPayment = Math.max(r.budget - toInt(r.discount), 0);
+    r.payment = Math.min(toInt(r.payment), maxPayment);
+    r.balance = Math.max(r.budget - toInt(r.discount) - r.payment, 0);
     next[idxOriginal] = r;
     onSessionsChange(next);
   };
@@ -186,6 +179,31 @@ export default function SessionsTable({
       return;
     }
     setInternalActiveId((cur) => (cur === id ? null : id));
+  };
+
+  // Agregar un procedimiento vacío a una sesión
+  const addProcedure = (idxOriginal: number) => {
+    const next = [...sessions];
+    const r = { ...next[idxOriginal] };
+    r.items = [
+      ...r.items,
+      {
+        id: crypto.randomUUID(),
+        name: "",
+        unit: 0,
+        qty: 0,
+        sub: 0,
+      },
+    ];
+    next[idxOriginal] = r;
+    onSessionsChange(next);
+  };
+
+  // Eliminar un procedimiento de una sesión
+  const removeProcedure = (idxOriginal: number, procId: string) => {
+    recalcRow(idxOriginal, (r) => {
+      r.items = r.items.filter((it) => it.id !== procId);
+    });
   };
 
   return (
@@ -236,7 +254,6 @@ export default function SessionsTable({
         <div className="space-y-3">
           {visibleSessions.map((row) => {
             const isExpanded = currentActiveId === row.id;
-            const isProcsExpanded = expandedProcs.has(row.id!);
             const activeProcs = row.items.filter((it) => it.qty > 0);
             const totalProcs = row.items.reduce((sum, it) => sum + it.sub, 0);
 
@@ -249,12 +266,15 @@ export default function SessionsTable({
               <div
                 key={row.id}
                 className={cn(
-                  "card p-4 pt-6 hover:border-[hsl(var(--brand))]",
-                  isExpanded && "ring-1 ring-[hsl(var(--brand))]"
+                  "card p-4 pt-6 hover:border-[hsl(var(--brand))] transition-all",
+                  isExpanded && "ring-2 ring-[hsl(var(--brand))]"
                 )}
               >
-                {/* Resumen */}
-                <div className="flex items-center justify-between gap-4 mb-3">
+                {/* Resumen - CLICKEABLE para expandir/colapsar */}
+                <div
+                  className="flex items-center justify-between gap-4 mb-3 cursor-pointer"
+                  onClick={() => handleToggleRow(row.id!)}
+                >
                   <div className="flex w-full items-center justify-between gap-4 flex-wrap sm:flex-nowrap text-center">
                     <div className="w-10 h-10 rounded-lg bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold shrink-0">
                       {displayIndex}
@@ -335,7 +355,10 @@ export default function SessionsTable({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleToggleRow(row.id!)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleRow(row.id!);
+                      }}
                       title={isExpanded ? "Contraer" : "Expandir"}
                     >
                       {isExpanded ? (
@@ -345,12 +368,15 @@ export default function SessionsTable({
                       )}
                     </Button>
 
-                    {/* NUEVO — Ver sesión en modo lectura */}
+                    {/* Ver sesión en modo lectura */}
                     <Button
                       variant="ghost"
                       size="sm"
                       title="Ver esta sesión (solo lectura)"
-                      onClick={() => onViewReadOnly?.(row.id!, row.visitId)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewReadOnly?.(row.id!, row.visitId);
+                      }}
                     >
                       <Eye size={16} />
                     </Button>
@@ -360,170 +386,203 @@ export default function SessionsTable({
                 {/* Detalles expandidos */}
                 {isExpanded && (
                   <div className="pt-3 mt-3 border-t border-[hsl(var(--border))] space-y-4">
-                    {/* Procedimientos */}
+                    {/* Tabla de Procedimientos - SIEMPRE VISIBLE cuando expandido */}
                     <div className="space-y-3">
-                      <button
-                        onClick={() => toggleProcs(row.id!)}
-                        className="w-full flex items-center justify-between rounded-md dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
-                      >
-                        <h4 className="font-semibold p-3 flex items-center gap-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold flex items-center gap-2">
                           <FileText size={18} className="text-[hsl(var(--brand))]" />
                           Procedimientos realizados
                         </h4>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => addProcedure(idxReal)}
+                        >
+                          <Plus size={16} />
+                          Agregar procedimiento
+                        </Button>
+                      </div>
 
-                        {isProcsExpanded ? (
-                          <ChevronUp
-                            size={18}
-                            className="text-blue-600 dark:text-blue-400 me-2"
-                          />
-                        ) : (
-                          <ChevronDown
-                            size={18}
-                            className="text-blue-600 dark:text-blue-400 me-2"
-                          />
-                        )}
-                      </button>
+                      {/* Header de la tabla */}
+                      <div className="grid grid-cols-[1fr_0.4fr_0.4fr_100px_50px] gap-3 px-3 pb-2 mb-2 border-b-2 border-blue-200 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
+                        <div>Procedimiento</div>
+                        <div className="text-center">Precio Unit.</div>
+                        <div className="text-center">Cantidad</div>
+                        <div className="text-center">Subtotal</div>
+                        <div></div>
+                      </div>
 
-                      {isProcsExpanded && (
-                        <>
-                          <div className="grid grid-cols-[1fr_0.5fr_0.5fr_110px] gap-3 px-3 pb-2 mb-2 border-b-2 border-blue-200 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
-                            <div>Procedimiento</div>
-                            <div className="text-center">Precio Unit.</div>
-                            <div className="text-center">Cantidad</div>
-                            <div className="text-center">Subtotal</div>
+                      {/* Filas de procedimientos */}
+                      <div className="space-y-1">
+                        {row.items.map((item, itemIdx) => (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              "grid grid-cols-[1fr_0.4fr_0.4fr_100px_50px] gap-3 items-center p-2 rounded-md",
+                              item.qty > 0 && "bg-[hsl(var(--muted))]"
+                            )}
+                          >
+                            <Input
+                              type="text"
+                              value={item.name}
+                              onChange={(e) =>
+                                recalcRow(idxReal, (r) => {
+                                  r.items[itemIdx].name = e.target.value;
+                                })
+                              }
+                              placeholder="Nombre del procedimiento"
+                              className="h-9"
+                            />
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={item.unit || ""}
+                              onChange={(e) =>
+                                recalcRow(idxReal, (r) => {
+                                  r.items[itemIdx].unit = toInt(e.target.value);
+                                })
+                              }
+                              icon={<DollarSign size={14} />}
+                              className="h-9 text-center"
+                              placeholder="0"
+                            />
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={item.qty || ""}
+                              onChange={(e) =>
+                                recalcRow(idxReal, (r) => {
+                                  r.items[itemIdx].qty = toInt(e.target.value);
+                                })
+                              }
+                              className="h-9 text-center font-semibold"
+                              placeholder="0"
+                            />
+                            <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center">
+                              ${item.sub}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeProcedure(idxReal, item.id!)}
+                              title="Eliminar procedimiento"
+                              className="h-9 w-9 p-0 hover:bg-red-500/20 hover:text-red-600"
+                            >
+                              <Trash2 size={16} />
+                            </Button>
                           </div>
+                        ))}
+                      </div>
 
-                          <div className="space-y-1">
-                            {row.items.map((item, itemIdx) => (
-                              <div
-                                key={item.name}
-                                className={cn(
-                                  "grid grid-cols-[1fr_0.5fr_0.5fr_110px] gap-3 items-center p-2 rounded-md",
-                                  item.qty > 0 && "bg-[hsl(var(--muted))]"
-                                )}
-                              >
-                                <div className="text-sm font-medium">
-                                  {item.name}
-                                </div>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={1}
-                                  value={item.unit || ""}
-                                  onChange={(e) =>
-                                    recalcRow(idxReal, (r) => {
-                                      r.items[itemIdx].unit = toInt(e.target.value);
-                                    })
-                                  }
-                                  icon={<DollarSign size={14} />}
-                                  className="h-9 text-center"
-                                  placeholder="Precio"
-                                />
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={1}
-                                  value={item.qty || ""}
-                                  onChange={(e) =>
-                                    recalcRow(idxReal, (r) => {
-                                      r.items[itemIdx].qty = toInt(e.target.value);
-                                    })
-                                  }
-                                  className="h-9 text-center font-semibold"
-                                  placeholder="Cantidad"
-                                />
-                                <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center">
-                                  ${item.sub}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex justify-between items-center mt-3 pt-3 pe-9 border-t border-dashed border-[hsl(var(--border))]">
-                            <span className="font-semibold">
-                              Total de procedimientos
-                            </span>
-                            <span className="font-bold text-lg px-3 py-1 rounded-md dark:bg-amber-500/20 dark:ring-amber-400/40">
-                              ${totalProcs}
-                            </span>
-                          </div>
-                        </>
-                      )}
+                      {/* Total de procedimientos */}
+                      <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed border-[hsl(var(--border))]">
+                        <span className="font-semibold">
+                          Total de procedimientos
+                        </span>
+                        <span className="font-bold text-lg px-3 py-1 rounded-md bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
+                          ${totalProcs}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Pagos */}
-                    <div className="grid md:grid-cols-3 gap-15">
-                      <div className="flex items-center gap-3 whitespace-nowrap">
+                    {/* Resumen financiero */}
+                    <div className="bg-[hsl(var(--muted))] p-4 rounded-lg space-y-3">
+                      <h4 className="font-semibold text-sm">Resumen financiero</h4>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {/* Presupuesto */}
+                        <div className="flex items-center gap-3">
+                          <Input
+                            label="Presupuesto total"
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={row.budget}
+                            onChange={(e) =>
+                              recalcRow(idxReal, (r) => {
+                                r.auto = false;
+                                r.budget = toInt(e.target.value);
+                              })
+                            }
+                            disabled={row.auto}
+                            icon={<DollarSign size={14} />}
+                            className="h-9"
+                          />
+                          <label className="inline-flex items-center gap-2 pt-6">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 align-middle"
+                              checked={row.auto}
+                              onChange={(e) =>
+                                recalcRow(idxReal, (r) => {
+                                  r.auto = e.target.checked;
+                                })
+                              }
+                            />
+                            <span className="text-sm leading-none whitespace-nowrap">
+                              Auto
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Descuento */}
                         <Input
-                          label="Presupuesto total"
+                          label="Descuento"
                           type="number"
                           min={0}
                           step={1}
-                          value={row.budget}
+                          value={row.discount || ""}
                           onChange={(e) =>
                             recalcRow(idxReal, (r) => {
-                              r.auto = false;
-                              r.budget = toInt(e.target.value);
+                              r.discount = toInt(e.target.value);
                             })
                           }
-                          disabled={row.auto}
                           icon={<DollarSign size={14} />}
-                          className="h-9"
+                          placeholder="0"
                         />
 
-                        <label className="inline-flex items-center gap-2 pt-6">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 align-middle"
-                            checked={row.auto}
-                            onChange={(e) =>
-                              recalcRow(idxReal, (r) => {
-                                r.auto = e.target.checked;
-                              })
-                            }
-                          />
-                          <span className="text-sm leading-none">
-                            Auto-calcular
-                          </span>
-                        </label>
+                        {/* Abono */}
+                        <Input
+                          label="Abono realizado"
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={row.payment || ""}
+                          onChange={(e) =>
+                            recalcRow(idxReal, (r) => {
+                              r.payment = toInt(e.target.value);
+                            })
+                          }
+                          icon={<DollarSign size={14} />}
+                          placeholder="0"
+                        />
+
+                        {/* Saldo */}
+                        <Input
+                          label="Saldo pendiente"
+                          type="number"
+                          value={row.balance}
+                          readOnly
+                          className="bg-[hsl(var(--surface))] cursor-not-allowed font-bold"
+                          icon={<DollarSign size={14} />}
+                        />
                       </div>
 
+                      {/* Firma */}
                       <Input
-                        label="Abono realizado"
-                        type="number"
-                        min={0}
-                        max={row.budget}
-                        step={1}
-                        value={row.payment || ""}
+                        label="Firma del responsable"
+                        type="text"
+                        value={row.signer || ""}
                         onChange={(e) =>
                           recalcRow(idxReal, (r) => {
-                            r.payment = toInt(e.target.value);
+                            r.signer = e.target.value;
                           })
                         }
-                        icon={<DollarSign size={14} />}
-                      />
-
-                      <Input
-                        label="Saldo pendiente"
-                        type="number"
-                        value={row.balance}
-                        readOnly
-                        className="bg-[hsl(var(--muted))] cursor-not-allowed"
-                        icon={<DollarSign size={14} />}
+                        placeholder="Nombre de quien firma"
                       />
                     </div>
-
-                    {/* Firma */}
-                    <Input
-                      label="Firma del responsable"
-                      type="text"
-                      value={row.signer || ""}
-                      onChange={(e) =>
-                        recalcRow(idxReal, (r) => {
-                          r.signer = e.target.value;
-                        })
-                      }
-                      placeholder="Nombre de quien firma"
-                    />
                   </div>
                 )}
               </div>
