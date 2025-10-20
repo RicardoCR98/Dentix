@@ -82,14 +82,30 @@ export default function SessionsTable({
     return { p, a, s };
   }, [sessions]);
 
-  const newRow = (): SessionRow => {
-    const baseItems: ProcItem[] = DEFAULT_PROCS.map((name) => ({
-      id: crypto.randomUUID(),
-      name,
-      unit: 0,
-      qty: 0,
-      sub: 0,
-    }));
+  const newRow = (templateItems?: ProcItem[]): SessionRow => {
+    let baseItems: ProcItem[];
+
+    if (templateItems && templateItems.length > 0) {
+      // Copiar procedimientos de la sesión anterior
+      // Mantener nombres y precios, pero resetear cantidad a 0
+      baseItems = templateItems.map((item) => ({
+        id: crypto.randomUUID(),
+        name: item.name,
+        unit: item.unit, // Mantener precio
+        qty: 0,         // Resetear cantidad
+        sub: 0,
+      }));
+    } else {
+      // Usar procedimientos por defecto
+      baseItems = DEFAULT_PROCS.map((name) => ({
+        id: crypto.randomUUID(),
+        name,
+        unit: 0,
+        qty: 0,
+        sub: 0,
+      }));
+    }
+
     const today = new Date().toISOString().slice(0, 10);
     return {
       id: crypto.randomUUID(),
@@ -126,7 +142,13 @@ export default function SessionsTable({
 
   // Agregar: respeta orden, y deja la NUEVA como activa
   const addRow = () => {
-    const row = newRow();
+    // Buscar la última sesión guardada (la más reciente con visitId)
+    const savedSessions = sessions.filter((s) => s.visitId);
+    const lastSession = savedSessions.length > 0 ? savedSessions[0] : null;
+
+    // Crear nueva sesión copiando procedimientos de la última
+    const row = lastSession ? newRow(lastSession.items) : newRow();
+
     let next: SessionRow[];
     if (sortOrder === "desc") next = [row, ...sessions]; // nueva arriba
     else next = [...sessions, row]; // nueva abajo
