@@ -50,12 +50,7 @@ import type {
 } from "./lib/types";
 import ThemePanel from "./components/ThemePanel";
 import { getRepository } from "./lib/storage/TauriSqliteRepository";
-import {
-  saveAttachmentFile,
-  resolveAttachmentPath,
-  openWithOS,
-  revealInOS,
-} from "./lib/files/attachments";
+import { saveAttachmentFile } from "./lib/files/attachments";
 
 // -------- Estados iniciales --------
 const initialPatient: Patient = {
@@ -85,19 +80,6 @@ export default function App() {
   // adjuntos NUEVOS a guardar
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
 
-  // adjuntos de la visita histórica (solo lectura, con ruta)
-  const [historicalAttachments, setHistoricalAttachments] = useState<
-    {
-      id: number;
-      filename: string;
-      storage_key: string;
-      mime_type: string;
-      bytes: number;
-      created_at: string;
-      absPath: string;
-    }[]
-  >([]);
-
   // diálogos / datos auxiliares
   const [showSaveAlert, setShowSaveAlert] = useState(false);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
@@ -109,18 +91,6 @@ export default function App() {
   const [patientSessionsMap, setPatientSessionsMap] = useState<
     Record<number, SessionRow[]>
   >({});
-
-  // —— Modo (timeline vs visita) para sesiones —— //
-  const [sessionsViewMode, setSessionsViewMode] = useState<
-    "timeline" | "visit"
-  >("timeline");
-  const [selectedVisitId, setSelectedVisitId] = useState<number | null>(null);
-
-  // —— Modo histórico (solo lectura total) —— //
-  const [historicalMode, setHistoricalMode] = useState(false);
-  const [historicalVisitId, setHistoricalVisitId] = useState<number | null>(
-    null
-  );
 
   // ---------- Diagnóstico generado desde el odontograma ----------
   const diagnosisFromTeeth = useMemo(() => {
@@ -158,26 +128,13 @@ export default function App() {
     setManualDiagnosis("");
     setSessions([]);
     setAttachments([]);
-    setHistoricalAttachments([]);
     setShowSaveAlert(false);
-
-    setSessionsViewMode("timeline");
-    setSelectedVisitId(null);
-    setHistoricalMode(false);
-    setHistoricalVisitId(null);
   }, []);
 
   const handlePreview = useCallback(() => window.print(), []);
 
   // ---------- Guardar ----------
   const handleSave = useCallback(async () => {
-    if (historicalMode) {
-      alert(
-        "Estás viendo un histórico (solo lectura). Vuelve a edición para guardar cambios."
-      );
-      return;
-    }
-
     const hasPatientData = Boolean(patient.full_name && patient.doc_id);
     if (!hasPatientData) {
       alert("Completa al menos nombre y cédula del paciente para guardar.");
@@ -231,13 +188,10 @@ export default function App() {
       setPatient((prev) => ({ ...prev, id: patientId }));
       setVisit((prev) => ({ ...prev, id: visitId, patient_id: patientId }));
 
-      if (sessionsViewMode === "visit" && patientId) {
-        const allSess = await (
-          await getRepository()
-        ).getSessionsByPatient(patientId);
+      // Recargar todas las sesiones del paciente para actualizar
+      if (patientId) {
+        const allSess = await (await getRepository()).getSessionsByPatient(patientId);
         setSessions(allSess);
-        setSessionsViewMode("timeline");
-        setSelectedVisitId(null);
       }
 
       setShowSaveAlert(true);
@@ -247,7 +201,6 @@ export default function App() {
       alert("Error al guardar la historia clínica.");
     }
   }, [
-    historicalMode,
     patient,
     visit,
     toothDx,
@@ -256,7 +209,6 @@ export default function App() {
     diagnosisFromTeeth,
     manualDiagnosis,
     attachments,
-    sessionsViewMode,
   ]);
 
   // ---------- Seleccionar paciente ----------
@@ -298,103 +250,6 @@ export default function App() {
     setSessions(allSess);
 
     setAttachments([]);
-    setHistoricalAttachments([]);
-    setSessionsViewMode("timeline");
-    setSelectedVisitId(null);
-    setHistoricalMode(false);
-    setHistoricalVisitId(null);
-  }, []);
-
-  // ---------- Ver visita desde Histórico ----------
-  const viewVisitFromHistory = useCallback(
-    async (visitId: number) => {
-      if (!patient?.id) return;
-      const repo = await getRepository();
-
-      const v = await repo.getVisitDetail(visitId);
-      const parsedTooth = v.tooth_dx_json
-        ? (JSON.parse(v.tooth_dx_json) as ToothDx)
-        : undefined;
-
-      setVisit({
-        id: v.id,
-        patient_id: v.patient_id,
-        date: v.date,
-        reasonType: (v.reason_type as Visit["reasonType"]) ?? undefined,
-        reasonDetail: v.reason_detail ?? "",
-        diagnosis: v.full_dx_text ?? v.diagnosis ?? "",
-        toothDx: parsedTooth,
-      });
-
-      const sess = await repo.getSessionsByVisit(visitId);
-      setSessions(sess);
-
-      const atts = await repo.getAttachmentsByVisit(visitId);
-      // resolver rutas absolutas
-      const enriched = await Promise.all(
-        atts.map(async (a) => ({
-          id: a.id,
-          filename: a.filename,
-          storage_key: a.storage_key,
-          mime_type: a.mime_type,
-          bytes: a.bytes,
-          created_at: a.created_at,
-          absPath: await resolveAttachmentPath(a.storage_key),
-        }))
-      );
-      setHistoricalAttachments(enriched);
-
-      setToothDx(parsedTooth || {});
-      setSessionsViewMode("visit");
-      setSelectedVisitId(visitId);
-      setHistoryOpen(false);
-
-      setHistoricalMode(true);
-      setHistoricalVisitId(visitId);
-
-      setAttachments([]);
-    },
-    [patient?.id]
-  );
-
-  const backToTimeline = useCallback(async () => {
-    if (!patient?.id) return;
-    const repo = await getRepository();
-    const allSess = await repo.getSessionsByPatient(patient.id);
-    setSessions(allSess);
-    setSessionsViewMode("timeline");
-    setSelectedVisitId(null);
-
-    setHistoricalMode(false);
-    setHistoricalVisitId(null);
-    setHistoricalAttachments([]);
-  }, [patient?.id]);
-
-  const copyOdontogramFromVisit = useCallback(async (visitId: number) => {
-    const repo = await getRepository();
-    const v = await repo.getVisitDetail(visitId);
-    const parsed = v.tooth_dx_json
-      ? (JSON.parse(v.tooth_dx_json) as ToothDx)
-      : {};
-    const today = new Date().toISOString().slice(0, 10);
-
-    setVisit({
-      date: today,
-      reasonType: undefined,
-      reasonDetail: "",
-      diagnosis: "",
-      toothDx: parsed,
-    });
-    setToothDx(parsed);
-    setSessions([]);
-    setAttachments([]);
-    setHistoricalAttachments([]);
-
-    setHistoricalMode(false);
-    setHistoricalVisitId(null);
-
-    setSessionsViewMode("timeline");
-    setSelectedVisitId(null);
   }, []);
 
   // ---------- Diálogos ----------
@@ -456,11 +311,7 @@ export default function App() {
 
   // ---------- Flags UI ----------
   const hasPatientData = Boolean(patient.full_name && patient.doc_id);
-  const canSave = hasPatientData && !historicalMode;
-
-  const readOnlyCls = historicalMode
-    ? "pointer-events-none opacity-70 select-none"
-    : "";
+  const canSave = hasPatientData;
 
   return (
     <Layout
@@ -487,38 +338,6 @@ export default function App() {
         patientSessions={patientSessionsMap}
         onSelectPatient={handleSelectPatient}
       />
-      {/* Banner histórico */}
-      {historicalMode && (
-        <div className='mb-4'>
-          <Alert
-            variant='warning'
-            title='Estás viendo un histórico (solo lectura)'
-          >
-            Estás consultando la visita #{historicalVisitId}. Puedes volver a
-            edición o usar este histórico como base para una nueva visita.
-            <div className='mt-3 flex gap-2'>
-              <Button
-                variant='secondary'
-                onClick={backToTimeline}
-                title='Volver a sesiones del paciente'
-              >
-                <ArrowLeft size={16} />
-                Volver a edición
-              </Button>
-
-              {historicalVisitId && (
-                <Button
-                  variant='primary'
-                  onClick={() => copyOdontogramFromVisit(historicalVisitId)}
-                  title='Crear nueva visita para hoy usando este odontograma'
-                >
-                  Usar como base (odontograma)
-                </Button>
-              )}
-            </div>
-          </Alert>
-        </div>
-      )}
       {showSaveAlert && (
         <div className='mb-6'>
           <Alert variant='success' title='¡Guardado exitoso!'>
@@ -592,10 +411,8 @@ export default function App() {
       </Section>
       {/* Datos del paciente */}
       <Section title='Datos del Paciente' icon={<User size={20} />}>
-        <div className={readOnlyCls}>
-          <PatientForm value={patient} onChange={setPatient} />
-        </div>
-        {!hasPatientData && !historicalMode && (
+        <PatientForm value={patient} onChange={setPatient} />
+        {!hasPatientData && (
           <Alert variant='warning' className='mt-4'>
             Por favor completa al menos el nombre y cédula del paciente para
             poder guardar.
@@ -604,7 +421,7 @@ export default function App() {
       </Section>
       {/* Motivo */}
       <Section title='Motivo de Consulta' icon={<Stethoscope size={20} />}>
-        <div className={"grid mb-4 " + readOnlyCls}>
+        <div className="grid mb-4">
           <div>
             <Label required>Tipo de consulta</Label>
             <SelectRoot
@@ -615,7 +432,6 @@ export default function App() {
                   reasonType: v as Visit["reasonType"],
                 }))
               }
-              disabled={historicalMode as unknown as boolean}
             >
               <SelectTrigger />
               <SelectContent>
@@ -629,24 +445,19 @@ export default function App() {
           </div>
         </div>
 
-        <div className={readOnlyCls}>
-          <Textarea
-            label='Descripción detallada'
-            value={visit.reasonDetail || ""}
-            onChange={(e) =>
-              setVisit((v) => ({ ...v, reasonDetail: e.target.value }))
-            }
-            placeholder='Describe el motivo de la consulta, síntomas, duración, etc.'
-            className='min-h-[100px]'
-            disabled={historicalMode}
-          />
-        </div>
+        <Textarea
+          label='Descripción detallada'
+          value={visit.reasonDetail || ""}
+          onChange={(e) =>
+            setVisit((v) => ({ ...v, reasonDetail: e.target.value }))
+          }
+          placeholder='Describe el motivo de la consulta, síntomas, duración, etc.'
+          className='min-h-[100px]'
+        />
       </Section>
       {/* Odontograma */}
       <Section title='Odontograma por Cuadrantes' icon={<Activity size={20} />}>
-        <div className={readOnlyCls}>
-          <Odontogram value={toothDx} onChange={onToothDxChange} />
-        </div>
+        <Odontogram value={toothDx} onChange={onToothDxChange} />
         <div className='mt-4 p-4 bg-[hsl(var(--muted))] rounded-lg'>
           <p className='text-sm text-[hsl(var(--muted-foreground))] flex items-center gap-2'>
             <FileText size={14} />
@@ -672,13 +483,11 @@ export default function App() {
           </Alert>
         )}
 
-        <div className={readOnlyCls}>
-          <DiagnosisArea
-            value={manualDiagnosis}
-            onChange={setManualDiagnosis}
-            autoGenerated={Boolean(diagnosisFromTeeth)}
-          />
-        </div>
+        <DiagnosisArea
+          value={manualDiagnosis}
+          onChange={setManualDiagnosis}
+          autoGenerated={Boolean(diagnosisFromTeeth)}
+        />
 
         <div className='mt-3 p-3 bg-[hsl(var(--muted))] rounded text-sm text-[hsl(var(--muted-foreground))]'>
           <strong>💡 Nota:</strong> Al guardar, se combinarán las selecciones
@@ -688,112 +497,17 @@ export default function App() {
       </Section>
       {/* Evolución y procedimientos */}
       <Section title='Evolución y Procedimientos' icon={<Activity size={20} />}>
-        <div className='flex items-center justify-between mb-3'>
-          <div className='text-sm text-[hsl(var(--muted-foreground))]'>
-            {sessionsViewMode === "timeline" ? (
-              <span>
-                Mostrando: <b>todas</b> las sesiones del paciente
-              </span>
-            ) : (
-              <span>
-                Mostrando: sesiones de la <b>visita #{selectedVisitId}</b>
-              </span>
-            )}
-          </div>
-
-          <div className='flex gap-2'>
-            {sessionsViewMode === "visit" && (
-              <Button variant='secondary' size='sm' onClick={backToTimeline}>
-                <ArrowLeft size={14} />
-                Volver a sesiones (todas)
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className={readOnlyCls}>
-          <SessionsTable
-            sessions={sessions}
-            onSessionsChange={historicalMode ? () => {} : setSessions}
-            onOpenSession={(id) => {
-              // si quieres marcarla visualmente como activa (controlado),
-              // guarda el id en un estado y pásalo a activeId
-              // setActiveSessionId(id);
-            }}
-            onViewReadOnly={async (_sessionId, visitId) => {
-              if (!visitId) {
-                alert("No encuentro la visita a la que pertenece esta sesión.");
-                return;
-              }
-              // Usa tu lógica existente para cargar visita en solo lectura:
-              await viewVisitFromHistory(visitId);
-            }}
-            // activeId={activeSessionId} // <- si decides controlar desde arriba
-          />
-        </div>
+        <SessionsTable
+          sessions={sessions}
+          onSessionsChange={setSessions}
+        />
       </Section>
       {/* Adjuntos */}
       <Section
         title='Adjuntos (Radiografías, Fotos, Documentos)'
         icon={<Paperclip size={20} />}
       >
-        {historicalMode ? (
-          <>
-            {historicalAttachments.length === 0 ? (
-              <Alert variant='info'>
-                Esta visita histórica no tiene adjuntos.
-              </Alert>
-            ) : (
-              <div className='space-y-2'>
-                <div className='text-sm text-[hsl(var(--muted-foreground))]'>
-                  Adjuntos guardados en esta visita (solo lectura):
-                </div>
-                <ul className='divide-y'>
-                  {historicalAttachments.map((a) => (
-                    <li
-                      key={a.id}
-                      className='py-2 flex items-center justify-between gap-3'
-                    >
-                      <div className='min-w-0'>
-                        <div className='font-medium text-sm truncate'>
-                          {a.filename}
-                        </div>
-                        <div className='text-xs text-[hsl(var(--muted-foreground))]'>
-                          {Math.round(a.bytes / 1024)} KB •{" "}
-                          {new Date(a.created_at).toLocaleString()}
-                        </div>
-                        <div className='text-[11px] mt-1 truncate'>
-                          <span className='opacity-70'>Ruta:</span> {a.absPath}
-                        </div>
-                      </div>
-                      <div className='flex gap-2 shrink-0'>
-                        <Button
-                          variant='secondary'
-                          size='sm'
-                          onClick={() => openWithOS(a.absPath)}
-                        >
-                          Abrir ubicación
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='sm'
-                          onClick={() => revealInOS(a.absPath)}
-                        >
-                          Mostrar carpeta
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <Alert variant='warning' className='mt-3'>
-              Estás en modo histórico: no puedes adjuntar ni eliminar archivos.
-            </Alert>
-          </>
-        ) : (
-          <Attachments files={attachments} onFilesChange={setAttachments} />
-        )}
+        <Attachments files={attachments} onFilesChange={setAttachments} />
       </Section>
       
       {/* Botonera final */}
@@ -811,7 +525,7 @@ export default function App() {
           variant='primary'
           size='lg'
           disabled={!canSave}
-          title={historicalMode ? "No disponible en modo histórico" : "Guardar"}
+          title="Guardar"
         >
           <Save size={18} />
           Guardar Historia
