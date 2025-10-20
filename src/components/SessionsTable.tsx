@@ -21,45 +21,29 @@ import {
   Save,
 } from "lucide-react";
 import { cn } from "../lib/cn";
-import type { SessionRow, ProcItem } from "../lib/types";
+import type { SessionRow, ProcItem, ProcedureTemplate } from "../lib/types";
 
 interface SessionsTableProps {
   sessions: SessionRow[];
   onSessionsChange: (sessions: SessionRow[]) => void;
+  procedureTemplates: ProcedureTemplate[];
+  onUpdateTemplates: (items: Array<{ name: string; unit: number }>) => Promise<void>;
 
   /** NUEVO — control externo de qué sesión está expandida (opcional) */
   activeId?: string | null;
   /** NUEVO — cuando el usuario abre una sesión (opcional) */
   onOpenSession?: (sessionId: string) => void;
-  /** NUEVO — al pulsar el “ojo” para ver en modo lectura (opcional) */
+  /** NUEVO — al pulsar el "ojo" para ver en modo lectura (opcional) */
   onViewReadOnly?: (sessionId: string, visitId?: number) => void;
 }
-
-const DEFAULT_PROCS = [
-  "Curación",
-  "Resinas simples",
-  "Resinas compuestas",
-  "Extracciones simples",
-  "Extracciones complejas",
-  "Correctivo inicial",
-  "Control mensual",
-  "Prótesis total",
-  "Prótesis removible",
-  "Prótesis fija",
-  "Retenedor",
-  "Endodoncia simple",
-  "Endodoncia compleja",
-  "Limpieza simple",
-  "Limpieza compleja",
-  "Reposición",
-  "Pegada",
-];
 
 const PAGE_SIZE = 5;
 
 export default function SessionsTable({
   sessions,
   onSessionsChange,
+  procedureTemplates,
+  onUpdateTemplates,
   activeId,
   onOpenSession,
   onViewReadOnly,
@@ -82,29 +66,15 @@ export default function SessionsTable({
     return { p, a, s };
   }, [sessions]);
 
-  const newRow = (templateItems?: ProcItem[]): SessionRow => {
-    let baseItems: ProcItem[];
-
-    if (templateItems && templateItems.length > 0) {
-      // Copiar procedimientos de la sesión anterior
-      // Mantener nombres y precios, pero resetear cantidad a 0
-      baseItems = templateItems.map((item) => ({
-        id: crypto.randomUUID(),
-        name: item.name,
-        unit: item.unit, // Mantener precio
-        qty: 0,         // Resetear cantidad
-        sub: 0,
-      }));
-    } else {
-      // Usar procedimientos por defecto
-      baseItems = DEFAULT_PROCS.map((name) => ({
-        id: crypto.randomUUID(),
-        name,
-        unit: 0,
-        qty: 0,
-        sub: 0,
-      }));
-    }
+  const newRow = (): SessionRow => {
+    // Usar plantilla global de procedimientos
+    const baseItems: ProcItem[] = procedureTemplates.map((template) => ({
+      id: crypto.randomUUID(),
+      name: template.name,
+      unit: template.default_price,
+      qty: 0,
+      sub: 0,
+    }));
 
     const today = new Date().toISOString().slice(0, 10);
     return {
@@ -142,12 +112,8 @@ export default function SessionsTable({
 
   // Agregar: respeta orden, y deja la NUEVA como activa
   const addRow = () => {
-    // Buscar la última sesión guardada (la más reciente con visitId)
-    const savedSessions = sessions.filter((s) => s.visitId);
-    const lastSession = savedSessions.length > 0 ? savedSessions[0] : null;
-
-    // Crear nueva sesión copiando procedimientos de la última
-    const row = lastSession ? newRow(lastSession.items) : newRow();
+    // Crear nueva sesión usando plantilla global
+    const row = newRow();
 
     let next: SessionRow[];
     if (sortOrder === "desc") next = [row, ...sessions]; // nueva arriba
@@ -238,7 +204,16 @@ export default function SessionsTable({
   };
 
   // Salir del modo edición de plantilla
-  const exitEditMode = () => {
+  const exitEditMode = async () => {
+    if (!editModeSessionId) return;
+
+    // Buscar la sesión que está en modo edición
+    const session = sessions.find((s) => s.id === editModeSessionId);
+    if (session) {
+      // Guardar los items de esta sesión como la nueva plantilla global
+      await onUpdateTemplates(session.items);
+    }
+
     setEditModeSessionId(null);
   };
 

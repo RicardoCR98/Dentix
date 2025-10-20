@@ -47,6 +47,7 @@ import type {
   Visit,
   ToothDx,
   SessionRow,
+  ProcedureTemplate,
 } from "./lib/types";
 import ThemePanel from "./components/ThemePanel";
 import { getRepository } from "./lib/storage/TauriSqliteRepository";
@@ -67,6 +68,27 @@ const initialVisit: Visit = {
   diagnosis: "",
 };
 
+// Procedimientos predefinidos por defecto (primera vez)
+const DEFAULT_PROCS = [
+  "Curación",
+  "Resinas simples",
+  "Resinas compuestas",
+  "Extracciones simples",
+  "Extracciones complejas",
+  "Correctivo inicial",
+  "Control mensual",
+  "Prótesis total",
+  "Prótesis removible",
+  "Prótesis fija",
+  "Retenedor",
+  "Endodoncia simple",
+  "Endodoncia compleja",
+  "Limpieza simple",
+  "Limpieza compleja",
+  "Reposición",
+  "Pegada",
+];
+
 export default function App() {
   // ficha + visita activa
   const [patient, setPatient] = useState<Patient>(initialPatient);
@@ -79,6 +101,9 @@ export default function App() {
 
   // adjuntos NUEVOS a guardar
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+
+  // plantilla global de procedimientos
+  const [procedureTemplates, setProcedureTemplates] = useState<ProcedureTemplate[]>([]);
 
   // diálogos / datos auxiliares
   const [showSaveAlert, setShowSaveAlert] = useState(false);
@@ -283,6 +308,46 @@ export default function App() {
       setPatientSessionsMap(map);
     })();
   }, [paymentsDialogOpen]);
+
+  // ---------- Cargar plantilla de procedimientos ----------
+  useEffect(() => {
+    (async () => {
+      const repo = await getRepository();
+      const templates = await repo.getProcedureTemplates();
+
+      if (templates.length === 0) {
+        // Primera vez: usar DEFAULT_PROCS
+        const defaultTemplates = DEFAULT_PROCS.map((name) => ({
+          name,
+          default_price: 0,
+        }));
+        await repo.saveProcedureTemplates(defaultTemplates);
+        // Recargar desde BD
+        const saved = await repo.getProcedureTemplates();
+        setProcedureTemplates(saved);
+      } else {
+        setProcedureTemplates(templates);
+      }
+    })();
+  }, []);
+
+  // Función para actualizar plantilla global
+  const updateProcedureTemplates = useCallback(
+    async (items: Array<{ name: string; unit: number }>) => {
+      const templates = items.map((it) => ({
+        name: it.name,
+        default_price: it.unit,
+      }));
+
+      const repo = await getRepository();
+      await repo.saveProcedureTemplates(templates);
+
+      // Recargar desde BD
+      const saved = await repo.getProcedureTemplates();
+      setProcedureTemplates(saved);
+    },
+    []
+  );
 
   // ---------- Atajos ----------
   useEffect(() => {
@@ -500,6 +565,8 @@ export default function App() {
         <SessionsTable
           sessions={sessions}
           onSessionsChange={setSessions}
+          procedureTemplates={procedureTemplates}
+          onUpdateTemplates={updateProcedureTemplates}
         />
       </Section>
       {/* Adjuntos */}
