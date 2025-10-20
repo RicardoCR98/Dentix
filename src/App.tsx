@@ -9,7 +9,6 @@ import SessionsTable from "./components/SessionsTable";
 import Attachments from "./components/Attachments";
 import PatientSearchDialog from "./components/PatientSearchDialog";
 import PendingPaymentsDialog from "./components/PendingPaymentsDialog";
-import VisitHistoryDrawer from "./components/VisitHistoryDrawer";
 import ShortcutsHelp from "./components/ShortcutsHelp";
 import {
   PopoverRoot,
@@ -38,7 +37,6 @@ import {
   Activity,
   Search,
   Wallet,
-  History,
   ArrowLeft,
   Info,
 } from "lucide-react";
@@ -104,7 +102,6 @@ export default function App() {
   const [showSaveAlert, setShowSaveAlert] = useState(false);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [paymentsDialogOpen, setPaymentsDialogOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const [patientsForDialogs, setPatientsForDialogs] = useState<
     Array<Patient & { id: number }>
@@ -395,7 +392,6 @@ export default function App() {
 
     setHistoricalMode(false);
     setHistoricalVisitId(null);
-    setHistoryOpen(false);
 
     setSessionsViewMode("timeline");
     setSelectedVisitId(null);
@@ -473,15 +469,6 @@ export default function App() {
       schedule='10:00 - 1:00 / 3:00 - 7:00'
       headerRight={
         <>
-          <Button
-            onClick={() => setHistoryOpen(true)}
-            variant='secondary'
-            size='sm'
-            className='me-2'
-          >
-            <History size={16} />
-            Histórico
-          </Button>
           <ThemePanel inlineTrigger />
         </>
       }
@@ -499,13 +486,6 @@ export default function App() {
         patients={patientsForDialogs}
         patientSessions={patientSessionsMap}
         onSelectPatient={handleSelectPatient}
-      />
-      <VisitHistoryDrawer
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        patientId={patient?.id ?? null}
-        onViewVisit={viewVisitFromHistory}
-        onUseOdontogram={copyOdontogramFromVisit}
       />
       {/* Banner histórico */}
       {historicalMode && (
@@ -571,41 +551,41 @@ export default function App() {
           </PopoverRoot>
         }
       >
-        <div className='flex flex-wrap gap-2 justify-center'>
-          <Button onClick={handleNew} variant='primary' size='md'>
-            <Plus size={16} />
+        <div className='flex flex-wrap gap-4 justify-center'>
+          <Button
+            onClick={handleNew}
+            variant='primary'
+            size='lg'
+            className='min-w-[180px] h-14 text-base font-semibold bg-green-600 hover:bg-green-700 text-white'
+          >
+            <Plus size={22} />
             Nueva historia
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={handlePreview}
             variant='secondary'
-            size='md'
-            disabled={!canSave}
-            title={
-              historicalMode ? "No disponible en modo histórico" : "Guardar"
-            }
+            size='lg'
+            className='min-w-[180px] h-14 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white'
           >
-            <Save size={16} />
-            Guardar
-          </Button>
-          <Button onClick={handlePreview} variant='ghost' size='md'>
-            <FileDown size={16} />
+            <FileDown size={22} />
             Vista previa/Imprimir
           </Button>
           <Button
             onClick={() => setSearchDialogOpen(true)}
             variant='secondary'
-            size='md'
+            size='lg'
+            className='min-w-[180px] h-14 text-base font-semibold bg-purple-600 hover:bg-purple-700 text-white'
           >
-            <Search size={16} />
+            <Search size={22} />
             Búsqueda de pacientes
           </Button>
           <Button
             onClick={() => setPaymentsDialogOpen(true)}
             variant='secondary'
-            size='md'
+            size='lg'
+            className='min-w-[180px] h-14 text-base font-semibold bg-orange-600 hover:bg-orange-700 text-white'
           >
-            <Wallet size={16} />
+            <Wallet size={22} />
             Cartera de pendientes
           </Button>
         </div>
@@ -728,14 +708,6 @@ export default function App() {
                 Volver a sesiones (todas)
               </Button>
             )}
-            <Button
-              variant='secondary'
-              size='sm'
-              onClick={() => setHistoryOpen(true)}
-            >
-              <History size={14} />
-              Histórico
-            </Button>
           </div>
         </div>
 
