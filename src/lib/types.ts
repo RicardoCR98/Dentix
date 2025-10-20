@@ -23,6 +23,7 @@ export type Visit = {
 
 // Tipos para sesiones y procedimientos
 export type ProcItem = {
+  id?: string; // ID temporal para facilitar eliminación de filas
   name: string;
   unit: number;
   qty: number;
@@ -35,6 +36,7 @@ export type SessionRow = {
   items: ProcItem[];
   auto: boolean;
   budget: number;
+  discount: number; // NUEVO: descuento aplicado
   payment: number;
   balance: number;
   signer?: string;
@@ -55,7 +57,25 @@ export type AttachmentFile = {
   name: string;
   size: number;
   type: string;
-  file?: File;       
+  file?: File;
   url: string;
   uploadDate: string;
+};
+
+// Tipos para templates y signers (maestros)
+export type ProcedureTemplate = {
+  id?: number;
+  name: string;
+  default_price: number;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type Signer = {
+  id?: number;
+  name: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
