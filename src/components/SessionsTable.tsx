@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Eye,
   Trash2,
+  Edit3,
+  Save,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import type { SessionRow, ProcItem } from "../lib/types";
@@ -62,10 +64,12 @@ export default function SessionsTable({
   onOpenSession,
   onViewReadOnly,
 }: SessionsTableProps) {
-  // —— Estado interno para “activa” SOLO si el padre no lo controla —— //
+  // —— Estado interno para "activa" SOLO si el padre no lo controla —— //
   const [internalActiveId, setInternalActiveId] = useState<string | null>(null);
   const currentActiveId = activeId ?? internalActiveId;
 
+  // Estado para modo edición de plantilla de procedimientos
+  const [editModeSessionId, setEditModeSessionId] = useState<string | null>(null);
 
   // Orden y paginado
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // desc = más reciente primero
@@ -204,6 +208,16 @@ export default function SessionsTable({
     recalcRow(idxOriginal, (r) => {
       r.items = r.items.filter((it) => it.id !== procId);
     });
+  };
+
+  // Entrar al modo edición de plantilla
+  const enterEditMode = (sessionId: string) => {
+    setEditModeSessionId(sessionId);
+  };
+
+  // Salir del modo edición de plantilla
+  const exitEditMode = () => {
+    setEditModeSessionId(null);
   };
 
   return (
@@ -384,55 +398,110 @@ export default function SessionsTable({
                 </div>
 
                 {/* Detalles expandidos */}
-                {isExpanded && (
+                {isExpanded && (() => {
+                  const inEditMode = editModeSessionId === row.id;
+                  const displayItems = inEditMode ? row.items : row.items.filter(it => it.qty > 0);
+
+                  return (
                   <div className="pt-3 mt-3 border-t border-[hsl(var(--border))] space-y-4">
-                    {/* Tabla de Procedimientos - SIEMPRE VISIBLE cuando expandido */}
+                    {/* Tabla de Procedimientos */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold flex items-center gap-2">
                           <FileText size={18} className="text-[hsl(var(--brand))]" />
                           Procedimientos realizados
                         </h4>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => addProcedure(idxReal)}
-                        >
-                          <Plus size={16} />
-                          Agregar procedimiento
-                        </Button>
+
+                        {/* Botones contextuales según modo */}
+                        <div className="flex gap-2">
+                          {inEditMode ? (
+                            <>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => addProcedure(idxReal)}
+                              >
+                                <Plus size={16} />
+                                Agregar campo
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={exitEditMode}
+                              >
+                                <Save size={16} />
+                                Guardar cambios
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => enterEditMode(row.id!)}
+                              title="Editar plantilla de procedimientos"
+                            >
+                              <Edit3 size={16} />
+                              Editar plantilla
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Header de la tabla */}
-                      <div className="grid grid-cols-[1fr_0.4fr_0.4fr_100px_50px] gap-3 px-3 pb-2 mb-2 border-b-2 border-blue-200 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
+                      <div className={cn(
+                        "grid gap-3 px-3 pb-2 mb-2 border-b-2 border-blue-200 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide",
+                        inEditMode
+                          ? "grid-cols-[1fr_0.4fr_0.4fr_100px_50px]"
+                          : "grid-cols-[1fr_0.4fr_0.4fr_100px]"
+                      )}>
                         <div>Procedimiento</div>
                         <div className="text-center">Precio Unit.</div>
                         <div className="text-center">Cantidad</div>
                         <div className="text-center">Subtotal</div>
-                        <div></div>
+                        {inEditMode && <div></div>}
                       </div>
 
                       {/* Filas de procedimientos */}
+                      {displayItems.length === 0 && !inEditMode ? (
+                        <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                          <FileText size={32} className="mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No hay procedimientos registrados</p>
+                          <p className="text-xs mt-1">Haz clic en "Editar plantilla" para agregar</p>
+                        </div>
+                      ) : (
                       <div className="space-y-1">
-                        {row.items.map((item, itemIdx) => (
+                        {displayItems.map((item, itemIdx) => {
+                          const fullIdx = row.items.findIndex(it => it.id === item.id);
+                          return (
                           <div
                             key={item.id}
                             className={cn(
-                              "grid grid-cols-[1fr_0.4fr_0.4fr_100px_50px] gap-3 items-center p-2 rounded-md",
+                              "grid gap-3 items-center p-2 rounded-md",
+                              inEditMode
+                                ? "grid-cols-[1fr_0.4fr_0.4fr_100px_50px]"
+                                : "grid-cols-[1fr_0.4fr_0.4fr_100px]",
                               item.qty > 0 && "bg-[hsl(var(--muted))]"
                             )}
                           >
-                            <Input
-                              type="text"
-                              value={item.name}
-                              onChange={(e) =>
-                                recalcRow(idxReal, (r) => {
-                                  r.items[itemIdx].name = e.target.value;
-                                })
-                              }
-                              placeholder="Nombre del procedimiento"
-                              className="h-9"
-                            />
+                            {/* Nombre del procedimiento */}
+                            {inEditMode ? (
+                              <Input
+                                type="text"
+                                value={item.name}
+                                onChange={(e) =>
+                                  recalcRow(idxReal, (r) => {
+                                    r.items[fullIdx].name = e.target.value;
+                                  })
+                                }
+                                placeholder="Nombre del procedimiento"
+                                className="h-9"
+                              />
+                            ) : (
+                              <div className="text-sm font-medium px-2 py-1.5">
+                                {item.name}
+                              </div>
+                            )}
+                            {/* Precio unitario */}
                             <Input
                               type="number"
                               min={0}
@@ -440,13 +509,15 @@ export default function SessionsTable({
                               value={item.unit || ""}
                               onChange={(e) =>
                                 recalcRow(idxReal, (r) => {
-                                  r.items[itemIdx].unit = toInt(e.target.value);
+                                  r.items[fullIdx].unit = toInt(e.target.value);
                                 })
                               }
                               icon={<DollarSign size={14} />}
                               className="h-9 text-center"
                               placeholder="0"
                             />
+
+                            {/* Cantidad */}
                             <Input
                               type="number"
                               min={0}
@@ -454,27 +525,35 @@ export default function SessionsTable({
                               value={item.qty || ""}
                               onChange={(e) =>
                                 recalcRow(idxReal, (r) => {
-                                  r.items[itemIdx].qty = toInt(e.target.value);
+                                  r.items[fullIdx].qty = toInt(e.target.value);
                                 })
                               }
                               className="h-9 text-center font-semibold"
                               placeholder="0"
                             />
+
+                            {/* Subtotal */}
                             <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center">
                               ${item.sub}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeProcedure(idxReal, item.id!)}
-                              title="Eliminar procedimiento"
-                              className="h-9 w-9 p-0 hover:bg-red-500/20 hover:text-red-600"
-                            >
-                              <Trash2 size={16} />
-                            </Button>
+
+                            {/* Botón eliminar (solo en modo edición) */}
+                            {inEditMode && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeProcedure(idxReal, item.id!)}
+                                title="Eliminar procedimiento"
+                                className="h-9 w-9 p-0 hover:bg-red-500/20 hover:text-red-600"
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
+                      )}
 
                       {/* Total de procedimientos */}
                       <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed border-[hsl(var(--border))]">
@@ -584,7 +663,8 @@ export default function SessionsTable({
                       />
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}
