@@ -5,11 +5,11 @@ type ThemeContextType = {
   theme: ThemeName
   brandHsl: string
   font: FontName
-  size: 14 | 16 | 18
+  size: 14 | 16 | 18 | 20 | 22 | 24
   setTheme: (t: ThemeName) => void
   setBrand: (brandHslOrHex: string) => void
   setFont: (f: FontName) => void
-  setSize: (s: 14 | 16 | 18) => void
+  setSize: (s: 14 | 16 | 18 | 20 | 22 | 24) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null)
@@ -43,7 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>('greenapple')
   const [brandHsl, setBrandHsl] = useState<string>('172 49% 56%') // default
   const [font, setFontState] = useState<FontName>('Inter')
-  const [size, setSizeState] = useState<14|16|18>(16)
+  const [size, setSizeState] = useState<14|16|18|20|22|24>(16)
 
   // load
   useEffect(() => {

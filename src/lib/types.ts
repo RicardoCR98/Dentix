@@ -38,6 +38,7 @@ export type SessionRow = {
   payment: number;
   balance: number;
   signer?: string;
+  visitId?: number;
 };
 
 // Tipo para almacenar datos completos del paciente
@@ -47,4 +48,14 @@ export type PatientRecord = {
   sessions: SessionRow[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type AttachmentFile = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  file?: File;       
+  url: string;
+  uploadDate: string;
 };

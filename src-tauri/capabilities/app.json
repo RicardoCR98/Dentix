@@ -1,0 +1,40 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "app",
+  "description": "Permisos para path, fs, opener y sql",
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+
+    "core:path:allow-join",
+    "core:path:allow-resolve-directory",
+
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-select",
+    "sql:allow-execute",
+
+    "fs:default",
+    "fs:allow-mkdir",
+    "fs:allow-open",
+    "fs:allow-read",
+    "fs:allow-read-dir",
+    "fs:allow-read-file",
+    "fs:allow-write",
+    "fs:allow-write-file",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+
+    "opener:default",
+    "opener:allow-open-path",
+    "opener:allow-open-url",
+    "opener:allow-reveal-item-in-dir",
+
+    "log:default",
+    "log:allow-log"
+  ],
+
+  "fs": {
+    "scope": ["$DOCUMENT/GreenAppleDental/**"]
+  }
+}

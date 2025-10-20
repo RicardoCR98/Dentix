@@ -45,7 +45,6 @@ type ThemePanelProps = {
 
 export default function ThemePanel({
   inlineTrigger = false,
-  label = "Diseño",
 }: ThemePanelProps) {
   const { theme, setTheme, brandHsl, setBrand, font, setFont, size, setSize } =
     useTheme();
@@ -60,7 +59,6 @@ export default function ThemePanel({
           className={cn(!inlineTrigger && "fixed right-4 top-4 z-50 shadow-lg")}
         >
           <Settings size={18} />
-          {label}
         </Button>
       </Dialog.Trigger>
 

@@ -1,3 +1,4 @@
+// src/components/SessionsTable.tsx
 import { useMemo, useState } from "react";
 import { toInt } from "../lib/utils";
 import { Button } from "./ui/Button";
@@ -6,7 +7,6 @@ import { Badge } from "./ui/Badge";
 import { Alert } from "./ui/Alert";
 import {
   Plus,
-  Trash2,
   DollarSign,
   FileText,
   ChevronDown,
@@ -15,6 +15,7 @@ import {
   ChevronsRight,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import type { SessionRow, ProcItem } from "../lib/types";
@@ -22,6 +23,13 @@ import type { SessionRow, ProcItem } from "../lib/types";
 interface SessionsTableProps {
   sessions: SessionRow[];
   onSessionsChange: (sessions: SessionRow[]) => void;
+
+  /** NUEVO — control externo de qué sesión está expandida (opcional) */
+  activeId?: string | null;
+  /** NUEVO — cuando el usuario abre una sesión (opcional) */
+  onOpenSession?: (sessionId: string) => void;
+  /** NUEVO — al pulsar el “ojo” para ver en modo lectura (opcional) */
+  onViewReadOnly?: (sessionId: string, visitId?: number) => void;
 }
 
 const DEFAULT_PROCS = [
@@ -49,8 +57,15 @@ const PAGE_SIZE = 5;
 export default function SessionsTable({
   sessions,
   onSessionsChange,
+  activeId,
+  onOpenSession,
+  onViewReadOnly,
 }: SessionsTableProps) {
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  // —— Estado interno para “activa” SOLO si el padre no lo controla —— //
+  const [internalActiveId, setInternalActiveId] = useState<string | null>(null);
+  const currentActiveId = activeId ?? internalActiveId;
+
+  // Mantengo el colapsable de “procedimientos” por fila (independiente de expandir card)
   const [expandedProcs, setExpandedProcs] = useState<Set<string>>(new Set());
 
   // Orden y paginado
@@ -96,11 +111,7 @@ export default function SessionsTable({
   }, [sessions, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(sortedSessions.length / PAGE_SIZE));
-
-  // Asegurar que la página actual siempre esté en rango
   const safePage = Math.min(page, totalPages - 1);
-
-  // Ventana visible por página
   const start = safePage * PAGE_SIZE;
   const end = start + PAGE_SIZE;
   const visibleSessions = useMemo(
@@ -108,59 +119,28 @@ export default function SessionsTable({
     [sortedSessions, start, end]
   );
 
-  // Agregar: respeta orden, expande y navega a la página donde cae la nueva
+  // Agregar: respeta orden, y deja la NUEVA como activa
   const addRow = () => {
     const row = newRow();
     let next: SessionRow[];
     if (sortOrder === "desc") next = [row, ...sessions]; // nueva arriba
-    else next = [...sessions, row]; // nueva al final
+    else next = [...sessions, row]; // nueva abajo
 
     onSessionsChange(next);
 
-    // Expandir la nueva
-    setExpandedRows((prev) => {
-      const n = new Set(prev);
-      n.add(row.id!);
-      return n;
-    });
+    // Expandir/activar la nueva (controlado o no)
+    if (onOpenSession) onOpenSession(row.id!);
+    else setInternalActiveId(row.id!);
 
     // Ir a la página donde quedó la nueva
-    if (sortOrder === "desc") {
-      // Siempre cae al inicio, vamos a la página 0
-      setPage(0);
-    } else {
-      // Cae al final: calcular última página tras añadir
+    if (sortOrder === "desc") setPage(0);
+    else {
       const nextTotalPages = Math.max(1, Math.ceil(next.length / PAGE_SIZE));
       setPage(nextTotalPages - 1);
     }
   };
 
-  // Eliminar "última" según el orden actual
-  const delLast = () => {
-    if (sortedSessions.length === 0) return;
-    const lastId = sortedSessions[sortedSessions.length - 1].id!;
-    const next = sessions.filter((r) => r.id !== lastId);
-    onSessionsChange(next);
-    // Ajustar página si quedó fuera de rango
-    const nextTotalPages = Math.max(1, Math.ceil(next.length / PAGE_SIZE));
-    setPage((p) => Math.min(p, nextTotalPages - 1));
-  };
-
-  const delRow = (id: string) => {
-    const next = sessions.filter((r) => r.id !== id);
-    onSessionsChange(next);
-    const nextTotalPages = Math.max(1, Math.ceil(next.length / PAGE_SIZE));
-    setPage((p) => Math.min(p, nextTotalPages - 1));
-  };
-
-  const toggleRow = (id: string) => {
-    setExpandedRows((prev) => {
-      const next = new Set(prev);
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  // —— Ya no se elimina por requerimiento legal; quitamos UI de borrado —— //
 
   const toggleProcs = (id: string) => {
     setExpandedProcs((prev) => {
@@ -171,9 +151,8 @@ export default function SessionsTable({
     });
   };
 
-  // Recalcular MONTOS (no toca fecha)
+  // Recalcular montos (no toca fecha)
   const recalcRow = (idxOriginal: number, mutate?: (r: SessionRow) => void) => {
-    // idxOriginal corresponde al array "sessions" (fuente de verdad)
     const next = [...sessions];
     const r = { ...next[idxOriginal] };
     mutate?.(r);
@@ -196,8 +175,17 @@ export default function SessionsTable({
 
   const toggleSort = () => {
     setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
-    // Para mantener simpleza y que siempre veas el inicio tras cambiar orden
     setPage(0);
+  };
+
+  const handleToggleRow = (id: string) => {
+    // Si ya está activa → la colapsamos (solo en modo no-controlado)
+    if (activeId !== undefined) {
+      // controlado por el padre
+      if (onOpenSession) onOpenSession(id);
+      return;
+    }
+    setInternalActiveId((cur) => (cur === id ? null : id));
   };
 
   return (
@@ -226,13 +214,7 @@ export default function SessionsTable({
           >
             {sortOrder === "desc" ? "Últimas arriba" : "Últimas abajo"}
           </Button>
-
-          {sessions.length > 0 && (
-            <Button variant="secondary" onClick={delLast} size="sm">
-              <Trash2 size={16} />
-              Eliminar última
-            </Button>
-          )}
+          {/* ⛔️ Eliminación deshabilitada por requerimiento legal */}
         </div>
       </div>
 
@@ -253,32 +235,32 @@ export default function SessionsTable({
       ) : (
         <div className="space-y-3">
           {visibleSessions.map((row) => {
-            const isExpanded = expandedRows.has(row.id!);
+            const isExpanded = currentActiveId === row.id;
             const isProcsExpanded = expandedProcs.has(row.id!);
             const activeProcs = row.items.filter((it) => it.qty > 0);
             const totalProcs = row.items.reduce((sum, it) => sum + it.sub, 0);
 
-            // índice mostrado según posición global en la lista ORDENADA
             const displayIndex =
               sortedSessions.findIndex((s) => s.id === row.id) + 1;
 
-            // idxReal para recalc: índice en "sessions" (fuente de verdad)
             const idxReal = sessions.findIndex((s) => s.id === row.id);
 
             return (
               <div
                 key={row.id}
-                className="card p-4 pt-6 hover:border-[hsl(var(--brand))]"
+                className={cn(
+                  "card p-4 pt-6 hover:border-[hsl(var(--brand))]",
+                  isExpanded && "ring-1 ring-[hsl(var(--brand))]"
+                )}
               >
-                {/* Resumen de la sesión */}
+                {/* Resumen */}
                 <div className="flex items-center justify-between gap-4 mb-3">
                   <div className="flex w-full items-center justify-between gap-4 flex-wrap sm:flex-nowrap text-center">
-                    {/* índice */}
                     <div className="w-10 h-10 rounded-lg bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold shrink-0">
                       {displayIndex}
                     </div>
+
                     <div>
-                      {/* fecha (NO recalcula) */}
                       <Input
                         type="date"
                         value={row.date}
@@ -290,14 +272,12 @@ export default function SessionsTable({
                         className="h-9 w-[160px]"
                       />
                     </div>
-                    {/* lista de procedimientos */}
+
                     <p
                       className="text-xs text-[hsl(var(--muted-foreground))] min-w-0 sm:max-w-[420px] px-2"
                       title={
                         activeProcs.length > 0
-                          ? activeProcs
-                              .map((p) => `${p.name} (${p.qty})`)
-                              .join(", ")
+                          ? activeProcs.map((p) => `${p.name} (${p.qty})`).join(", ")
                           : "Sin procedimientos"
                       }
                     >
@@ -306,7 +286,6 @@ export default function SessionsTable({
                         : "Sin procedimientos"}
                     </p>
 
-                    {/* badge de estado */}
                     <Badge
                       className="shrink-0"
                       variant={
@@ -356,17 +335,24 @@ export default function SessionsTable({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => toggleRow(row.id!)}
+                      onClick={() => handleToggleRow(row.id!)}
+                      title={isExpanded ? "Contraer" : "Expandir"}
                     >
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      {isExpanded ? (
+                        <ChevronUp size={16} />
+                      ) : (
+                        <ChevronDown size={16} />
+                      )}
                     </Button>
+
+                    {/* NUEVO — Ver sesión en modo lectura */}
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => delRow(row.id!)}
-                      className="hover:bg-red-400 dark:bg-red-400/50 dark:hover:bg-red-600/70"
+                      title="Ver esta sesión (solo lectura)"
+                      onClick={() => onViewReadOnly?.(row.id!, row.visitId)}
                     >
-                      <Trash2 size={16} />
+                      <Eye size={16} />
                     </Button>
                   </div>
                 </div>
@@ -381,10 +367,7 @@ export default function SessionsTable({
                         className="w-full flex items-center justify-between rounded-md dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
                       >
                         <h4 className="font-semibold p-3 flex items-center gap-2">
-                          <FileText
-                            size={18}
-                            className="text-[hsl(var(--brand))]"
-                          />
+                          <FileText size={18} className="text-[hsl(var(--brand))]" />
                           Procedimientos realizados
                         </h4>
 
@@ -401,10 +384,8 @@ export default function SessionsTable({
                         )}
                       </button>
 
-                      {/* Tabla de procedimientos (colapsable) */}
                       {isProcsExpanded && (
                         <>
-                          {/* Encabezados de columna */}
                           <div className="grid grid-cols-[1fr_0.5fr_0.5fr_110px] gap-3 px-3 pb-2 mb-2 border-b-2 border-blue-200 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
                             <div>Procedimiento</div>
                             <div className="text-center">Precio Unit.</div>
@@ -431,9 +412,7 @@ export default function SessionsTable({
                                   value={item.unit || ""}
                                   onChange={(e) =>
                                     recalcRow(idxReal, (r) => {
-                                      r.items[itemIdx].unit = toInt(
-                                        e.target.value
-                                      );
+                                      r.items[itemIdx].unit = toInt(e.target.value);
                                     })
                                   }
                                   icon={<DollarSign size={14} />}
@@ -447,22 +426,13 @@ export default function SessionsTable({
                                   value={item.qty || ""}
                                   onChange={(e) =>
                                     recalcRow(idxReal, (r) => {
-                                      r.items[itemIdx].qty = toInt(
-                                        e.target.value
-                                      );
+                                      r.items[itemIdx].qty = toInt(e.target.value);
                                     })
                                   }
                                   className="h-9 text-center font-semibold"
                                   placeholder="Cantidad"
                                 />
-                                <div
-                                  className={cn(
-                                    "text-center font-semibold rounded-md h-9 flex items-center justify-center",
-                                    (item.unit ?? 0) > 0 &&
-                                      (item.qty ?? 0) > 0 &&
-                                      "dark:bg-amber-500/20 dark:ring-amber-400/40"
-                                  )}
-                                >
+                                <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center">
                                   ${item.sub}
                                 </div>
                               </div>

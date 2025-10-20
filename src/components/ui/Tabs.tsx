@@ -1,40 +1,71 @@
-import * as Tabs from '@radix-ui/react-tabs';
-import { cn } from '../../lib/cn';
+import * as TabsPrimitive from "@radix-ui/react-tabs";
+import React from "react";
+import { cn } from "../../lib/cn";
 
-export const TabsRoot = Tabs.Root;
+const Tabs = TabsPrimitive.Root;
 
-export function TabsList({ className, ...props }: Tabs.TabsListProps) {
-  return (
-    <Tabs.List
-      className={cn(
-        'inline-flex gap-1 bg-[hsl(var(--muted))] p-1 rounded-lg',
-        className
-      )}
-      {...props}
-    />
-  );
-}
+const TabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center rounded-none border-b border-[hsl(var(--border))]",
+      "bg-transparent",
+      className
+    )}
+    {...props}
+  />
+));
+TabsList.displayName = TabsPrimitive.List.displayName;
 
-export function TabsTrigger({ className, ...props }: Tabs.TabsTriggerProps) {
-  return (
-    <Tabs.Trigger
-      className={cn(
-        'px-4 py-2 rounded-md text-sm font-medium transition-all',
-        'hover:text-[hsl(var(--foreground))]',
-        'data-[state=active]:bg-[hsl(var(--surface))] data-[state=active]:shadow-sm',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand))]',
-        className
-      )}
-      {...props}
-    />
-  );
-}
+const TabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap",
+      "px-4 py-3 text-sm font-medium",
+      "text-[hsl(var(--muted-foreground))]",
+      "transition-all duration-300 ease-out",
+      "relative",
+      // Estado normal
+      "hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted)/0.5)]",
+      // Estado activo
+      "data-[state=active]:text-[hsl(var(--primary))]",
+      "data-[state=active]:bg-transparent",
+      // Línea indicadora
+      "before:absolute before:bottom-0 before:left-0 before:right-0",
+      "before:h-1 before:bg-[hsl(var(--primary))]",
+      "before:scale-x-0 before:origin-left before:transition-transform before:duration-300",
+      "data-[state=active]:before:scale-x-100",
+      // Focus visible
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] focus-visible:ring-offset-2",
+      className
+    )}
+    {...props}
+  />
+));
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
-export function TabsContent({ className, ...props }: Tabs.TabsContentProps) {
-  return (
-    <Tabs.Content
-      className={cn('mt-4 focus-visible:outline-none', className)}
-      {...props}
-    />
-  );
-}
+const TabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      "mt-0 ring-offset-[hsl(var(--background))]",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] focus-visible:ring-offset-2",
+      "animate-in fade-in-50 duration-300",
+      className
+    )}
+    {...props}
+  />
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
+
+export { Tabs, TabsList, TabsTrigger, TabsContent };

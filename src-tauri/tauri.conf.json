@@ -1,5 +1,5 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "odonto",
   "version": "0.1.0",
   "identifier": "com.tauri.dev",
@@ -10,18 +10,17 @@
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
+    "security": { "csp": null },
     "windows": [
       {
+        "label": "main",
         "title": "odonto",
         "width": 1200,
         "height": 800,
         "resizable": true,
         "fullscreen": false
       }
-    ],
-    "security": {
-      "csp": null
-    }
+    ]
   },
   "bundle": {
     "active": true,
@@ -35,8 +34,7 @@
     ]
   },
   "plugins": {
-    "sql": {
-      "preload": ["sqlite:clinic.db"]
-    }
+    "sql": { "preload": ["sqlite:clinic.db"] },
+    "fs": { "requireLiteralLeadingDot": false }
   }
 }

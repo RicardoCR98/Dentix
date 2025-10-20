@@ -1,9 +1,8 @@
 // src-tauri/src/main.rs
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod db;
-
-use tauri_plugin_sql::{Builder, Migration, MigrationKind};
+use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
+use tauri::Manager;
 
 fn main() {
     let migrations = vec![
@@ -16,11 +15,14 @@ fn main() {
     ];
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(
-            Builder::default()
+            SqlBuilder::default()
                 .add_migrations("sqlite:clinic.db", migrations)
                 .build(),
         )
+        .plugin(tauri_plugin_fs::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
