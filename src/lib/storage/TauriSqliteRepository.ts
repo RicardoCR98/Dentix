@@ -1,6 +1,6 @@
 // src/lib/storage/TauriSqliteRepository.ts
 import Database from "@tauri-apps/plugin-sql";
-import type { Patient, Visit, SessionRow, ProcItem } from "../types";
+import type { Patient, Visit, SessionRow, ProcItem, ProcedureTemplate } from "../types";
 
 /** Fila completa de la tabla visits (para detalles) */
 type VisitRow = {
@@ -502,6 +502,32 @@ export class TauriSqliteRepository {
 
   async deleteAttachment(attachmentId: number) {
     await this.conn.execute(`DELETE FROM attachments WHERE id = $1`, [attachmentId]);
+  }
+
+  // -------------------------------------------------------------------------
+  // PROCEDURE TEMPLATES (Plantilla global de procedimientos)
+  // -------------------------------------------------------------------------
+  async getProcedureTemplates(): Promise<ProcedureTemplate[]> {
+    return this.conn.select<ProcedureTemplate[]>(
+      `SELECT id, name, default_price, active, created_at, updated_at
+         FROM procedure_templates
+        WHERE active = 1
+        ORDER BY id ASC`
+    );
+  }
+
+  async saveProcedureTemplates(templates: Array<{ name: string; default_price: number }>): Promise<void> {
+    // Estrategia: eliminar todos y reinsertar
+    // (O podrías hacer un diff inteligente, pero esto es más simple)
+    await this.conn.execute(`DELETE FROM procedure_templates`);
+
+    for (const t of templates) {
+      await this.conn.execute(
+        `INSERT INTO procedure_templates (name, default_price, active)
+         VALUES ($1, $2, 1)`,
+        [t.name, t.default_price]
+      );
+    }
   }
 }
 
