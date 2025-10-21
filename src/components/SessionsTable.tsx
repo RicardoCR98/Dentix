@@ -227,35 +227,11 @@ export default function SessionsTable({
     const session = sessions[sessionIdx];
 
     // Guardar los items de esta sesión como la nueva plantilla global
+    // La función onUpdateTemplates ya filtra items vacíos y actualiza el estado procedureTemplates
     await onUpdateTemplates(session.items);
 
-    // Después de guardar, actualizar la sesión con la plantilla nueva
-    // pero manteniendo las cantidades (qty) que el usuario ya puso
-    const next = [...sessions];
-    const oldQtyMap = new Map(session.items.map(it => [it.name, it.qty]));
-
-    // Esperar un momento para que procedureTemplates se actualice
-    setTimeout(() => {
-      const updatedItems: ProcItem[] = procedureTemplates.map((template) => ({
-        id: crypto.randomUUID(),
-        name: template.name,
-        unit: template.default_price,
-        qty: oldQtyMap.get(template.name) || 0, // Mantener qty anterior
-        sub: 0,
-      }));
-
-      // Recalcular subtotales
-      updatedItems.forEach(it => {
-        it.sub = it.unit * it.qty;
-      });
-
-      next[sessionIdx] = {
-        ...session,
-        items: updatedItems,
-      };
-
-      onSessionsChange(next);
-    }, 100);
+    // No necesitamos actualizar la sesión aquí porque los items ya están correctos
+    // en session.items (son los que el usuario acaba de editar)
 
     setEditModeSessionId(null);
   };

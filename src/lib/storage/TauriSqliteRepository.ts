@@ -638,7 +638,14 @@ let _repo: TauriSqliteRepository | null = null;
 export async function getRepository() {
   if (!_repo) {
     _repo = new TauriSqliteRepository();
-    await _repo.initialize();
+    try {
+      await _repo.initialize();
+    } catch (error) {
+      // Si falla la inicialización, resetear _repo para que se pueda reintentar
+      _repo = null;
+      console.error("Error inicializando repositorio:", error);
+      throw error;
+    }
   }
   return _repo;
 }
