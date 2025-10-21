@@ -312,9 +312,16 @@ export default function App() {
   // ---------- Cargar plantilla de procedimientos ----------
   useEffect(() => {
     (async () => {
-      const repo = await getRepository();
-      const templates = await repo.getProcedureTemplates();
-      setProcedureTemplates(templates);
+      try {
+        const repo = await getRepository();
+        const templates = await repo.getProcedureTemplates();
+        setProcedureTemplates(templates);
+        console.log(`Plantilla cargada: ${templates.length} procedimientos`);
+      } catch (error) {
+        console.error("Error cargando plantilla de procedimientos:", error);
+        // Si falla, usar array vacío para no bloquear la app
+        setProcedureTemplates([]);
+      }
     })();
   }, []);
 
