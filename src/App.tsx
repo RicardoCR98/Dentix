@@ -314,20 +314,7 @@ export default function App() {
     (async () => {
       const repo = await getRepository();
       const templates = await repo.getProcedureTemplates();
-
-      if (templates.length === 0) {
-        // Primera vez: usar DEFAULT_PROCS
-        const defaultTemplates = DEFAULT_PROCS.map((name) => ({
-          name,
-          default_price: 0,
-        }));
-        await repo.saveProcedureTemplates(defaultTemplates);
-        // Recargar desde BD
-        const saved = await repo.getProcedureTemplates();
-        setProcedureTemplates(saved);
-      } else {
-        setProcedureTemplates(templates);
-      }
+      setProcedureTemplates(templates);
     })();
   }, []);
 
