@@ -34,6 +34,106 @@ export class TauriSqliteRepository {
     // clinic.db ya se crea y migra desde Rust (tauri-plugin-sql)
     this.db = await Database.load("sqlite:clinic.db");
     await this.db.execute("PRAGMA foreign_keys = ON;");
+
+    // Verificar si la tabla procedure_templates existe, si no, crearla
+    try {
+      await this.db.select("SELECT 1 FROM procedure_templates LIMIT 1");
+    } catch {
+      // La tabla no existe, ejecutar migración manualmente
+      console.log("Creando tablas de plantillas...");
+      await this.executeMigration002();
+    }
+  }
+
+  private async executeMigration002() {
+    // Agregar campo discount a sessions
+    try {
+      await this.db!.execute(
+        "ALTER TABLE sessions ADD COLUMN discount INTEGER NOT NULL DEFAULT 0"
+      );
+    } catch {
+      // Ya existe, ignorar
+    }
+
+    // Crear tabla signers
+    await this.db!.execute(`
+      CREATE TABLE IF NOT EXISTS signers (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL UNIQUE,
+        active     INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Crear tabla procedure_templates
+    await this.db!.execute(`
+      CREATE TABLE IF NOT EXISTS procedure_templates (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        name          TEXT NOT NULL UNIQUE,
+        default_price INTEGER NOT NULL DEFAULT 0,
+        active        INTEGER NOT NULL DEFAULT 1,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Triggers
+    await this.db!.execute(`
+      CREATE TRIGGER IF NOT EXISTS trg_signers_updated_at
+      AFTER UPDATE ON signers
+      FOR EACH ROW
+      BEGIN
+        UPDATE signers SET updated_at = datetime('now') WHERE id = NEW.id;
+      END
+    `);
+
+    await this.db!.execute(`
+      CREATE TRIGGER IF NOT EXISTS trg_procedure_templates_updated_at
+      AFTER UPDATE ON procedure_templates
+      FOR EACH ROW
+      BEGIN
+        UPDATE procedure_templates SET updated_at = datetime('now') WHERE id = NEW.id;
+      END
+    `);
+
+    // Datos iniciales - procedimientos predefinidos
+    const defaultProcs = [
+      "Curación",
+      "Resinas simples",
+      "Resinas compuestas",
+      "Extracciones simples",
+      "Extracciones complejas",
+      "Correctivo inicial",
+      "Control mensual",
+      "Prótesis total",
+      "Prótesis removible",
+      "Prótesis fija",
+      "Retenedor",
+      "Endodoncia simple",
+      "Endodoncia compleja",
+      "Limpieza simple",
+      "Limpieza compleja",
+      "Reposición",
+      "Pegada",
+    ];
+
+    for (const name of defaultProcs) {
+      await this.db!.execute(
+        `INSERT OR IGNORE INTO procedure_templates (name, default_price) VALUES (?, 0)`,
+        [name]
+      );
+    }
+
+    // Índices
+    await this.db!.execute(
+      `CREATE INDEX IF NOT EXISTS idx_procedure_templates_active ON procedure_templates(active)`
+    );
+    await this.db!.execute(
+      `CREATE INDEX IF NOT EXISTS idx_signers_active ON signers(active)`
+    );
+
+    console.log("Migración 002 ejecutada exitosamente");
   }
 
   private get conn(): Database {
