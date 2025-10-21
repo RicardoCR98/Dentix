@@ -40,6 +40,21 @@ interface SessionsTableProps {
 
 const PAGE_SIZE = 5;
 
+// Funciones auxiliares para formato de fecha DD/MM/YYYY
+function formatDateToDDMMYYYY(dateStr: string): string {
+  // Convierte YYYY-MM-DD a DD/MM/YYYY
+  if (!dateStr || dateStr.length !== 10) return "";
+  const [year, month, day] = dateStr.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function parseDateFromDDMMYYYY(dateStr: string): string {
+  // Convierte DD/MM/YYYY a YYYY-MM-DD
+  if (!dateStr || dateStr.length !== 10) return "";
+  const [day, month, year] = dateStr.split("/");
+  return `${year}-${month}-${day}`;
+}
+
 export default function SessionsTable({
   sessions,
   onSessionsChange,
@@ -59,8 +74,7 @@ export default function SessionsTable({
   // Estado para guardar snapshot de items originales (para poder cancelar cambios)
   const [itemsSnapshot, setItemsSnapshot] = useState<Map<string, ProcItem[]>>(new Map());
 
-  // Orden y paginado
-  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // desc = más reciente primero
+  // Paginado
   const [page, setPage] = useState(0); // 0-based
 
   const totals = useMemo(() => {
@@ -109,15 +123,16 @@ export default function SessionsTable({
   };
 
   // Lista ordenada por fecha (YYYY-MM-DD compara bien como string)
+  // Siempre descendente: más reciente arriba
   const sortedSessions = useMemo(() => {
     const copy = [...sessions];
     copy.sort((a, b) => {
       const da = a.date ?? "";
       const db = b.date ?? "";
-      return sortOrder === "desc" ? db.localeCompare(da) : da.localeCompare(db);
+      return db.localeCompare(da); // desc: más reciente primero
     });
     return copy;
-  }, [sessions, sortOrder]);
+  }, [sessions]);
 
   const totalPages = Math.max(1, Math.ceil(sortedSessions.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
@@ -164,9 +179,8 @@ export default function SessionsTable({
       }
     }
 
-    let next: SessionRow[];
-    if (sortOrder === "desc") next = [row, ...sessions]; // nueva arriba
-    else next = [...sessions, row]; // nueva abajo
+    // Siempre agregar al inicio (orden descendente fijo)
+    const next = [row, ...sessions];
 
     onSessionsChange(next);
 
@@ -174,12 +188,8 @@ export default function SessionsTable({
     if (onOpenSession) onOpenSession(row.id!);
     else setInternalActiveId(row.id!);
 
-    // Ir a la página donde quedó la nueva
-    if (sortOrder === "desc") setPage(0);
-    else {
-      const nextTotalPages = Math.max(1, Math.ceil(next.length / PAGE_SIZE));
-      setPage(nextTotalPages - 1);
-    }
+    // La nueva sesión siempre queda en la primera página
+    setPage(0);
   };
 
   // —— Ya no se elimina por requerimiento legal; quitamos UI de borrado —— //
@@ -206,11 +216,6 @@ export default function SessionsTable({
   const goPrev = () => setPage((p) => Math.max(0, p - 1));
   const goNext = () => setPage((p) => Math.min(totalPages - 1, p + 1));
   const goLast = () => setPage(totalPages - 1);
-
-  const toggleSort = () => {
-    setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
-    setPage(0);
-  };
 
   const handleToggleRow = (id: string) => {
     // Si ya está activa → la colapsamos (solo en modo no-controlado)
@@ -326,15 +331,6 @@ export default function SessionsTable({
             <Plus size={16} />
             Nueva sesión
           </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={toggleSort}
-            title={sortOrder === "desc" ? "Más reciente arriba" : "Más reciente abajo"}
-          >
-            {sortOrder === "desc" ? "Últimas arriba" : "Últimas abajo"}
-          </Button>
           {/* ⛔️ Eliminación deshabilitada por requerimiento legal */}
         </div>
       </div>
@@ -360,8 +356,11 @@ export default function SessionsTable({
             const activeProcs = row.items.filter((it) => it.qty > 0);
             const totalProcs = row.items.reduce((sum, it) => sum + it.sub, 0);
 
+            // displayIndex representa el orden cronológico (1 = primera sesión, n = última sesión)
+            // sortedSessions está ordenado descendente (más reciente primero)
+            // Por lo tanto, invertimos el índice
             const displayIndex =
-              sortedSessions.findIndex((s) => s.id === row.id) + 1;
+              sortedSessions.length - sortedSessions.findIndex((s) => s.id === row.id);
 
             const idxReal = sessions.findIndex((s) => s.id === row.id);
             const isEditable = row.id === mostRecentSessionId; // Solo la sesión más reciente es editable
@@ -386,14 +385,22 @@ export default function SessionsTable({
 
                     <div>
                       <Input
-                        type="date"
-                        value={row.date}
+                        type="text"
+                        value={formatDateToDDMMYYYY(row.date)}
                         onChange={(e) => {
-                          const next = [...sessions];
-                          next[idxReal] = { ...next[idxReal], date: e.target.value };
-                          onSessionsChange(next);
+                          const inputValue = e.target.value;
+                          // Solo actualizar si tiene formato correcto DD/MM/YYYY
+                          if (inputValue.length === 10 && inputValue.includes("/")) {
+                            const next = [...sessions];
+                            next[idxReal] = {
+                              ...next[idxReal],
+                              date: parseDateFromDDMMYYYY(inputValue)
+                            };
+                            onSessionsChange(next);
+                          }
                         }}
-                        className="h-9 w-[160px]"
+                        placeholder="DD/MM/YYYY"
+                        className="h-9 w-[130px]"
                         disabled={!isEditable}
                       />
                     </div>
