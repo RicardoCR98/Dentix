@@ -130,8 +130,39 @@ export default function SessionsTable({
 
   // Agregar: respeta orden, y deja la NUEVA como activa
   const addRow = () => {
+    // Encontrar la sesión más reciente (para copiar cantidades)
+    let previousSession: SessionRow | null = null;
+    if (sessions.length > 0) {
+      previousSession = sessions[0];
+      for (const session of sessions) {
+        if ((session.date ?? "") > (previousSession.date ?? "")) {
+          previousSession = session;
+        }
+      }
+    }
+
     // Crear nueva sesión usando plantilla global
     const row = newRow();
+
+    // Si existe sesión anterior, copiar las cantidades (qty) de sus procedimientos
+    if (previousSession) {
+      // Crear mapa de cantidades de la sesión anterior por nombre de procedimiento
+      const prevQtyMap = new Map(
+        previousSession.items.map((item) => [item.name, item.qty])
+      );
+
+      // Aplicar las cantidades de la sesión anterior a los procedimientos de la nueva sesión
+      row.items = row.items.map((item) => ({
+        ...item,
+        qty: prevQtyMap.get(item.name) || 0, // Copiar qty si existe, sino 0
+        sub: item.unit * (prevQtyMap.get(item.name) || 0), // Recalcular subtotal
+      }));
+
+      // Recalcular presupuesto automático si está en modo auto
+      if (row.auto) {
+        row.budget = row.items.reduce((sum, it) => sum + it.sub, 0);
+      }
+    }
 
     let next: SessionRow[];
     if (sortOrder === "desc") next = [row, ...sessions]; // nueva arriba
