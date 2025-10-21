@@ -321,8 +321,11 @@ export default function App() {
   // Función para actualizar plantilla global
   const updateProcedureTemplates = useCallback(
     async (items: Array<{ name: string; unit: number }>) => {
-      const templates = items.map((it) => ({
-        name: it.name,
+      // Filtrar solo items con nombre (ignorar vacíos)
+      const validItems = items.filter((it) => it.name.trim().length > 0);
+
+      const templates = validItems.map((it) => ({
+        name: it.name.trim(),
         default_price: it.unit,
       }));
 
@@ -332,6 +335,8 @@ export default function App() {
       // Recargar desde BD
       const saved = await repo.getProcedureTemplates();
       setProcedureTemplates(saved);
+
+      console.log(`Plantilla actualizada: ${saved.length} procedimientos guardados`);
     },
     []
   );
