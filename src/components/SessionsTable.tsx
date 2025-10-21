@@ -208,11 +208,44 @@ export default function SessionsTable({
     if (!editModeSessionId) return;
 
     // Buscar la sesión que está en modo edición
-    const session = sessions.find((s) => s.id === editModeSessionId);
-    if (session) {
-      // Guardar los items de esta sesión como la nueva plantilla global
-      await onUpdateTemplates(session.items);
+    const sessionIdx = sessions.findIndex((s) => s.id === editModeSessionId);
+    if (sessionIdx === -1) {
+      setEditModeSessionId(null);
+      return;
     }
+
+    const session = sessions[sessionIdx];
+
+    // Guardar los items de esta sesión como la nueva plantilla global
+    await onUpdateTemplates(session.items);
+
+    // Después de guardar, actualizar la sesión con la plantilla nueva
+    // pero manteniendo las cantidades (qty) que el usuario ya puso
+    const next = [...sessions];
+    const oldQtyMap = new Map(session.items.map(it => [it.name, it.qty]));
+
+    // Esperar un momento para que procedureTemplates se actualice
+    setTimeout(() => {
+      const updatedItems: ProcItem[] = procedureTemplates.map((template) => ({
+        id: crypto.randomUUID(),
+        name: template.name,
+        unit: template.default_price,
+        qty: oldQtyMap.get(template.name) || 0, // Mantener qty anterior
+        sub: 0,
+      }));
+
+      // Recalcular subtotales
+      updatedItems.forEach(it => {
+        it.sub = it.unit * it.qty;
+      });
+
+      next[sessionIdx] = {
+        ...session,
+        items: updatedItems,
+      };
+
+      onSessionsChange(next);
+    }, 100);
 
     setEditModeSessionId(null);
   };
