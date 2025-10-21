@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import type { SessionRow, ProcItem, ProcedureTemplate } from "../lib/types";
+import { DatePicker } from "./ui/DatePicker";
 
 interface SessionsTableProps {
   sessions: SessionRow[];
@@ -39,21 +40,6 @@ interface SessionsTableProps {
 }
 
 const PAGE_SIZE = 5;
-
-// Funciones auxiliares para formato de fecha DD/MM/YYYY
-function formatDateToDDMMYYYY(dateStr: string): string {
-  // Convierte YYYY-MM-DD a DD/MM/YYYY
-  if (!dateStr || dateStr.length !== 10) return "";
-  const [year, month, day] = dateStr.split("-");
-  return `${day}/${month}/${year}`;
-}
-
-function parseDateFromDDMMYYYY(dateStr: string): string {
-  // Convierte DD/MM/YYYY a YYYY-MM-DD
-  if (!dateStr || dateStr.length !== 10) return "";
-  const [day, month, year] = dateStr.split("/");
-  return `${year}-${month}-${day}`;
-}
 
 export default function SessionsTable({
   sessions,
@@ -383,25 +369,20 @@ export default function SessionsTable({
                       {displayIndex}
                     </div>
 
-                    <div>
-                      <Input
-                        type="text"
-                        value={formatDateToDDMMYYYY(row.date)}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          // Solo actualizar si tiene formato correcto DD/MM/YYYY
-                          if (inputValue.length === 10 && inputValue.includes("/")) {
-                            const next = [...sessions];
-                            next[idxReal] = {
-                              ...next[idxReal],
-                              date: parseDateFromDDMMYYYY(inputValue)
-                            };
-                            onSessionsChange(next);
-                          }
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <DatePicker
+                        value={row.date}
+                        onChange={(date) => {
+                          const next = [...sessions];
+                          next[idxReal] = {
+                            ...next[idxReal],
+                            date: date
+                          };
+                          onSessionsChange(next);
                         }}
-                        placeholder="DD/MM/YYYY"
-                        className="h-9 w-[130px]"
                         disabled={!isEditable}
+                        className="w-[150px]"
+                        placeholder="Seleccionar fecha"
                       />
                     </div>
 
@@ -509,7 +490,7 @@ export default function SessionsTable({
                           <FileText size={18} className="text-[hsl(var(--brand))]" />
                           Procedimientos realizados
                           {!isEditable && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="info" className="text-xs">
                               Solo lectura
                             </Badge>
                           )}

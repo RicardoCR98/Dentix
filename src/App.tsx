@@ -37,7 +37,6 @@ import {
   Activity,
   Search,
   Wallet,
-  ArrowLeft,
   Info,
 } from "lucide-react";
 
