@@ -430,7 +430,7 @@ export default function SessionsTable({
                 {/* Detalles expandidos */}
                 {isExpanded && (() => {
                   const inEditMode = editModeSessionId === row.id;
-                  const displayItems = inEditMode ? row.items : row.items.filter(it => it.qty > 0);
+                  const displayItems = row.items; // Mostrar todos los procedimientos siempre
 
                   return (
                   <div className="pt-3 mt-3 border-t border-[hsl(var(--border))] space-y-4">
