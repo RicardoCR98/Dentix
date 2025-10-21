@@ -70,6 +70,20 @@ export default function SessionsTable({
     return { p, a, s };
   }, [sessions]);
 
+  // Determinar cuál es la sesión más reciente (la única editable)
+  const mostRecentSessionId = useMemo(() => {
+    if (sessions.length === 0) return null;
+
+    // Encontrar la sesión con la fecha más reciente
+    let mostRecent = sessions[0];
+    for (const session of sessions) {
+      if ((session.date ?? "") > (mostRecent.date ?? "")) {
+        mostRecent = session;
+      }
+    }
+    return mostRecent.id;
+  }, [sessions]);
+
   const newRow = (): SessionRow => {
     // Usar plantilla global de procedimientos
     const baseItems: ProcItem[] = procedureTemplates.map((template) => ({
@@ -319,6 +333,7 @@ export default function SessionsTable({
               sortedSessions.findIndex((s) => s.id === row.id) + 1;
 
             const idxReal = sessions.findIndex((s) => s.id === row.id);
+            const isEditable = row.id === mostRecentSessionId; // Solo la sesión más reciente es editable
 
             return (
               <div
@@ -348,6 +363,7 @@ export default function SessionsTable({
                           onSessionsChange(next);
                         }}
                         className="h-9 w-[160px]"
+                        disabled={!isEditable}
                       />
                     </div>
 
@@ -454,9 +470,15 @@ export default function SessionsTable({
                         <h4 className="font-semibold flex items-center gap-2">
                           <FileText size={18} className="text-[hsl(var(--brand))]" />
                           Procedimientos realizados
+                          {!isEditable && (
+                            <Badge variant="secondary" className="text-xs">
+                              Solo lectura
+                            </Badge>
+                          )}
                         </h4>
 
                         {/* Botones contextuales según modo */}
+                        {isEditable && (
                         <div className="flex gap-2">
                           {inEditMode ? (
                             <>
@@ -497,6 +519,7 @@ export default function SessionsTable({
                             </Button>
                           )}
                         </div>
+                        )}
                       </div>
 
                       {/* Header de la tabla */}
@@ -567,6 +590,7 @@ export default function SessionsTable({
                               icon={<DollarSign size={14} />}
                               className="h-9 text-center"
                               placeholder="0"
+                              disabled={!isEditable}
                             />
 
                             {/* Cantidad */}
@@ -582,6 +606,7 @@ export default function SessionsTable({
                               }
                               className="h-9 text-center font-semibold"
                               placeholder="0"
+                              disabled={!isEditable}
                             />
 
                             {/* Subtotal */}
@@ -637,7 +662,7 @@ export default function SessionsTable({
                                 r.budget = toInt(e.target.value);
                               })
                             }
-                            disabled={row.auto}
+                            disabled={row.auto || !isEditable}
                             icon={<DollarSign size={14} />}
                             className="h-9"
                           />
@@ -651,6 +676,7 @@ export default function SessionsTable({
                                   r.auto = e.target.checked;
                                 })
                               }
+                              disabled={!isEditable}
                             />
                             <span className="text-sm leading-none whitespace-nowrap">
                               Auto
@@ -672,6 +698,7 @@ export default function SessionsTable({
                           }
                           icon={<DollarSign size={14} />}
                           placeholder="0"
+                          disabled={!isEditable}
                         />
 
                         {/* Abono */}
@@ -688,6 +715,7 @@ export default function SessionsTable({
                           }
                           icon={<DollarSign size={14} />}
                           placeholder="0"
+                          disabled={!isEditable}
                         />
 
                         {/* Saldo */}
