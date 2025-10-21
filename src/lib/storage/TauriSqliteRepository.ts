@@ -410,10 +410,11 @@ export class TauriSqliteRepository {
         budget: number;
         payment: number;
         balance: number;
+        discount: number;
         signer: string | null;
       }>
     >(
-      `SELECT id, date, auto, budget, payment, balance, signer
+      `SELECT id, date, auto, budget, payment, balance, discount, signer
          FROM sessions
         WHERE visit_id = $1
         ORDER BY date DESC, id DESC`,
@@ -435,6 +436,7 @@ export class TauriSqliteRepository {
         budget: s.budget,
         payment: s.payment,
         balance: s.balance,
+        discount: s.discount,
         signer: s.signer ?? "",
         items,
       });
@@ -453,6 +455,7 @@ export class TauriSqliteRepository {
         budget: number;
         payment: number;
         balance: number;
+        discount: number;
         signer: string | null;
       }>
     >(
@@ -463,6 +466,7 @@ export class TauriSqliteRepository {
               s.budget,
               s.payment,
               s.balance,
+              s.discount,
               s.signer
          FROM sessions s
          JOIN visits v ON v.id = s.visit_id
@@ -484,6 +488,7 @@ export class TauriSqliteRepository {
         budget: r.budget,
         payment: r.payment,
         balance: r.balance,
+        discount: r.discount,
         signer: r.signer ?? "",
         items,
         visitId: r.visit_id,

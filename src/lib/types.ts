@@ -36,7 +36,7 @@ export type SessionRow = {
   items: ProcItem[];
   auto: boolean;
   budget: number;
-  discount: number; // NUEVO: descuento aplicado
+  discount: number; 
   payment: number;
   balance: number;
   signer?: string;
