@@ -19,6 +19,7 @@ import {
   Trash2,
   Edit3,
   Save,
+  X,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import type { SessionRow, ProcItem, ProcedureTemplate } from "../lib/types";
@@ -54,6 +55,9 @@ export default function SessionsTable({
 
   // Estado para modo edición de plantilla de procedimientos
   const [editModeSessionId, setEditModeSessionId] = useState<string | null>(null);
+
+  // Estado para guardar snapshot de items originales (para poder cancelar cambios)
+  const [itemsSnapshot, setItemsSnapshot] = useState<Map<string, ProcItem[]>>(new Map());
 
   // Orden y paginado
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // desc = más reciente primero
@@ -200,6 +204,12 @@ export default function SessionsTable({
 
   // Entrar al modo edición de plantilla
   const enterEditMode = (sessionId: string) => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (session) {
+      // Guardar snapshot profundo de los items originales
+      const snapshot = JSON.parse(JSON.stringify(session.items)) as ProcItem[];
+      setItemsSnapshot((prev) => new Map(prev).set(sessionId, snapshot));
+    }
     setEditModeSessionId(sessionId);
   };
 
@@ -246,6 +256,34 @@ export default function SessionsTable({
 
       onSessionsChange(next);
     }, 100);
+
+    setEditModeSessionId(null);
+  };
+
+  // Cancelar la edición de plantilla y restaurar items originales
+  const cancelEditMode = () => {
+    if (!editModeSessionId) return;
+
+    const snapshot = itemsSnapshot.get(editModeSessionId);
+    if (snapshot) {
+      // Restaurar los items originales
+      const sessionIdx = sessions.findIndex((s) => s.id === editModeSessionId);
+      if (sessionIdx !== -1) {
+        const next = [...sessions];
+        next[sessionIdx] = {
+          ...next[sessionIdx],
+          items: JSON.parse(JSON.stringify(snapshot)), // Copia profunda
+        };
+        onSessionsChange(next);
+      }
+
+      // Limpiar snapshot
+      setItemsSnapshot((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(editModeSessionId);
+        return newMap;
+      });
+    }
 
     setEditModeSessionId(null);
   };
@@ -430,7 +468,7 @@ export default function SessionsTable({
                 {/* Detalles expandidos */}
                 {isExpanded && (() => {
                   const inEditMode = editModeSessionId === row.id;
-                  const displayItems = inEditMode ? row.items : row.items.filter(it => it.qty > 0);
+                  const displayItems = row.items; // Mostrar todos los procedimientos siempre
 
                   return (
                   <div className="pt-3 mt-3 border-t border-[hsl(var(--border))] space-y-4">
@@ -452,7 +490,15 @@ export default function SessionsTable({
                                 onClick={() => addProcedure(idxReal)}
                               >
                                 <Plus size={16} />
-                                Agregar campo
+                                Añadir procedimiento
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={cancelEditMode}
+                              >
+                                <X size={16} />
+                                Cancelar
                               </Button>
                               <Button
                                 variant="primary"
