@@ -9,7 +9,7 @@ interface DialogProps {
   children: React.ReactNode;
   title?: string;
   description?: string;
-  size?: "sm" | "md" | "lg" | "xl" | "4xl" |"full";
+  size?: "sm" | "md" | "lg" | "xl" | "4xl" | "full";
   spotlight?: boolean;
 }
 
@@ -33,12 +33,10 @@ export function Dialog({
 
     if (open) {
       document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden";
     }
 
     return () => {
       document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "unset";
     };
   }, [open, onOpenChange]);
 
@@ -61,7 +59,7 @@ export function Dialog({
           "fixed inset-0 transition-all duration-300",
           spotlight
             ? "bg-black/60 backdrop-blur-xl"
-            : "bg-black/50 backdrop-blur-sm"
+            : "bg-black/50 backdrop-blur-sm",
         )}
         onClick={() => onOpenChange(false)}
       />
@@ -73,8 +71,9 @@ export function Dialog({
           "relative w-full bg-[hsl(var(--surface))] rounded-2xl shadow-2xl",
           "transform transition-all duration-300 ease-out",
           "animate-in fade-in-0 zoom-in-95 slide-in-from-top-4",
-          spotlight && "ring-1 ring-white/20 shadow-[0_0_80px_rgba(255,255,255,0.1)]",
-          sizeClasses[size]
+          spotlight &&
+            "ring-1 ring-white/20 shadow-[0_0_80px_rgba(255,255,255,0.1)]",
+          sizeClasses[size],
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -112,13 +111,30 @@ export function Dialog({
 }
 
 // Componente auxiliar para contenido del diálogo
-export function DialogContent({ children, className }: { children: React.ReactNode; className?: string }) {
+export function DialogContent({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return <div className={cn("space-y-4", className)}>{children}</div>;
 }
 
-export function DialogFooter({ children, className }: { children: React.ReactNode; className?: string }) {
+export function DialogFooter({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cn("flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[hsl(var(--border))]", className)}>
+    <div
+      className={cn(
+        "flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[hsl(var(--border))]",
+        className,
+      )}
+    >
       {children}
     </div>
   );

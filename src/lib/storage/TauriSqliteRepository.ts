@@ -1,6 +1,12 @@
 // src/lib/storage/TauriSqliteRepository.ts
 import Database from "@tauri-apps/plugin-sql";
-import type { Patient, Visit, SessionRow, ProcItem, ProcedureTemplate } from "../types";
+import type {
+  Patient,
+  Visit,
+  SessionRow,
+  ProcItem,
+  ProcedureTemplate,
+} from "../types";
 
 /** Fila completa de la tabla visits (para detalles) */
 type VisitRow = {
@@ -35,13 +41,38 @@ export class TauriSqliteRepository {
     this.db = await Database.load("sqlite:clinic.db");
     await this.db.execute("PRAGMA foreign_keys = ON;");
 
-    // Verificar si la tabla procedure_templates existe, si no, crearla
-    try {
-      await this.db.select("SELECT 1 FROM procedure_templates LIMIT 1");
-    } catch {
-      // La tabla no existe, ejecutar migración manualmente
-      console.log("Creando tablas de plantillas...");
+    // Crear tabla de versiones de migración si no existe
+    await this.db.execute(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Ejecutar migraciones pendientes
+    await this.runMigrations();
+  }
+
+  private async hasMigration(version: number): Promise<boolean> {
+    const rows = await this.db!.select<Array<{ count: number }>>(
+      "SELECT COUNT(*) as count FROM schema_migrations WHERE version = ?",
+      [version],
+    );
+    return (rows[0]?.count ?? 0) > 0;
+  }
+
+  private async markMigration(version: number): Promise<void> {
+    await this.db!.execute(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      [version],
+    );
+  }
+
+  private async runMigrations() {
+    // Migración 002: Plantillas y doctores
+    if (!(await this.hasMigration(2))) {
       await this.executeMigration002();
+      await this.markMigration(2);
     }
   }
 
@@ -49,7 +80,7 @@ export class TauriSqliteRepository {
     // Agregar campo discount a sessions
     try {
       await this.db!.execute(
-        "ALTER TABLE sessions ADD COLUMN discount INTEGER NOT NULL DEFAULT 0"
+        "ALTER TABLE sessions ADD COLUMN discount INTEGER NOT NULL DEFAULT 0",
       );
     } catch {
       // Ya existe, ignorar
@@ -97,7 +128,7 @@ export class TauriSqliteRepository {
       END
     `);
 
-    // Datos iniciales - procedimientos predefinidos
+    // Datos iniciales - procedimientos predefinidos (SOLO PRIMERA VEZ)
     const defaultProcs = [
       "Curación",
       "Resinas simples",
@@ -121,19 +152,26 @@ export class TauriSqliteRepository {
     for (const name of defaultProcs) {
       await this.db!.execute(
         `INSERT OR IGNORE INTO procedure_templates (name, default_price) VALUES (?, 0)`,
-        [name]
+        [name],
+      );
+    }
+
+    // Datos iniciales - doctores por defecto (SOLO PRIMERA VEZ)
+    const defaultSigners = ["Dr. Ejemplo 1", "Dra. Ejemplo 2"];
+    for (const name of defaultSigners) {
+      await this.db!.execute(
+        `INSERT OR IGNORE INTO signers (name, active) VALUES (?, 1)`,
+        [name],
       );
     }
 
     // Índices
     await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_procedure_templates_active ON procedure_templates(active)`
+      `CREATE INDEX IF NOT EXISTS idx_procedure_templates_active ON procedure_templates(active)`,
     );
     await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_signers_active ON signers(active)`
+      `CREATE INDEX IF NOT EXISTS idx_signers_active ON signers(active)`,
     );
-
-    console.log("Migración 002 ejecutada exitosamente");
   }
 
   private get conn(): Database {
@@ -159,7 +197,7 @@ export class TauriSqliteRepository {
            OR doc_id    LIKE $1
            OR phone     LIKE $1
         ORDER BY full_name`,
-      [like]
+      [like],
     );
   }
 
@@ -174,7 +212,7 @@ export class TauriSqliteRepository {
               allergy_detail AS allergyDetail
          FROM patients
         WHERE id = $1`,
-      [id]
+      [id],
     );
     return rows[0] ?? null;
   }
@@ -200,7 +238,7 @@ export class TauriSqliteRepository {
           p.anamnesis ?? null,
           p.allergyDetail ?? null,
           p.id,
-        ]
+        ],
       );
       return p.id;
     }
@@ -209,7 +247,7 @@ export class TauriSqliteRepository {
     if (p.doc_id) {
       const ex = await this.conn.select<Array<{ id: number }>>(
         `SELECT id FROM patients WHERE doc_id = $1`,
-        [p.doc_id]
+        [p.doc_id],
       );
       if (ex[0]) {
         await this.conn.execute(
@@ -228,7 +266,7 @@ export class TauriSqliteRepository {
             p.anamnesis ?? null,
             p.allergyDetail ?? null,
             ex[0].id,
-          ]
+          ],
         );
         return ex[0].id;
       }
@@ -245,7 +283,7 @@ export class TauriSqliteRepository {
         p.age ?? null,
         p.anamnesis ?? null,
         p.allergyDetail ?? null,
-      ]
+      ],
     );
     return Number(res.lastInsertId);
   }
@@ -267,12 +305,16 @@ export class TauriSqliteRepository {
          FROM visits
         WHERE patient_id = $1
         ORDER BY date DESC, id DESC`,
-      [patientId]
+      [patientId],
     );
   }
 
   /** Paginado de visitas de un paciente. */
-  async getVisitsByPatientPaged(patientId: number, page = 1, pageSize = 10): Promise<{
+  async getVisitsByPatientPaged(
+    patientId: number,
+    page = 1,
+    pageSize = 10,
+  ): Promise<{
     rows: VisitListRow[];
     total: number;
     page: number;
@@ -286,7 +328,7 @@ export class TauriSqliteRepository {
       `SELECT COUNT(*) AS total
          FROM visits
         WHERE patient_id = $1`,
-      [patientId]
+      [patientId],
     );
     const total = Number(totalRows[0]?.total ?? 0);
 
@@ -302,7 +344,7 @@ export class TauriSqliteRepository {
         WHERE patient_id = $1
         ORDER BY date DESC, id DESC
         LIMIT $2 OFFSET $3`,
-      [patientId, safeSize, offset]
+      [patientId, safeSize, offset],
     );
 
     return { rows, total, page: safePage, pageSize: safeSize };
@@ -322,14 +364,18 @@ export class TauriSqliteRepository {
               tooth_dx_json
          FROM visits
         WHERE id = $1`,
-      [visitId]
+      [visitId],
     );
     return rows[0] ?? null;
   }
 
   private async insertVisit(
     patient_id: number,
-    v: Visit & { autoDxText?: string; manualDxText?: string; fullDxText?: string }
+    v: Visit & {
+      autoDxText?: string;
+      manualDxText?: string;
+      fullDxText?: string;
+    },
   ): Promise<number> {
     const res = await this.conn.execute(
       `INSERT INTO visits
@@ -346,7 +392,7 @@ export class TauriSqliteRepository {
         v.manualDxText ?? null,
         v.fullDxText ?? null,
         v.toothDx ? JSON.stringify(v.toothDx) : null,
-      ]
+      ],
     );
     return Number(res.lastInsertId);
   }
@@ -360,12 +406,14 @@ export class TauriSqliteRepository {
       await db.execute(
         `DELETE FROM session_items
           WHERE session_id IN (SELECT id FROM sessions WHERE visit_id = $1)`,
-        [visitId]
+        [visitId],
       );
       // 2) Sesiones de esa visita
       await db.execute(`DELETE FROM sessions WHERE visit_id = $1`, [visitId]);
       // 3) Adjuntos asociados a esa visita (solo metadatos; los archivos quedan en disco)
-      await db.execute(`DELETE FROM attachments WHERE visit_id = $1`, [visitId]);
+      await db.execute(`DELETE FROM attachments WHERE visit_id = $1`, [
+        visitId,
+      ]);
       // 4) Visita
       await db.execute(`DELETE FROM visits WHERE id = $1`, [visitId]);
 
@@ -384,7 +432,15 @@ export class TauriSqliteRepository {
       `INSERT INTO sessions
          (visit_id, date, auto, budget, payment, balance, signer)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [visitId, s.date, s.auto ? 1 : 0, s.budget, s.payment, s.balance, s.signer ?? null]
+      [
+        visitId,
+        s.date,
+        s.auto ? 1 : 0,
+        s.budget,
+        s.payment,
+        s.balance,
+        s.signer ?? null,
+      ],
     );
     return Number(res.lastInsertId);
   }
@@ -395,7 +451,7 @@ export class TauriSqliteRepository {
       await this.conn.execute(
         `INSERT INTO session_items (session_id, name, unit, qty, sub)
          VALUES ($1,$2,$3,$4,$5)`,
-        [sessionId, it.name, it.unit, it.qty, it.sub]
+        [sessionId, it.name, it.unit, it.qty, it.sub],
       );
     }
   }
@@ -418,7 +474,7 @@ export class TauriSqliteRepository {
          FROM sessions
         WHERE visit_id = $1
         ORDER BY date DESC, id DESC`,
-      [visitId]
+      [visitId],
     );
 
     const out: SessionRow[] = [];
@@ -427,7 +483,7 @@ export class TauriSqliteRepository {
         `SELECT name, unit, qty, sub
            FROM session_items
           WHERE session_id = $1`,
-        [s.id]
+        [s.id],
       );
       out.push({
         id: String(s.id),
@@ -472,14 +528,14 @@ export class TauriSqliteRepository {
          JOIN visits v ON v.id = s.visit_id
         WHERE v.patient_id = $1
         ORDER BY s.date DESC, s.id DESC`,
-      [patientId]
+      [patientId],
     );
 
     const result: SessionRow[] = [];
     for (const r of rows) {
       const items = await this.conn.select<ProcItem[]>(
         `SELECT name, unit, qty, sub FROM session_items WHERE session_id = $1`,
-        [r.id]
+        [r.id],
       );
       result.push({
         id: String(r.id),
@@ -500,7 +556,11 @@ export class TauriSqliteRepository {
   /** Guardar paciente + visita + sesiones (con items) en transacción. */
   async saveVisitWithSessions(payload: {
     patient: Patient;
-    visit: Visit & { autoDxText?: string; manualDxText?: string; fullDxText?: string };
+    visit: Visit & {
+      autoDxText?: string;
+      manualDxText?: string;
+      fullDxText?: string;
+    };
     sessions: SessionRow[];
   }): Promise<{ patientId: number; visitId: number }> {
     const db = this.conn;
@@ -541,7 +601,7 @@ export class TauriSqliteRepository {
          FROM attachments
         WHERE visit_id = $1
         ORDER BY created_at DESC, id DESC`,
-      [visitId]
+      [visitId],
     );
   }
 
@@ -564,7 +624,7 @@ export class TauriSqliteRepository {
         WHERE patient_id = $1
           AND visit_id IS NULL
         ORDER BY created_at DESC, id DESC`,
-      [patientId]
+      [patientId],
     );
   }
 
@@ -593,7 +653,7 @@ export class TauriSqliteRepository {
         meta.storage_key,
         meta.checksum ?? null,
         meta.note ?? null,
-      ]
+      ],
     );
     return Number(res.lastInsertId);
   }
@@ -601,12 +661,14 @@ export class TauriSqliteRepository {
   async moveAttachmentToVisit(attachmentId: number, visitId: number | null) {
     await this.conn.execute(
       `UPDATE attachments SET visit_id = $2 WHERE id = $1`,
-      [attachmentId, visitId]
+      [attachmentId, visitId],
     );
   }
 
   async deleteAttachment(attachmentId: number) {
-    await this.conn.execute(`DELETE FROM attachments WHERE id = $1`, [attachmentId]);
+    await this.conn.execute(`DELETE FROM attachments WHERE id = $1`, [
+      attachmentId,
+    ]);
   }
 
   // -------------------------------------------------------------------------
@@ -617,11 +679,13 @@ export class TauriSqliteRepository {
       `SELECT id, name, default_price, active, created_at, updated_at
          FROM procedure_templates
         WHERE active = 1
-        ORDER BY id ASC`
+        ORDER BY id ASC`,
     );
   }
 
-  async saveProcedureTemplates(templates: Array<{ name: string; default_price: number }>): Promise<void> {
+  async saveProcedureTemplates(
+    templates: Array<{ name: string; default_price: number }>,
+  ): Promise<void> {
     // Estrategia: eliminar todos y reinsertar
     // (O podrías hacer un diff inteligente, pero esto es más simple)
     await this.conn.execute(`DELETE FROM procedure_templates`);
@@ -630,9 +694,65 @@ export class TauriSqliteRepository {
       await this.conn.execute(
         `INSERT INTO procedure_templates (name, default_price, active)
          VALUES ($1, $2, 1)`,
-        [t.name, t.default_price]
+        [t.name, t.default_price],
       );
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // SIGNERS (Doctores/Responsables)
+  // -------------------------------------------------------------------------
+  async getSigners(): Promise<Array<{ id: number; name: string }>> {
+    return this.conn.select<Array<{ id: number; name: string }>>(
+      `SELECT id, name
+         FROM signers
+        WHERE active = 1
+        ORDER BY name ASC`,
+    );
+  }
+
+  async createSigner(name: string): Promise<number> {
+    const trimmed = name.trim();
+
+    // Verificar si ya existe (activo o inactivo)
+    const existing = await this.conn.select<
+      Array<{ id: number; active: number }>
+    >(`SELECT id, active FROM signers WHERE name = $1`, [trimmed]);
+
+    if (existing.length > 0) {
+      const signer = existing[0];
+      if (signer.active === 0) {
+        // Si existe pero está inactivo, reactivarlo
+        await this.conn.execute(`UPDATE signers SET active = 1 WHERE id = $1`, [
+          signer.id,
+        ]);
+        return signer.id;
+      } else {
+        // Si existe y está activo, lanzar error
+        throw new Error("Ya existe un doctor con ese nombre");
+      }
+    }
+
+    // Si no existe, crear uno nuevo
+    const res = await this.conn.execute(
+      `INSERT INTO signers (name, active) VALUES ($1, 1)`,
+      [trimmed],
+    );
+    return Number(res.lastInsertId);
+  }
+
+  async updateSigner(id: number, name: string): Promise<void> {
+    await this.conn.execute(`UPDATE signers SET name = $1 WHERE id = $2`, [
+      name.trim(),
+      id,
+    ]);
+  }
+
+  async deleteSigner(id: number): Promise<void> {
+    // Soft delete: marcamos como inactivo
+    await this.conn.execute(`UPDATE signers SET active = 0 WHERE id = $1`, [
+      id,
+    ]);
   }
 }
 

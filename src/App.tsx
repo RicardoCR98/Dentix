@@ -67,27 +67,6 @@ const initialVisit: Visit = {
   diagnosis: "",
 };
 
-// Procedimientos predefinidos por defecto (primera vez)
-const DEFAULT_PROCS = [
-  "Curación",
-  "Resinas simples",
-  "Resinas compuestas",
-  "Extracciones simples",
-  "Extracciones complejas",
-  "Correctivo inicial",
-  "Control mensual",
-  "Prótesis total",
-  "Prótesis removible",
-  "Prótesis fija",
-  "Retenedor",
-  "Endodoncia simple",
-  "Endodoncia compleja",
-  "Limpieza simple",
-  "Limpieza compleja",
-  "Reposición",
-  "Pegada",
-];
-
 export default function App() {
   // ficha + visita activa
   const [patient, setPatient] = useState<Patient>(initialPatient);
@@ -102,7 +81,14 @@ export default function App() {
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
 
   // plantilla global de procedimientos
-  const [procedureTemplates, setProcedureTemplates] = useState<ProcedureTemplate[]>([]);
+  const [procedureTemplates, setProcedureTemplates] = useState<
+    ProcedureTemplate[]
+  >([]);
+
+  // lista de doctores/firmantes
+  const [signers, setSigners] = useState<Array<{ id: number; name: string }>>(
+    [],
+  );
 
   // diálogos / datos auxiliares
   const [showSaveAlert, setShowSaveAlert] = useState(false);
@@ -121,7 +107,7 @@ export default function App() {
     const lines = Object.keys(toothDx)
       .sort((a, b) => +a - +b)
       .map((n) =>
-        toothDx[n]?.length ? `Diente ${n}: ${toothDx[n].join(", ")}` : ""
+        toothDx[n]?.length ? `Diente ${n}: ${toothDx[n].join(", ")}` : "",
       )
       .filter(Boolean);
     return lines.join("\n");
@@ -196,12 +182,12 @@ export default function App() {
         const { storage_key, bytes } = await saveAttachmentFile(
           a.file!,
           patientId,
-          visit.date
+          visit.date,
         );
         await repo.createAttachment({
           patient_id: patientId,
           visit_id: visitId,
-          filename: a.name, 
+          filename: a.name,
           mime_type: a.type || "application/octet-stream",
           bytes,
           storage_key,
@@ -214,7 +200,9 @@ export default function App() {
 
       // Recargar todas las sesiones del paciente para actualizar
       if (patientId) {
-        const allSess = await (await getRepository()).getSessionsByPatient(patientId);
+        const allSess = await (
+          await getRepository()
+        ).getSessionsByPatient(patientId);
         setSessions(allSess);
       }
 
@@ -308,18 +296,25 @@ export default function App() {
     })();
   }, [paymentsDialogOpen]);
 
-  // ---------- Cargar plantilla de procedimientos ----------
+  // ---------- Inicializar y cargar datos ----------
   useEffect(() => {
     (async () => {
       try {
+        // Primero obtener el repositorio (esto inicializa la DB)
         const repo = await getRepository();
-        const templates = await repo.getProcedureTemplates();
+
+        // Luego cargar todos los datos necesarios
+        const [templates, signersList] = await Promise.all([
+          repo.getProcedureTemplates(),
+          repo.getSigners(),
+        ]);
+
         setProcedureTemplates(templates);
-        console.log(`Plantilla cargada: ${templates.length} procedimientos`);
+        setSigners(signersList);
       } catch (error) {
-        console.error("Error cargando plantilla de procedimientos:", error);
-        // Si falla, usar array vacío para no bloquear la app
+        console.error("Error inicializando datos:", error);
         setProcedureTemplates([]);
+        setSigners([]);
       }
     })();
   }, []);
@@ -341,11 +336,20 @@ export default function App() {
       // Recargar desde BD
       const saved = await repo.getProcedureTemplates();
       setProcedureTemplates(saved);
-
-      console.log(`Plantilla actualizada: ${saved.length} procedimientos guardados`);
     },
-    []
+    [],
   );
+
+  // Función para recargar lista de doctores
+  const reloadSigners = useCallback(async () => {
+    try {
+      const repo = await getRepository();
+      const list = await repo.getSigners();
+      setSigners(list);
+    } catch (error) {
+      console.error("Error recargando doctores:", error);
+    }
+  }, []);
 
   // ---------- Atajos ----------
   useEffect(() => {
@@ -378,9 +382,9 @@ export default function App() {
 
   return (
     <Layout
-      clinicName='GREENAPPLEDENTAL'
-      slogan='Magic in your smile'
-      schedule='10:00 - 1:00 / 3:00 - 7:00'
+      clinicName="GREENAPPLEDENTAL"
+      slogan="Magic in your smile"
+      schedule="10:00 - 1:00 / 3:00 - 7:00"
       headerRight={
         <>
           <ThemePanel inlineTrigger />
@@ -402,70 +406,70 @@ export default function App() {
         onSelectPatient={handleSelectPatient}
       />
       {showSaveAlert && (
-        <div className='mb-6'>
-          <Alert variant='success' title='¡Guardado exitoso!'>
+        <div className="mb-6">
+          <Alert variant="success" title="¡Guardado exitoso!">
             La historia clínica se ha guardado correctamente.
           </Alert>
         </div>
       )}
       {/* Acciones rápidas */}
       <Section
-        title='Acciones Rápidas'
+        title="Acciones Rápidas"
         icon={
           <PopoverRoot>
             <PopoverTrigger asChild>
               <button
-                type='button'
-                aria-label='Ver atajos de teclado'
-                className='cursor-pointer inline-flex items-center justify-center rounded-full p-1 hover:bg-[hsl(var(--muted))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))]'
-                title='Atajos de teclado'
+                type="button"
+                aria-label="Ver atajos de teclado"
+                className="cursor-pointer inline-flex items-center justify-center rounded-full p-1 hover:bg-[hsl(var(--muted))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))]"
+                title="Atajos de teclado"
               >
                 <Info size={20} />
               </button>
             </PopoverTrigger>
             <PopoverContent
-              side='bottom'
-              align='start'
-              className='w-[320px] p-3'
+              side="bottom"
+              align="start"
+              className="w-[320px] p-3"
             >
               <ShortcutsHelp />
             </PopoverContent>
           </PopoverRoot>
         }
       >
-        <div className='flex flex-wrap gap-4 justify-center'>
+        <div className="flex flex-wrap gap-4 justify-center">
           <Button
             onClick={handleNew}
-            variant='primary'
-            size='lg'
-            className='min-w-[180px] h-14 text-base font-semibold bg-green-600 hover:bg-green-700 text-white'
+            variant="primary"
+            size="lg"
+            className="min-w-[180px] h-14 text-base font-semibold bg-green-600 hover:bg-green-700 text-white"
           >
             <Plus size={22} />
             Nueva historia
           </Button>
           <Button
             onClick={handlePreview}
-            variant='secondary'
-            size='lg'
-            className='min-w-[180px] h-14 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white'
+            variant="secondary"
+            size="lg"
+            className="min-w-[180px] h-14 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white"
           >
             <FileDown size={22} />
             Vista previa/Imprimir
           </Button>
           <Button
             onClick={() => setSearchDialogOpen(true)}
-            variant='secondary'
-            size='lg'
-            className='min-w-[180px] h-14 text-base font-semibold bg-purple-600 hover:bg-purple-700 text-white'
+            variant="secondary"
+            size="lg"
+            className="min-w-[180px] h-14 text-base font-semibold bg-purple-600 hover:bg-purple-700 text-white"
           >
             <Search size={22} />
             Búsqueda de pacientes
           </Button>
           <Button
             onClick={() => setPaymentsDialogOpen(true)}
-            variant='secondary'
-            size='lg'
-            className='min-w-[180px] h-14 text-base font-semibold bg-orange-600 hover:bg-orange-700 text-white'
+            variant="secondary"
+            size="lg"
+            className="min-w-[180px] h-14 text-base font-semibold bg-orange-600 hover:bg-orange-700 text-white"
           >
             <Wallet size={22} />
             Cartera de pendientes
@@ -473,17 +477,17 @@ export default function App() {
         </div>
       </Section>
       {/* Datos del paciente */}
-      <Section title='Datos del Paciente' icon={<User size={20} />}>
+      <Section title="Datos del Paciente" icon={<User size={20} />}>
         <PatientForm value={patient} onChange={setPatient} />
         {!hasPatientData && (
-          <Alert variant='warning' className='mt-4'>
+          <Alert variant="warning" className="mt-4">
             Por favor completa al menos el nombre y cédula del paciente para
             poder guardar.
           </Alert>
         )}
       </Section>
       {/* Motivo */}
-      <Section title='Motivo de Consulta' icon={<Stethoscope size={20} />}>
+      <Section title="Motivo de Consulta" icon={<Stethoscope size={20} />}>
         <div className="grid mb-4">
           <div>
             <Label required>Tipo de consulta</Label>
@@ -498,31 +502,31 @@ export default function App() {
             >
               <SelectTrigger />
               <SelectContent>
-                <SelectItem value='Dolor'>🦷 Dolor</SelectItem>
-                <SelectItem value='Control'>✅ Control</SelectItem>
-                <SelectItem value='Emergencia'>🚨 Emergencia</SelectItem>
-                <SelectItem value='Estetica'>✨ Estética</SelectItem>
-                <SelectItem value='Otro'>📋 Otro</SelectItem>
+                <SelectItem value="Dolor">🦷 Dolor</SelectItem>
+                <SelectItem value="Control">✅ Control</SelectItem>
+                <SelectItem value="Emergencia">🚨 Emergencia</SelectItem>
+                <SelectItem value="Estetica">✨ Estética</SelectItem>
+                <SelectItem value="Otro">📋 Otro</SelectItem>
               </SelectContent>
             </SelectRoot>
           </div>
         </div>
 
         <Textarea
-          label='Descripción detallada'
+          label="Descripción detallada"
           value={visit.reasonDetail || ""}
           onChange={(e) =>
             setVisit((v) => ({ ...v, reasonDetail: e.target.value }))
           }
-          placeholder='Describe el motivo de la consulta, síntomas, duración, etc.'
-          className='min-h-[100px]'
+          placeholder="Describe el motivo de la consulta, síntomas, duración, etc."
+          className="min-h-[100px]"
         />
       </Section>
       {/* Odontograma */}
-      <Section title='Odontograma por Cuadrantes' icon={<Activity size={20} />}>
+      <Section title="Odontograma por Cuadrantes" icon={<Activity size={20} />}>
         <Odontogram value={toothDx} onChange={onToothDxChange} />
-        <div className='mt-4 p-4 bg-[hsl(var(--muted))] rounded-lg'>
-          <p className='text-sm text-[hsl(var(--muted-foreground))] flex items-center gap-2'>
+        <div className="mt-4 p-4 bg-[hsl(var(--muted))] rounded-lg">
+          <p className="text-sm text-[hsl(var(--muted-foreground))] flex items-center gap-2">
             <FileText size={14} />
             <span>
               <strong>Instrucciones:</strong> Haz clic en cualquier pieza dental
@@ -533,14 +537,14 @@ export default function App() {
         </div>
       </Section>
       {/* Diagnóstico */}
-      <Section title='Diagnóstico' icon={<FileText size={20} />}>
+      <Section title="Diagnóstico" icon={<FileText size={20} />}>
         {diagnosisFromTeeth && (
-          <Alert variant='info' className='mb-3'>
-            <div className='flex items-start gap-2'>
-              <Calendar size={16} className='mt-0.5' />
-              <div className='text-sm'>
+          <Alert variant="info" className="mb-3">
+            <div className="flex items-start gap-2">
+              <Calendar size={16} className="mt-0.5" />
+              <div className="text-sm">
                 <strong>Diagnóstico automático del odontograma:</strong>
-                <p className='mt-1 whitespace-pre-line'>{diagnosisFromTeeth}</p>
+                <p className="mt-1 whitespace-pre-line">{diagnosisFromTeeth}</p>
               </div>
             </div>
           </Alert>
@@ -552,43 +556,45 @@ export default function App() {
           autoGenerated={Boolean(diagnosisFromTeeth)}
         />
 
-        <div className='mt-3 p-3 bg-[hsl(var(--muted))] rounded text-sm text-[hsl(var(--muted-foreground))]'>
+        <div className="mt-3 p-3 bg-[hsl(var(--muted))] rounded text-sm text-[hsl(var(--muted-foreground))]">
           <strong>💡 Nota:</strong> Al guardar, se combinarán las selecciones
           del odontograma con tus notas manuales en el campo{" "}
           <em>diagnóstico</em> de la visita.
         </div>
       </Section>
       {/* Evolución y procedimientos */}
-      <Section title='Evolución y Procedimientos' icon={<Activity size={20} />}>
+      <Section title="Evolución y Procedimientos" icon={<Activity size={20} />}>
         <SessionsTable
           sessions={sessions}
           onSessionsChange={setSessions}
           procedureTemplates={procedureTemplates}
           onUpdateTemplates={updateProcedureTemplates}
+          signers={signers}
+          onSignersChange={reloadSigners}
         />
       </Section>
       {/* Adjuntos */}
       <Section
-        title='Adjuntos (Radiografías, Fotos, Documentos)'
+        title="Adjuntos (Radiografías, Fotos, Documentos)"
         icon={<Paperclip size={20} />}
       >
         <Attachments files={attachments} onFilesChange={setAttachments} />
       </Section>
-      
+
       {/* Botonera final */}
-      <div className='flex justify-end gap-3 mt-8 p-6 bg-[hsl(var(--muted))] rounded-lg'>
-        <Button onClick={handleNew} variant='ghost' size='lg'>
+      <div className="flex justify-end gap-3 mt-8 p-6 bg-[hsl(var(--muted))] rounded-lg">
+        <Button onClick={handleNew} variant="ghost" size="lg">
           <Plus size={18} />
           Nueva Historia
         </Button>
-        <Button onClick={handlePreview} variant='secondary' size='lg'>
+        <Button onClick={handlePreview} variant="secondary" size="lg">
           <FileDown size={18} />
           Vista previa/Imprimir
         </Button>
         <Button
           onClick={handleSave}
-          variant='primary'
-          size='lg'
+          variant="primary"
+          size="lg"
           disabled={!canSave}
           title="Guardar"
         >

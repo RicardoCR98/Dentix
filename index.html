@@ -1,13 +1,48 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>odonto</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>odonto</title>
+
+        <!-- Prevenir flash de tema oscuro: cargar tema guardado ANTES del CSS -->
+        <script>
+            (function () {
+                try {
+                    const stored = localStorage.getItem("odonto.theme.v1");
+                    if (stored) {
+                        const { theme, brandHsl, font, size } =
+                            JSON.parse(stored);
+                        const root = document.documentElement;
+                        if (theme) root.setAttribute("data-theme", theme);
+                        if (brandHsl)
+                            root.style.setProperty("--brand", brandHsl);
+                        if (font) root.style.setProperty("--font-sans", font);
+                        if (size)
+                            root.style.setProperty(
+                                "--font-size-base",
+                                size + "px",
+                            );
+                    } else {
+                        // Si no hay tema guardado, usar light por defecto (no auto)
+                        document.documentElement.setAttribute(
+                            "data-theme",
+                            "light",
+                        );
+                    }
+                } catch (e) {
+                    // Fallback a light si hay error
+                    document.documentElement.setAttribute(
+                        "data-theme",
+                        "light",
+                    );
+                }
+            })();
+        </script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
 </html>
