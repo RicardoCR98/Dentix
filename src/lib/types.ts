@@ -79,3 +79,13 @@ export type Signer = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type DiagnosisOption = {
+  id?: number;
+  label: string;
+  color: "success" | "info" | "warning" | "danger" | "default";
+  active?: boolean;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};

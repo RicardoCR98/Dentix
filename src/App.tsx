@@ -304,11 +304,53 @@ export default function App() {
         const repo = await getRepository();
 
         // Luego cargar todos los datos necesarios
-        const [templates, signersList] = await Promise.all([
-          repo.getProcedureTemplates(),
-          repo.getSigners(),
-        ]);
+        let templates = await repo.getProcedureTemplates();
+        let signersList = await repo.getSigners();
 
+        // Si no hay plantillas de procedimientos, insertar las por defecto
+        if (templates.length === 0) {
+          console.log("📋 No hay plantillas en BD, insertando valores por defecto...");
+          const defaultProcs = [
+            "Curación",
+            "Resinas simples",
+            "Resinas compuestas",
+            "Extracciones simples",
+            "Extracciones complejas",
+            "Correctivo inicial",
+            "Control mensual",
+            "Prótesis total",
+            "Prótesis removible",
+            "Prótesis fija",
+            "Retenedor",
+            "Endodoncia simple",
+            "Endodoncia compleja",
+            "Limpieza simple",
+            "Limpieza compleja",
+            "Reposición",
+            "Pegada",
+          ];
+
+          await repo.saveProcedureTemplates(
+            defaultProcs.map((name) => ({ name, default_price: 0 }))
+          );
+
+          // Recargar después de insertar
+          templates = await repo.getProcedureTemplates();
+          console.log("✅ Plantillas insertadas:", templates.length);
+        } else {
+          console.log("✅ Plantillas cargadas desde BD:", templates.length);
+        }
+
+        // Si no hay firmantes, insertar los por defecto
+        if (signersList.length === 0) {
+          await repo.createSigner("Dr. Ejemplo 1");
+          await repo.createSigner("Dra. Ejemplo 2");
+
+          // Recargar después de insertar
+          signersList = await repo.getSigners();
+        }
+
+        console.log("🔄 Actualizando estado con templates:", templates);
         setProcedureTemplates(templates);
         setSigners(signersList);
       } catch (error) {

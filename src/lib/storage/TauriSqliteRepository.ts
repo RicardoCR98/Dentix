@@ -6,6 +6,7 @@ import type {
   SessionRow,
   ProcItem,
   ProcedureTemplate,
+  DiagnosisOption,
 } from "../types";
 
 /** Fila completa de la tabla visits (para detalles) */
@@ -430,8 +431,8 @@ export class TauriSqliteRepository {
   private async insertSession(visitId: number, s: SessionRow): Promise<number> {
     const res = await this.conn.execute(
       `INSERT INTO sessions
-         (visit_id, date, auto, budget, payment, balance, signer)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+         (visit_id, date, auto, budget, payment, balance, discount, signer)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [
         visitId,
         s.date,
@@ -439,6 +440,7 @@ export class TauriSqliteRepository {
         s.budget,
         s.payment,
         s.balance,
+        s.discount ?? 0,
         s.signer ?? null,
       ],
     );
@@ -447,7 +449,8 @@ export class TauriSqliteRepository {
 
   private async insertSessionItems(sessionId: number, items: ProcItem[]) {
     for (const it of items) {
-      if ((it.qty ?? 0) <= 0) continue;
+      // Guardar TODOS los items (incluso con qty=0) para preservar
+      // la plantilla personalizada del doctor
       await this.conn.execute(
         `INSERT INTO session_items (session_id, name, unit, qty, sub)
          VALUES ($1,$2,$3,$4,$5)`,
@@ -754,23 +757,122 @@ export class TauriSqliteRepository {
       id,
     ]);
   }
+
+  // -------------------------------------------------------------------------
+  // DIAGNOSIS OPTIONS (Opciones de diagnóstico del odontograma)
+  // -------------------------------------------------------------------------
+  async getDiagnosisOptions(): Promise<DiagnosisOption[]> {
+    return this.conn.select<DiagnosisOption[]>(
+      `SELECT id, label, color, active, sort_order, created_at, updated_at
+         FROM diagnosis_options
+        WHERE active = 1
+        ORDER BY sort_order ASC, id ASC`,
+    );
+  }
+
+  async createDiagnosisOption(option: {
+    label: string;
+    color: string;
+    sort_order: number;
+  }): Promise<number> {
+    const trimmed = option.label.trim();
+
+    // Verificar si ya existe (activo o inactivo)
+    const existing = await this.conn.select<
+      Array<{ id: number; active: number }>
+    >(`SELECT id, active FROM diagnosis_options WHERE label = $1`, [trimmed]);
+
+    if (existing.length > 0) {
+      const opt = existing[0];
+      if (opt.active === 0) {
+        // Si existe pero está inactivo, reactivarlo
+        await this.conn.execute(
+          `UPDATE diagnosis_options SET active = 1, color = $2, sort_order = $3 WHERE id = $1`,
+          [opt.id, option.color, option.sort_order],
+        );
+        return opt.id;
+      } else {
+        // Si existe y está activo, lanzar error
+        throw new Error("Ya existe una opción con ese nombre");
+      }
+    }
+
+    // Si no existe, crear una nueva
+    const res = await this.conn.execute(
+      `INSERT INTO diagnosis_options (label, color, sort_order, active)
+       VALUES ($1, $2, $3, 1)`,
+      [trimmed, option.color, option.sort_order],
+    );
+    return Number(res.lastInsertId);
+  }
+
+  async updateDiagnosisOption(
+    id: number,
+    option: { label: string; color: string; sort_order: number },
+  ): Promise<void> {
+    await this.conn.execute(
+      `UPDATE diagnosis_options
+       SET label = $1, color = $2, sort_order = $3
+       WHERE id = $4`,
+      [option.label.trim(), option.color, option.sort_order, id],
+    );
+  }
+
+  async deleteDiagnosisOption(id: number): Promise<void> {
+    // Soft delete: marcamos como inactivo
+    await this.conn.execute(
+      `UPDATE diagnosis_options SET active = 0 WHERE id = $1`,
+      [id],
+    );
+  }
+
+  async saveDiagnosisOptions(
+    options: Array<{ label: string; color: string; sort_order: number }>,
+  ): Promise<void> {
+    // Estrategia: eliminar todos y reinsertar
+    await this.conn.execute(`DELETE FROM diagnosis_options`);
+
+    for (const opt of options) {
+      await this.conn.execute(
+        `INSERT INTO diagnosis_options (label, color, sort_order, active)
+         VALUES ($1, $2, $3, 1)`,
+        [opt.label, opt.color, opt.sort_order],
+      );
+    }
+  }
 }
 
 // -----------------------------
 // Singleton
 // -----------------------------
 let _repo: TauriSqliteRepository | null = null;
+let _initPromise: Promise<TauriSqliteRepository> | null = null;
+
 export async function getRepository() {
-  if (!_repo) {
-    _repo = new TauriSqliteRepository();
+  // Si ya está inicializado, retornar inmediatamente
+  if (_repo) {
+    return _repo;
+  }
+
+  // Si ya hay una inicialización en progreso, esperar a que termine
+  if (_initPromise) {
+    return _initPromise;
+  }
+
+  // Iniciar nueva inicialización
+  _initPromise = (async () => {
+    const repo = new TauriSqliteRepository();
     try {
-      await _repo.initialize();
+      await repo.initialize();
+      _repo = repo;
+      return repo;
     } catch (error) {
-      // Si falla la inicialización, resetear _repo para que se pueda reintentar
-      _repo = null;
+      // Si falla la inicialización, resetear para que se pueda reintentar
+      _initPromise = null;
       console.error("Error inicializando repositorio:", error);
       throw error;
     }
-  }
-  return _repo;
+  })();
+
+  return _initPromise;
 }

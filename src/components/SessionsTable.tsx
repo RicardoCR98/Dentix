@@ -97,6 +97,7 @@ export default function SessionsTable({
 
   const newRow = (): SessionRow => {
     // Usar plantilla global de procedimientos
+    console.log("🆕 Creando nueva sesión con plantillas:", procedureTemplates);
     const baseItems: ProcItem[] = procedureTemplates.map((template) => ({
       id: crypto.randomUUID(),
       name: template.name,
@@ -104,6 +105,8 @@ export default function SessionsTable({
       qty: 0,
       sub: 0,
     }));
+
+    console.log("📦 Items generados:", baseItems);
 
     const today = new Date().toISOString().slice(0, 10);
     return {
