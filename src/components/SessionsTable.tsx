@@ -1,5 +1,5 @@
 // src/components/SessionsTable.tsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo } from "react";
 import { toInt } from "../lib/utils";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -45,6 +45,97 @@ interface SessionsTableProps {
 }
 
 const PAGE_SIZE = 5;
+
+// Componente memoizado para las filas de procedimientos (evita re-renders innecesarios)
+const ProcedureRow = memo(
+  ({
+    item,
+    inEditMode,
+    isEditable,
+    onNameChange,
+    onUnitChange,
+    onQtyChange,
+    onRemove,
+  }: {
+    item: ProcItem;
+    inEditMode: boolean;
+    isEditable: boolean;
+    onNameChange: (value: string) => void;
+    onUnitChange: (value: string) => void;
+    onQtyChange: (value: string) => void;
+    onRemove: () => void;
+  }) => {
+    return (
+      <div
+        className={cn(
+          "grid gap-2 items-center p-2 rounded-md",
+          inEditMode
+            ? "grid-cols-[1fr_90px_80px_90px_50px] min-w-[400px]"
+            : "grid-cols-[1fr_90px_80px_90px] min-w-[350px]",
+          item.qty > 0 && "bg-[hsl(var(--muted))]",
+        )}
+      >
+        {/* Nombre del procedimiento */}
+        {inEditMode ? (
+          <Input
+            type="text"
+            value={item.name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Nombre del procedimiento"
+            className="h-9"
+          />
+        ) : (
+          <div className="text-sm font-medium px-2 py-1.5">{item.name}</div>
+        )}
+
+        {/* Precio unitario */}
+        <Input
+          type="number"
+          min={0}
+          step={1}
+          value={item.unit || ""}
+          onChange={(e) => onUnitChange(e.target.value)}
+          icon={<DollarSign size={14} />}
+          className="h-9 text-center text-xs"
+          placeholder="0"
+          disabled={!isEditable}
+        />
+
+        {/* Cantidad */}
+        <Input
+          type="number"
+          min={0}
+          step={1}
+          value={item.qty || ""}
+          onChange={(e) => onQtyChange(e.target.value)}
+          className="h-9 text-center font-semibold text-xs"
+          placeholder="0"
+          disabled={!isEditable}
+        />
+
+        {/* Subtotal */}
+        <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center text-xs">
+          ${item.sub}
+        </div>
+
+        {/* Botón eliminar (solo en modo edición) */}
+        {inEditMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRemove}
+            title="Eliminar procedimiento"
+            className="h-9 w-9 p-0 hover:bg-red-500/20 hover:text-red-600"
+          >
+            <Trash2 size={16} />
+          </Button>
+        )}
+      </div>
+    );
+  },
+);
+
+ProcedureRow.displayName = "ProcedureRow";
 
 export default function SessionsTable({
   sessions,
@@ -605,97 +696,32 @@ export default function SessionsTable({
                                       );
 
                                       return (
-                                        <div
+                                        <ProcedureRow
                                           key={item.id}
-                                          className={cn(
-                                            "grid gap-2 items-center p-2 rounded-md",
-                                            inEditMode
-                                              ? "grid-cols-[1fr_90px_80px_90px_50px] min-w-[400px]"
-                                              : "grid-cols-[1fr_90px_80px_90px] min-w-[350px]",
-                                            item.qty > 0 &&
-                                              "bg-[hsl(var(--muted))]",
-                                          )}
-                                        >
-                                          {/* Nombre del procedimiento */}
-                                          {inEditMode ? (
-                                            <Input
-                                              type="text"
-                                              value={item.name}
-                                              onChange={(e) =>
-                                                recalcRow(idxReal, (r) => {
-                                                  r.items[fullIdx].name =
-                                                    e.target.value;
-                                                })
-                                              }
-                                              placeholder="Nombre del procedimiento"
-                                              className="h-9"
-                                            />
-                                          ) : (
-                                            <div className="text-sm font-medium px-2 py-1.5">
-                                              {item.name}
-                                            </div>
-                                          )}
-
-                                          {/* Precio unitario */}
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            step={1}
-                                            value={item.unit || ""}
-                                            onChange={(e) =>
-                                              recalcRow(idxReal, (r) => {
-                                                r.items[fullIdx].unit = toInt(
-                                                  e.target.value,
-                                                );
-                                              })
-                                            }
-                                            icon={<DollarSign size={14} />}
-                                            className="h-9 text-center text-xs"
-                                            placeholder="0"
-                                            disabled={!isEditable}
-                                          />
-
-                                          {/* Cantidad */}
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            step={1}
-                                            value={item.qty || ""}
-                                            onChange={(e) =>
-                                              recalcRow(idxReal, (r) => {
-                                                r.items[fullIdx].qty = toInt(
-                                                  e.target.value,
-                                                );
-                                              })
-                                            }
-                                            className="h-9 text-center font-semibold text-xs"
-                                            placeholder="0"
-                                            disabled={!isEditable}
-                                          />
-
-                                          {/* Subtotal */}
-                                          <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center text-xs">
-                                            ${item.sub}
-                                          </div>
-
-                                          {/* Botón eliminar (solo en modo edición) */}
-                                          {inEditMode && (
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() =>
-                                                removeProcedure(
-                                                  idxReal,
-                                                  item.id!,
-                                                )
-                                              }
-                                              title="Eliminar procedimiento"
-                                              className="h-9 w-9 p-0 hover:bg-red-500/20 hover:text-red-600"
-                                            >
-                                              <Trash2 size={16} />
-                                            </Button>
-                                          )}
-                                        </div>
+                                          item={item}
+                                          inEditMode={inEditMode}
+                                          isEditable={isEditable}
+                                          onNameChange={(value) =>
+                                            recalcRow(idxReal, (r) => {
+                                              r.items[fullIdx].name = value;
+                                            })
+                                          }
+                                          onUnitChange={(value) =>
+                                            recalcRow(idxReal, (r) => {
+                                              r.items[fullIdx].unit =
+                                                toInt(value);
+                                            })
+                                          }
+                                          onQtyChange={(value) =>
+                                            recalcRow(idxReal, (r) => {
+                                              r.items[fullIdx].qty =
+                                                toInt(value);
+                                            })
+                                          }
+                                          onRemove={() =>
+                                            removeProcedure(idxReal, item.id!)
+                                          }
+                                        />
                                       );
                                     })}
                                   </div>

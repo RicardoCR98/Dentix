@@ -80,6 +80,11 @@ export class TauriSqliteRepository {
       await this.executeMigration003();
       await this.markMigration(3);
     }
+    // Migración 004: Índices compuestos para optimizar queries
+    if (!(await this.hasMigration(4))) {
+      await this.executeMigration004();
+      await this.markMigration(4);
+    }
   }
 
   private async executeMigration002() {
@@ -228,6 +233,29 @@ export class TauriSqliteRepository {
     );
     await this.db!.execute(
       `CREATE INDEX IF NOT EXISTS idx_diagnosis_options_sort_order ON diagnosis_options(sort_order)`,
+    );
+  }
+
+  private async executeMigration004() {
+    // Índices compuestos para optimizar queries de ordenamiento por fecha
+    // Esto mejora significativamente el performance de getSessionsByPatient y queries similares
+
+    // Índice compuesto para sessions ordenadas por fecha/id descendente
+    await this.db!.execute(
+      `CREATE INDEX IF NOT EXISTS idx_sessions_date_id_desc
+       ON sessions(date DESC, id DESC)`,
+    );
+
+    // Índice compuesto para visits ordenadas por fecha/id descendente
+    await this.db!.execute(
+      `CREATE INDEX IF NOT EXISTS idx_visits_date_id_desc
+       ON visits(date DESC, id DESC)`,
+    );
+
+    // Índice compuesto para visits de un paciente ordenadas por fecha
+    await this.db!.execute(
+      `CREATE INDEX IF NOT EXISTS idx_visits_patient_date_desc
+       ON visits(patient_id, date DESC, id DESC)`,
     );
   }
 
@@ -515,8 +543,10 @@ export class TauriSqliteRepository {
     }
   }
 
-  /** Sesiones de una visita (detalle con items). */
+  /** Sesiones de una visita (detalle con items).
+   * OPTIMIZADO: usa 2 queries totales en lugar de N+1 */
   async getSessionsByVisit(visitId: number): Promise<SessionRow[]> {
+    // Query 1: Obtener todas las sesiones
     const sessions = await this.conn.select<
       Array<{
         id: number;
@@ -536,31 +566,53 @@ export class TauriSqliteRepository {
       [visitId],
     );
 
-    const out: SessionRow[] = [];
-    for (const s of sessions) {
-      const items = await this.conn.select<ProcItem[]>(
-        `SELECT name, unit, qty, sub
-           FROM session_items
-          WHERE session_id = $1`,
-        [s.id],
-      );
-      out.push({
-        id: String(s.id),
-        date: s.date,
-        auto: !!s.auto,
-        budget: s.budget,
-        payment: s.payment,
-        balance: s.balance,
-        discount: s.discount,
-        signer: s.signer ?? "",
-        items,
-      });
+    // Si no hay sesiones, retornar vacío
+    if (sessions.length === 0) return [];
+
+    // Query 2: Obtener TODOS los items de TODAS las sesiones de una vez
+    const sessionIds = sessions.map((s) => s.id);
+    const placeholders = sessionIds.map(() => "?").join(",");
+    const allItems = await this.conn.select<
+      Array<ProcItem & { session_id: number }>
+    >(
+      `SELECT session_id, name, unit, qty, sub
+       FROM session_items
+       WHERE session_id IN (${placeholders})`,
+      sessionIds,
+    );
+
+    // Agrupar items por session_id
+    const itemsBySessionId = new Map<number, ProcItem[]>();
+    for (const item of allItems) {
+      const sessionId = item.session_id;
+      if (!itemsBySessionId.has(sessionId)) {
+        itemsBySessionId.set(sessionId, []);
+      }
+      // Eliminar session_id del item antes de agregarlo
+      const { session_id, ...cleanItem } = item;
+      itemsBySessionId.get(sessionId)!.push(cleanItem as ProcItem);
     }
+
+    // Construir resultado final
+    const out: SessionRow[] = sessions.map((s) => ({
+      id: String(s.id),
+      date: s.date,
+      auto: !!s.auto,
+      budget: s.budget,
+      payment: s.payment,
+      balance: s.balance,
+      discount: s.discount,
+      signer: s.signer ?? "",
+      items: itemsBySessionId.get(s.id) ?? [],
+    }));
+
     return out;
   }
 
-  /** Todas las sesiones del paciente (timeline), ordenadas desc por fecha/id. */
+  /** Todas las sesiones del paciente (timeline), ordenadas desc por fecha/id.
+   * OPTIMIZADO: usa 2 queries totales en lugar de N+1 */
   async getSessionsByPatient(patientId: number): Promise<SessionRow[]> {
+    // Query 1: Obtener todas las sesiones
     const rows = await this.conn.select<
       Array<{
         id: number;
@@ -590,25 +642,47 @@ export class TauriSqliteRepository {
       [patientId],
     );
 
-    const result: SessionRow[] = [];
-    for (const r of rows) {
-      const items = await this.conn.select<ProcItem[]>(
-        `SELECT name, unit, qty, sub FROM session_items WHERE session_id = $1`,
-        [r.id],
-      );
-      result.push({
-        id: String(r.id),
-        date: r.date,
-        auto: !!r.auto,
-        budget: r.budget,
-        payment: r.payment,
-        balance: r.balance,
-        discount: r.discount,
-        signer: r.signer ?? "",
-        items,
-        visitId: r.visit_id,
-      });
+    // Si no hay sesiones, retornar vacío
+    if (rows.length === 0) return [];
+
+    // Query 2: Obtener TODOS los items de TODAS las sesiones de una vez
+    const sessionIds = rows.map((r) => r.id);
+    const placeholders = sessionIds.map(() => "?").join(",");
+    const allItems = await this.conn.select<
+      Array<ProcItem & { session_id: number }>
+    >(
+      `SELECT session_id, name, unit, qty, sub
+       FROM session_items
+       WHERE session_id IN (${placeholders})`,
+      sessionIds,
+    );
+
+    // Agrupar items por session_id
+    const itemsBySessionId = new Map<number, ProcItem[]>();
+    for (const item of allItems) {
+      const sessionId = item.session_id;
+      if (!itemsBySessionId.has(sessionId)) {
+        itemsBySessionId.set(sessionId, []);
+      }
+      // Eliminar session_id del item antes de agregarlo
+      const { session_id, ...cleanItem } = item;
+      itemsBySessionId.get(sessionId)!.push(cleanItem as ProcItem);
     }
+
+    // Construir resultado final
+    const result: SessionRow[] = rows.map((r) => ({
+      id: String(r.id),
+      date: r.date,
+      auto: !!r.auto,
+      budget: r.budget,
+      payment: r.payment,
+      balance: r.balance,
+      discount: r.discount,
+      signer: r.signer ?? "",
+      items: itemsBySessionId.get(r.id) ?? [],
+      visitId: r.visit_id,
+    }));
+
     return result;
   }
 
