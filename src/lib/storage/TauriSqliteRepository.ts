@@ -75,6 +75,11 @@ export class TauriSqliteRepository {
       await this.executeMigration002();
       await this.markMigration(2);
     }
+    // Migración 003: Opciones de diagnóstico
+    if (!(await this.hasMigration(3))) {
+      await this.executeMigration003();
+      await this.markMigration(3);
+    }
   }
 
   private async executeMigration002() {
@@ -172,6 +177,57 @@ export class TauriSqliteRepository {
     );
     await this.db!.execute(
       `CREATE INDEX IF NOT EXISTS idx_signers_active ON signers(active)`,
+    );
+  }
+
+  private async executeMigration003() {
+    // Crear tabla diagnosis_options
+    await this.db!.execute(`
+      CREATE TABLE IF NOT EXISTS diagnosis_options (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        label      TEXT NOT NULL UNIQUE,
+        color      TEXT NOT NULL DEFAULT 'success',
+        active     INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Trigger para updated_at
+    await this.db!.execute(`
+      CREATE TRIGGER IF NOT EXISTS trg_diagnosis_options_updated_at
+      AFTER UPDATE ON diagnosis_options
+      FOR EACH ROW
+      BEGIN
+        UPDATE diagnosis_options SET updated_at = datetime('now') WHERE id = NEW.id;
+      END
+    `);
+
+    // Datos iniciales - opciones por defecto
+    const defaultOptions = [
+      { label: "Caries", color: "info", sort_order: 1 },
+      { label: "Gingivitis", color: "info", sort_order: 2 },
+      { label: "Fractura", color: "info", sort_order: 3 },
+      { label: "Pérdida", color: "info", sort_order: 4 },
+      { label: "Obturación", color: "info", sort_order: 5 },
+      { label: "Endodoncia", color: "info", sort_order: 6 },
+    ];
+
+    for (const opt of defaultOptions) {
+      await this.db!.execute(
+        `INSERT OR IGNORE INTO diagnosis_options (label, color, sort_order, active)
+         VALUES ($1, $2, $3, 1)`,
+        [opt.label, opt.color, opt.sort_order],
+      );
+    }
+
+    // Índices
+    await this.db!.execute(
+      `CREATE INDEX IF NOT EXISTS idx_diagnosis_options_active ON diagnosis_options(active)`,
+    );
+    await this.db!.execute(
+      `CREATE INDEX IF NOT EXISTS idx_diagnosis_options_sort_order ON diagnosis_options(sort_order)`,
     );
   }
 
