@@ -7,26 +7,13 @@
    ANIMACIONES PERSONALIZADAS (deben estar antes de @import tailwindcss)
    ===================================================== */
 @keyframes pulseAlert {
-    0% {
-        box-shadow:
-            0 0 0 0 rgba(239, 68, 68, 0.7),
-            0 0 20px rgba(239, 68, 68, 0.3);
-        border-color: rgb(239, 68, 68);
+    0%, 100% {
         transform: scale(1);
+        opacity: 1;
     }
     50% {
-        box-shadow:
-            0 0 0 15px rgba(239, 68, 68, 0),
-            0 0 30px rgba(239, 68, 68, 0.5);
-        border-color: rgb(220, 38, 38);
-        transform: scale(1.01);
-    }
-    100% {
-        box-shadow:
-            0 0 0 0 rgba(239, 68, 68, 0.7),
-            0 0 20px rgba(239, 68, 68, 0.3);
-        border-color: rgb(239, 68, 68);
-        transform: scale(1);
+        transform: scale(1.02);
+        opacity: 0.85;
     }
 }
 
@@ -51,16 +38,13 @@
 }
 
 @keyframes glow {
-    0%,
-    100% {
+    0%, 100% {
         opacity: 1;
-        box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+        transform: scale(1);
     }
     50% {
-        opacity: 0.8;
-        box-shadow:
-            0 0 20px rgba(239, 68, 68, 0.8),
-            0 0 30px rgba(239, 68, 68, 0.6);
+        opacity: 0.5;
+        transform: scale(1.1);
     }
 }
 
@@ -150,6 +134,8 @@
 /* Animación de alerta FUERA del @layer para mayor prioridad */
 .animate-pulseAlert {
     animation: pulseAlert 0.7s ease-in-out infinite;
+    /* Optimizaciones de rendimiento - solo propiedades GPU */
+    will-change: transform, opacity;
 }
 
 /* Registrar animaciones personalizadas como utilities */
@@ -157,6 +143,7 @@
     /* Animaciones de alerta */
     .animate-glow {
         animation: glow 0.5s ease-in-out infinite;
+        will-change: transform, opacity;
     }
 
     /* Animaciones minimalistas */
