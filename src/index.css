@@ -215,6 +215,8 @@
         --muted: 220 16% 94%;
         --muted-foreground: 215 16% 46%;
         --surface: 0 0% 100%;
+        --surface-elevated: 0 0% 100%;
+        --surface-overlay: 0 0% 100%;
         --surface-foreground: 222 47% 11%;
         --border: 220 13% 88%;
         --input: 220 13% 88%;
@@ -242,6 +244,8 @@
         --bg: hsl(var(--background));
         --fg: hsl(var(--foreground));
         --surface-bg: hsl(var(--surface));
+        --surface-elevated-bg: hsl(var(--surface-elevated));
+        --surface-overlay-bg: hsl(var(--surface-overlay));
         --surface-soft: hsl(var(--muted));
         --text: hsl(var(--foreground));
         --text-muted: hsl(var(--muted-foreground));
@@ -250,42 +254,56 @@
     /* Dark Mode - automático */
     @media (prefers-color-scheme: dark) {
         :root:not([data-theme]) {
-            --background: 222 14% 8%;
-            --foreground: 210 20% 96%;
-            --muted: 220 14% 14%;
-            --muted-foreground: 220 10% 65%;
-            --surface: 222 14% 11%;
-            --surface-foreground: 210 20% 96%;
-            --border: 220 14% 22%;
-            --input: 220 14% 22%;
-            --ring: 217 91% 60%;
-            --brand: 217 91% 60%;
+            --background: 222 14% 12%;
+            --foreground: 210 20% 98%;
+            --muted: 220 14% 18%;
+            --muted-foreground: 220 10% 70%;
+            --surface: 222 14% 15%;
+            --surface-elevated: 222 14% 18%;
+            --surface-overlay: 222 14% 21%;
+            --surface-foreground: 210 20% 98%;
+            --border: 220 14% 24%;
+            --input: 220 14% 24%;
+            --ring: 217 91% 65%;
+            --brand: 217 91% 65%;
 
-            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+            --success: 142 71% 50%;
+            --warning: 38 92% 55%;
+            --danger: 0 84% 65%;
+            --info: 199 89% 53%;
+
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
             --shadow:
-                0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+                0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
             --shadow-lg:
-                0 12px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+                0 12px 24px rgba(0, 0, 0, 0.55), 0 4px 8px rgba(0, 0, 0, 0.35);
         }
     }
 
     /* Tema oscuro explícito */
     :root[data-theme="dark"] {
-        --background: 222 14% 8%;
-        --foreground: 210 20% 96%;
-        --muted: 220 14% 14%;
-        --muted-foreground: 220 10% 65%;
-        --surface: 222 14% 11%;
-        --surface-foreground: 210 20% 96%;
-        --border: 220 14% 22%;
-        --input: 220 14% 22%;
-        --ring: 217 91% 60%;
-        --brand: 217 91% 60%;
+        --background: 222 14% 12%;
+        --foreground: 210 20% 98%;
+        --muted: 220 14% 18%;
+        --muted-foreground: 220 10% 70%;
+        --surface: 222 14% 15%;
+        --surface-elevated: 222 14% 18%;
+        --surface-overlay: 222 14% 21%;
+        --surface-foreground: 210 20% 98%;
+        --border: 220 14% 24%;
+        --input: 220 14% 24%;
+        --ring: 217 91% 65%;
+        --brand: 217 91% 65%;
 
-        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-        --shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+        --success: 142 71% 50%;
+        --warning: 38 92% 55%;
+        --danger: 0 84% 65%;
+        --info: 199 89% 53%;
+
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
         --shadow-lg:
-            0 12px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+            0 12px 24px rgba(0, 0, 0, 0.55), 0 4px 8px rgba(0, 0, 0, 0.35);
     }
 
     /* Reset global */
@@ -313,6 +331,37 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         /* NO aplicar overflow aquí para que html maneje el scroll */
+        /* Transiciones suaves para cambios de tema */
+        transition: background-color 200ms ease, color 200ms ease;
+    }
+
+    /* Transiciones globales para elementos que cambian con el tema */
+    *,
+    *::before,
+    *::after {
+        transition-property: background-color, border-color, color, fill, stroke;
+        transition-timing-function: ease;
+        transition-duration: 200ms;
+    }
+
+    /* Deshabilitar transiciones para elementos que ya tienen animaciones específicas */
+    .animate-fadeIn,
+    .animate-fadeOut,
+    .animate-scaleIn,
+    .animate-scaleOut,
+    .animate-pulseAlert,
+    .animate-glow,
+    .animate-shimmer,
+    .animate-ping,
+    .animate-pulse,
+    .animate-bounce,
+    [data-radix-popper-content-wrapper],
+    [data-radix-select-content],
+    [data-radix-popover-content],
+    [data-radix-dialog-content],
+    [data-radix-dropdown-menu-content],
+    [data-radix-tooltip-content] {
+        transition: none !important;
     }
 
     /* Encabezados */

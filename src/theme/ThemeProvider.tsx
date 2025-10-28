@@ -49,7 +49,7 @@ function hexToHsl(hex: string): string {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeName>("light");
+  const [theme, setThemeState] = useState<ThemeName>("dark");
   const [brandHsl, setBrandHsl] = useState<string>("172 49% 56%"); // default
   const [font, setFontState] = useState<FontName>("Inter");
   const [size, setSizeState] = useState<14 | 16 | 18 | 20 | 22 | 24>(16); // Tamaño base balanceado

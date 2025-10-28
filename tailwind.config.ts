@@ -7,11 +7,17 @@ export default {
       colors: {
         bg: "var(--bg)",
         surface: "var(--surface)",
+        "surface-elevated": "hsl(var(--surface-elevated))",
+        "surface-overlay": "hsl(var(--surface-overlay))",
         "surface-soft": "var(--surface-soft)",
         text: "var(--text)",
         "text-muted": "var(--text-muted)",
         brand: "hsl(var(--brand))",
         border: "hsl(var(--border))",
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--danger))",
+        info: "hsl(var(--info))",
       },
       borderRadius: {
         DEFAULT: "var(--radius)",

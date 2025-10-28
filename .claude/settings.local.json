@@ -5,7 +5,8 @@
       "Bash(if exist node_modules.vite rmdir /s /q node_modules.vite)",
       "Bash(npm run dev:*)",
       "WebSearch",
-      "WebFetch(domain:www.radix-ui.com)"
+      "WebFetch(domain:www.radix-ui.com)",
+      "Bash(del \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\hooks\\useScrollLock.ts\")"
     ],
     "deny": [],
     "ask": []
