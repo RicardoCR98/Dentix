@@ -8,54 +8,211 @@
    ===================================================== */
 @keyframes pulseAlert {
     0% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.3);
+        box-shadow:
+            0 0 0 0 rgba(239, 68, 68, 0.7),
+            0 0 20px rgba(239, 68, 68, 0.3);
         border-color: rgb(239, 68, 68);
         transform: scale(1);
     }
     50% {
-        box-shadow: 0 0 0 15px rgba(239, 68, 68, 0), 0 0 30px rgba(239, 68, 68, 0.5);
+        box-shadow:
+            0 0 0 15px rgba(239, 68, 68, 0),
+            0 0 30px rgba(239, 68, 68, 0.5);
         border-color: rgb(220, 38, 38);
         transform: scale(1.01);
     }
     100% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.3);
+        box-shadow:
+            0 0 0 0 rgba(239, 68, 68, 0.7),
+            0 0 20px rgba(239, 68, 68, 0.3);
         border-color: rgb(239, 68, 68);
         transform: scale(1);
     }
 }
 
 @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-    20%, 40%, 60%, 80% { transform: translateX(2px); }
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translateX(-2px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translateX(2px);
+    }
 }
 
 @keyframes glow {
-    0%, 100% {
+    0%,
+    100% {
         opacity: 1;
         box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
     }
     50% {
         opacity: 0.8;
-        box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.6);
+        box-shadow:
+            0 0 20px rgba(239, 68, 68, 0.8),
+            0 0 30px rgba(239, 68, 68, 0.6);
+    }
+}
+
+/* Animaciones minimalistas estilo iOS/macOS */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes scaleOut {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+}
+
+@keyframes shimmer {
+    from {
+        background-position: -200% 0;
+    }
+    to {
+        background-position: 200% 0;
+    }
+}
+
+/* Sobrescribir animaciones de Tailwind CSS */
+@keyframes ping {
+    75%,
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes bounce {
+    0%,
+    100% {
+        transform: translateY(-25%);
+        animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+    50% {
+        transform: translateY(0);
+        animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
     }
 }
 
 @import "tailwindcss";
 
+/* Animación de alerta FUERA del @layer para mayor prioridad */
+.animate-pulseAlert {
+    animation: pulseAlert 0.7s ease-in-out infinite;
+}
+
 /* Registrar animaciones personalizadas como utilities */
 @layer utilities {
-    .animate-pulseAlert {
-        animation: pulseAlert 2s ease-in-out infinite;
-    }
-
-    .animate-shake {
-        animation: shake 0.5s ease-in-out;
-    }
-
+    /* Animaciones de alerta */
     .animate-glow {
-        animation: glow 1.5s ease-in-out infinite;
+        animation: glow 0.5s ease-in-out infinite;
     }
+
+    /* Animaciones minimalistas */
+    .animate-fadeIn {
+        animation: fadeIn 150ms ease-out;
+    }
+
+    .animate-fadeOut {
+        animation: fadeOut 100ms ease-in;
+    }
+
+    .animate-scaleIn {
+        animation: scaleIn 120ms ease-out;
+    }
+
+    .animate-scaleOut {
+        animation: scaleOut 100ms ease-in;
+    }
+
+    .animate-shimmer {
+        animation: shimmer 2s ease-in-out infinite;
+    }
+
+    /* Sobrescribir animaciones de Tailwind CSS para hacerlas más lentas */
+    .animate-ping {
+        animation: ping 0.5s cubic-bezier(0, 0, 0.2, 1) infinite !important;
+    }
+
+    .animate-pulse {
+        animation: pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+    }
+
+    .animate-bounce {
+        animation: bounce 3s infinite !important;
+    }
+}
+
+/* =====================================================
+      DESHABILITAR ANIMACIONES DE RADIX UI
+      ===================================================== */
+/* Deshabilitar TODAS las animaciones y transiciones de Radix UI */
+[data-radix-popper-content-wrapper],
+[data-radix-select-content],
+[data-radix-popover-content],
+[data-radix-dialog-content],
+[data-radix-dropdown-menu-content],
+[data-radix-tooltip-content] {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* Asegurar que no haya transforms animados */
+[data-radix-select-viewport],
+[data-radix-popover-viewport] {
+    animation: none !important;
+    transition: none !important;
 }
 
 /* =====================================================
@@ -229,61 +386,6 @@
     *::-webkit-scrollbar-thumb:hover {
         background: hsl(var(--muted-foreground));
     }
-
-    /* Animaciones */
-    @keyframes scaleIn {
-        from {
-            opacity: 0;
-            transform: translateY(-4px) scale(0.96);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-    }
-
-    @keyframes fadeOut {
-        from {
-            opacity: 1;
-        }
-        to {
-            opacity: 0;
-        }
-    }
-
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-8px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes slideUp {
-        from {
-            opacity: 0;
-            transform: translateY(8px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes staggeredIn {
-        from {
-            opacity: 0;
-            transform: translateY(12px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
 }
 
 /* =====================================================
@@ -688,17 +790,6 @@
     }
     .stagger-item-4 {
         animation-delay: 250ms;
-    }
-
-    /* Preferencias de movimiento reducido - solo afecta transiciones, no animaciones críticas */
-    @media (prefers-reduced-motion: reduce) {
-        *:not(.animate-pulseAlert):not(.animate-glow):not(.animate-ping):not(.animate-bounce):not(.animate-pulse),
-        *:not(.animate-pulseAlert):not(.animate-glow):not(.animate-ping):not(.animate-bounce):not(.animate-pulse)::before,
-        *:not(.animate-pulseAlert):not(.animate-glow):not(.animate-ping):not(.animate-bounce):not(.animate-pulse)::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-        }
     }
 
     /* Print */

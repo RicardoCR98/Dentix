@@ -188,7 +188,7 @@ export default function PatientForm({ value, onChange, errors }: Props) {
       {(value.full_name || value.doc_id) && (
         <div
           className={[
-            "mt-4 p-4 rounded-lg border-2 relative transition-all duration-300",
+            "mt-4 p-4 rounded-lg border-2 relative ",
             hasAllergy
               ? "border-red-500 bg-red-50 dark:bg-red-950/20 animate-pulseAlert shadow-lg"
               : "border-[hsl(var(--border))] bg-[hsl(var(--muted))]",
@@ -196,13 +196,13 @@ export default function PatientForm({ value, onChange, errors }: Props) {
         >
           {/* Banner de advertencia visible */}
           {hasAllergy && (
-            <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2 animate-bounce hover:animate-shake cursor-pointer">
+            <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2  cursor-auto">
               <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
               ¡ALERTA!
             </div>
           )}
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-full bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold text-lg shrink-0">
               {value.full_name?.charAt(0)?.toUpperCase() || "?"}
             </div>
             <div className="flex-1 min-w-0">

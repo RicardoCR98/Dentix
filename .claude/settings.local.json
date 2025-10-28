@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(if exist node_modules.vite rmdir /s /q node_modules.vite)",
+      "Bash(npm run dev:*)",
+      "WebSearch",
+      "WebFetch(domain:www.radix-ui.com)"
     ],
     "deny": [],
     "ask": []

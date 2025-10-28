@@ -53,10 +53,10 @@ export function Dialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4 sm:pt-[15vh]">
-      {/* Backdrop con blur */}
+      {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 transition-all duration-300",
+          "fixed inset-0",
           spotlight
             ? "bg-black/60 backdrop-blur-xl"
             : "bg-black/50 backdrop-blur-sm",
@@ -69,8 +69,6 @@ export function Dialog({
         ref={contentRef}
         className={cn(
           "relative w-full bg-[hsl(var(--surface))] rounded-2xl shadow-2xl",
-          "transform transition-all duration-300 ease-out",
-          "animate-in fade-in-0 zoom-in-95 slide-in-from-top-4",
           spotlight &&
             "ring-1 ring-white/20 shadow-[0_0_80px_rgba(255,255,255,0.1)]",
           sizeClasses[size],
@@ -94,7 +92,7 @@ export function Dialog({
             </div>
             <button
               onClick={() => onOpenChange(false)}
-              className="ml-4 rounded-lg p-2 hover:bg-[hsl(var(--muted))] transition-colors"
+              className="ml-4 rounded-lg p-2 hover:bg-[hsl(var(--muted))] transition-colors duration-150 active:scale-95"
             >
               <X size={20} className="text-[hsl(var(--muted-foreground))]" />
             </button>
