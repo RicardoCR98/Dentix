@@ -38,6 +38,7 @@ import {
   Search,
   Wallet,
   Info,
+  AlertTriangle,
 } from "lucide-react";
 
 import type {
@@ -421,6 +422,7 @@ export default function App() {
   // ---------- Flags UI ----------
   const hasPatientData = Boolean(patient.full_name && patient.doc_id);
   const canSave = hasPatientData;
+  const hasAllergy = Boolean(patient.allergyDetail?.trim());
 
   return (
     <Layout
@@ -519,7 +521,18 @@ export default function App() {
         </div>
       </Section>
       {/* Datos del paciente */}
-      <Section title="Datos del Paciente" icon={<User size={20} />}>
+      <Section
+        title="Datos del Paciente"
+        icon={<User size={20} />}
+        right={
+          hasAllergy && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg">
+              <AlertTriangle size={20} className="animate-pulse" />
+              ALERGIA
+            </div>
+          )
+        }
+      >
         <PatientForm value={patient} onChange={setPatient} />
         {!hasPatientData && (
           <Alert variant="warning" className="mt-4">
