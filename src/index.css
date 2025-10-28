@@ -7,7 +7,8 @@
    ANIMACIONES PERSONALIZADAS (deben estar antes de @import tailwindcss)
    ===================================================== */
 @keyframes pulseAlert {
-    0%, 100% {
+    0%,
+    100% {
         transform: scale(1);
         opacity: 1;
     }
@@ -38,7 +39,8 @@
 }
 
 @keyframes glow {
-    0%, 100% {
+    0%,
+    100% {
         opacity: 1;
         transform: scale(1);
     }
