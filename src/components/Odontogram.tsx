@@ -288,7 +288,7 @@ export default function Odontogram({ value, onChange }: Props) {
                         className={cn(
                           "rounded-lg border border-[hsl(var(--border))]",
                           "bg-[hsl(var(--surface))] shadow-lg",
-                          "w-[320px] p-4 z-50",
+                          "w-auto  p-4 z-50",
                           "data-[state=open]:animate-[scaleIn_150ms_ease-out] ",
                         )}
                       >
