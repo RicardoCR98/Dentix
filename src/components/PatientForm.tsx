@@ -196,7 +196,7 @@ export default function PatientForm({ value, onChange, errors }: Props) {
         >
           {/* Banner de advertencia visible */}
           {hasAllergy && (
-            <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2 animate-bounce hover:animate-shake">
+            <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2 animate-bounce hover:animate-shake cursor-pointer">
               <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
               ¡ALERTA!
             </div>

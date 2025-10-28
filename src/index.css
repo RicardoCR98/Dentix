@@ -1,8 +1,62 @@
 /* =====================================================
    TAILWIND + FUENTES
    ===================================================== */
-@import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* =====================================================
+   ANIMACIONES PERSONALIZADAS (deben estar antes de @import tailwindcss)
+   ===================================================== */
+@keyframes pulseAlert {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.3);
+        border-color: rgb(239, 68, 68);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 15px rgba(239, 68, 68, 0), 0 0 30px rgba(239, 68, 68, 0.5);
+        border-color: rgb(220, 38, 38);
+        transform: scale(1.01);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.3);
+        border-color: rgb(239, 68, 68);
+        transform: scale(1);
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+    20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+@keyframes glow {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+    }
+    50% {
+        opacity: 0.8;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.6);
+    }
+}
+
+@import "tailwindcss";
+
+/* Registrar animaciones personalizadas como utilities */
+@layer utilities {
+    .animate-pulseAlert {
+        animation: pulseAlert 2s ease-in-out infinite;
+    }
+
+    .animate-shake {
+        animation: shake 0.5s ease-in-out;
+    }
+
+    .animate-glow {
+        animation: glow 1.5s ease-in-out infinite;
+    }
+}
 
 /* =====================================================
       VARIABLES CSS - SOLO VALORES
@@ -230,48 +284,6 @@
         }
     }
 
-    /* Animaciones personalizadas de alergias */
-    @keyframes pulseAlert {
-        0% {
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.3);
-            border-color: rgb(239, 68, 68);
-            transform: scale(1);
-        }
-        50% {
-            box-shadow: 0 0 0 15px rgba(239, 68, 68, 0), 0 0 30px rgba(239, 68, 68, 0.5);
-            border-color: rgb(220, 38, 38);
-            transform: scale(1.01);
-        }
-        100% {
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.3);
-            border-color: rgb(239, 68, 68);
-            transform: scale(1);
-        }
-    }
-
-    @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-        20%, 40%, 60%, 80% { transform: translateX(2px); }
-    }
-
-    @keyframes glow {
-        0%, 100% {
-            opacity: 1;
-            box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
-        }
-        50% {
-            opacity: 0.8;
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.6);
-        }
-    }
-}
-
-/* Registrar las animaciones personalizadas para Tailwind v4 */
-@theme {
-    --animate-pulseAlert: pulseAlert 2s ease-in-out infinite;
-    --animate-shake: shake 0.5s ease-in-out;
-    --animate-glow: glow 1.5s ease-in-out infinite;
 }
 
 /* =====================================================
@@ -678,11 +690,11 @@
         animation-delay: 250ms;
     }
 
-    /* Preferencias de movimiento reducido */
+    /* Preferencias de movimiento reducido - solo afecta transiciones, no animaciones críticas */
     @media (prefers-reduced-motion: reduce) {
-        *,
-        *::before,
-        *::after {
+        *:not(.animate-pulseAlert):not(.animate-glow):not(.animate-ping):not(.animate-bounce):not(.animate-pulse),
+        *:not(.animate-pulseAlert):not(.animate-glow):not(.animate-ping):not(.animate-bounce):not(.animate-pulse)::before,
+        *:not(.animate-pulseAlert):not(.animate-glow):not(.animate-ping):not(.animate-bounce):not(.animate-pulse)::after {
             animation-duration: 0.01ms !important;
             animation-iteration-count: 1 !important;
             transition-duration: 0.01ms !important;
