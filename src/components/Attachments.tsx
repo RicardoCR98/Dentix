@@ -86,11 +86,11 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
   const images = useMemo(
     () => files.filter((f) => f.type?.startsWith("image/")),
-    [files]
+    [files],
   );
   const docs = useMemo(
     () => files.filter((f) => !f.type?.startsWith("image/")),
-    [files]
+    [files],
   );
 
   const FileCard = ({ file }: { file: AttachmentFile }) => {
@@ -105,7 +105,7 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
           "hover:shadow-md hover:border-[hsl(var(--primary)/0.5)]",
           isNew
             ? "bg-[hsl(var(--success)/0.05)] border-[hsl(var(--success))]"
-            : "bg-[hsl(var(--card))] border-[hsl(var(--border))]"
+            : "bg-[hsl(var(--card))] border-[hsl(var(--border))]",
         )}
       >
         <div className="p-4 flex items-center gap-3">
@@ -154,7 +154,7 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
               className={cn(
                 "p-2 rounded-md transition-all opacity-0 group-hover:opacity-100",
                 "hover:bg-red-500/10 text-red-600 hover:text-red-700",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500",
               )}
               aria-label="Eliminar archivo"
             >
@@ -223,7 +223,7 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
             "relative border-2 border-dashed rounded-lg p-8 transition-all duration-200",
             dragActive
               ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.05)]"
-              : "border-[hsl(var(--border))] hover:border-[hsl(var(--primary)/0.5)]"
+              : "border-[hsl(var(--border))] hover:border-[hsl(var(--primary)/0.5)]",
           )}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -246,7 +246,7 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
                 "mx-auto w-16 h-16 rounded-lg flex items-center justify-center mb-4 transition-colors",
                 dragActive
                   ? "bg-[hsl(var(--primary))] text-white"
-                  : "bg-[hsl(var(--muted))] text-[hsl(var(--primary))]"
+                  : "bg-[hsl(var(--muted))] text-[hsl(var(--primary))]",
               )}
             >
               <Upload size={32} />
@@ -261,11 +261,7 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
             </p>
 
             <label htmlFor="file-upload" className="cursor-pointer">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="cursor-pointer"
-              >
+              <Button variant="secondary" size="sm" className="cursor-pointer">
                 <span className="flex items-center gap-2">
                   <Paperclip size={16} />
                   Seleccionar archivos

@@ -6,7 +6,13 @@ type LayoutProps = {
   headerRight?: React.ReactNode; // <-- NUEVO
 };
 
-export default function Layout({ clinicName, slogan, schedule, children, headerRight }: LayoutProps) {
+export default function Layout({
+  clinicName,
+  slogan,
+  schedule,
+  children,
+  headerRight,
+}: LayoutProps) {
   return (
     <>
       {/* sticky arriba */}
@@ -14,9 +20,17 @@ export default function Layout({ clinicName, slogan, schedule, children, headerR
         <div className="mx-auto max-w-[1100px] px-4 py-3 relative">
           {/* Contenido centrado */}
           <div className="text-center">
-            <h1 className="text-[hsl(var(--brand))] text-xl tracking-wider m-0">{clinicName}</h1>
-            {slogan && <small className="text-text-muted block mt-1">{slogan}</small>}
-            {schedule && <small className="text-text-muted block">Horario: {schedule}</small>}
+            <h1 className="text-[hsl(var(--brand))] text-xl tracking-wider m-0">
+              {clinicName}
+            </h1>
+            {slogan && (
+              <small className="text-text-muted block mt-1">{slogan}</small>
+            )}
+            {schedule && (
+              <small className="text-text-muted block">
+                Horario: {schedule}
+              </small>
+            )}
           </div>
 
           {/* Acciones a la derecha del header */}
@@ -26,8 +40,8 @@ export default function Layout({ clinicName, slogan, schedule, children, headerR
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1100px] px-4 py-6">
-        <div className="mx-auto w-full max-w-[960px] flex flex-col gap-5">{children}</div>
+      <main className="mx-auto max-w-10/12 px-4 py-6">
+        <div className="mx-auto w-full flex flex-col gap-5">{children}</div>
       </main>
     </>
   );

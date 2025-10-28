@@ -13,7 +13,7 @@ const TabsList = React.forwardRef<
     className={cn(
       "inline-flex items-center justify-center rounded-none border-b border-[hsl(var(--border))]",
       "bg-transparent",
-      className
+      className,
     )}
     {...props}
   />
@@ -27,16 +27,16 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap",
+      " inline-flex items-center justify-center whitespace-nowrap cursor-pointer ",
       "px-4 py-3 text-sm font-medium",
       "text-[hsl(var(--muted-foreground))]",
       "transition-all duration-300 ease-out",
       "relative",
       // Estado normal
-      "hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted)/0.5)]",
+      "hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]",
       // Estado activo
       "data-[state=active]:text-[hsl(var(--primary))]",
-      "data-[state=active]:bg-transparent",
+      "data-[state=active]:bg-[hsl(var(--muted)/0.5)]",
       // Línea indicadora
       "before:absolute before:bottom-0 before:left-0 before:right-0",
       "before:h-1 before:bg-[hsl(var(--primary))]",
@@ -44,7 +44,7 @@ const TabsTrigger = React.forwardRef<
       "data-[state=active]:before:scale-x-100",
       // Focus visible
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] focus-visible:ring-offset-2",
-      className
+      className,
     )}
     {...props}
   />
@@ -61,7 +61,7 @@ const TabsContent = React.forwardRef<
       "mt-0 ring-offset-[hsl(var(--background))]",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] focus-visible:ring-offset-2",
       "animate-in fade-in-50 duration-300",
-      className
+      className,
     )}
     {...props}
   />

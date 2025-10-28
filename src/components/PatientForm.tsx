@@ -1,7 +1,7 @@
 // src/components/PatientForm.tsx
 import type { Patient } from "../lib/types";
 import { Input } from "./ui/Input";
-import { User, CreditCard, Calendar, Phone } from "lucide-react";
+import { User, CreditCard, Calendar, Phone, PhoneCall } from "lucide-react";
 import { Textarea } from "./ui/Textarea";
 import React from "react";
 
@@ -37,13 +37,15 @@ export default function PatientForm({ value, onChange, errors }: Props) {
       "acetaminofén",
       "ketorolaco",
     ],
-    []
+    [],
   );
 
   // Resalta términos críticos usando <mark> (sin HTML peligroso)
   const highlightAllergy = (text: string) => {
     if (!text) return null;
-    const escaped = CRITICAL.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const escaped = CRITICAL.map((t) =>
+      t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    );
     const regex = new RegExp(`(${escaped.join("|")})`, "gi");
 
     const parts: React.ReactNode[] = [];
@@ -56,7 +58,7 @@ export default function PatientForm({ value, onChange, errors }: Props) {
       parts.push(
         <mark key={`${match.index}-${match[0]}`} className="px-1 rounded">
           {match[0]}
-        </mark>
+        </mark>,
       );
       lastIndex = regex.lastIndex;
     }
@@ -68,7 +70,6 @@ export default function PatientForm({ value, onChange, errors }: Props) {
 
   return (
     <div className="space-y-4">
-
       {/* Fila 1: Nombre y Cédula */}
       <div className="grid md:grid-cols-2 gap-4">
         <Input
@@ -79,7 +80,9 @@ export default function PatientForm({ value, onChange, errors }: Props) {
           onChange={(e) => set("full_name", e.target.value)}
           error={!!errors?.full_name}
           helperText={errors?.full_name}
-          icon={<User size={16} className="text-[hsl(var(--muted-foreground))]" />}
+          icon={
+            <User size={16} className="text-[hsl(var(--muted-foreground))]" />
+          }
         />
 
         <Input
@@ -91,7 +94,12 @@ export default function PatientForm({ value, onChange, errors }: Props) {
           error={!!errors?.doc_id}
           helperText={errors?.doc_id}
           maxLength={10}
-          icon={<CreditCard size={16} className="text-[hsl(var(--muted-foreground))]" />}
+          icon={
+            <CreditCard
+              size={16}
+              className="text-[hsl(var(--muted-foreground))]"
+            />
+          }
         />
       </div>
 
@@ -107,7 +115,12 @@ export default function PatientForm({ value, onChange, errors }: Props) {
           onChange={(e) => set("age", Number(e.target.value) || undefined)}
           error={!!errors?.age}
           helperText={errors?.age || "Años cumplidos"}
-          icon={<Calendar size={16} className="text-[hsl(var(--muted-foreground))]" />}
+          icon={
+            <Calendar
+              size={16}
+              className="text-[hsl(var(--muted-foreground))]"
+            />
+          }
         />
 
         <Input
@@ -120,7 +133,9 @@ export default function PatientForm({ value, onChange, errors }: Props) {
           error={!!errors?.phone}
           helperText={errors?.phone || "Celular o convencional"}
           maxLength={10}
-          icon={<Phone size={16} className="text-[hsl(var(--muted-foreground))]" />}
+          icon={
+            <Phone size={16} className="text-[hsl(var(--muted-foreground))]" />
+          }
         />
       </div>
 
@@ -134,24 +149,58 @@ export default function PatientForm({ value, onChange, errors }: Props) {
           error={!!errors?.anamnesis}
           helperText={errors?.anamnesis}
         />
-        <Textarea
-          label="Detalles de alergias"
-          value={value.allergyDetail || ""}
-          placeholder="Ej: Paciente es alérgico a la penicilina"
-          onChange={(e) => set("allergyDetail", e.target.value)}
-          error={!!errors?.allergyDetail}
-          helperText={errors?.allergyDetail}
-        />
+        <div className="relative">
+          <Textarea
+            label="Detalles de alergias y novedades"
+            value={value.allergyDetail || ""}
+            placeholder="Ej: Paciente es alérgico a la penicilina"
+            onChange={(e) => set("allergyDetail", e.target.value)}
+            error={!!errors?.allergyDetail}
+            helperText={errors?.allergyDetail}
+          />
+          {hasAllergy && (
+            <>
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full animate-ping" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full animate-glow" />
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Campo de teléfono de emergencia (solo si hay alergias) */}
+      {hasAllergy && (
+        <div className="grid">
+          <div></div>
+          <Input
+            label="Teléfono de emergencia"
+            type="tel"
+            value={value.emergency_phone || ""}
+            placeholder="Ej: 0991234567"
+            onChange={(e) => set("emergency_phone", e.target.value)}
+            helperText="Contacto en caso de emergencia médica"
+            maxLength={10}
+            icon={<PhoneCall size={16} className="text-red-600" />}
+          />
+        </div>
+      )}
 
       {/* Información adicional */}
       {(value.full_name || value.doc_id) && (
         <div
           className={[
-            "mt-4 p-4 rounded-lg bg-[hsl(var(--muted))] border relative",
-            hasAllergy ? "border-red-500 ring-2 ring-red-500/20" : "border-[hsl(var(--border))]",
+            "mt-4 p-4 rounded-lg border-2 relative transition-all duration-300",
+            hasAllergy
+              ? "border-red-500 bg-red-50 dark:bg-red-950/20 animate-pulseAlert shadow-lg"
+              : "border-[hsl(var(--border))] bg-[hsl(var(--muted))]",
           ].join(" ")}
         >
+          {/* Banner de advertencia visible */}
+          {hasAllergy && (
+            <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2 animate-bounce hover:animate-shake">
+              <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
+              ¡ALERTA!
+            </div>
+          )}
           <div className="flex items-start gap-3">
             <div className="w-12 h-12 rounded-full bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
               {value.full_name?.charAt(0)?.toUpperCase() || "?"}
@@ -179,10 +228,16 @@ export default function PatientForm({ value, onChange, errors }: Props) {
                     {value.phone}
                   </span>
                 )}
+                {value.emergency_phone && (
+                  <span className="flex items-center gap-1 text-red-700 font-semibold">
+                    <PhoneCall size={12} />
+                    {value.emergency_phone}
+                  </span>
+                )}
                 {hasAllergy && (
                   <span className="flex items-center gap-1 font-semibold text-red-700">
-                    <span className="inline-block w-2 h-2 rounded-full bg-red-600" />
-                    Alergia registrada
+                    <span className="inline-block w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                    Novedad Encontrada
                   </span>
                 )}
               </div>
@@ -190,7 +245,9 @@ export default function PatientForm({ value, onChange, errors }: Props) {
               {/* Bloque de detalle de alergias también aquí (opcional) */}
               {hasAllergy && (
                 <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/5 border border-red-200 dark:border-red-500/30">
-                  <div className="text-xs font-semibold text-red-700 mb-1">Detalle:</div>
+                  <div className="text-xs font-semibold text-red-700 mb-1">
+                    Detalle:
+                  </div>
                   <div className="text-sm leading-relaxed text-[hsl(var(--foreground))]">
                     {highlightAllergy(value.allergyDetail!)}
                   </div>

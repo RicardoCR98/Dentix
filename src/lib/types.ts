@@ -7,6 +7,7 @@ export type Patient = {
   doc_id?: string;
   age?: number;
   phone?: string;
+  emergency_phone?: string;
   anamnesis?: string;
   allergyDetail?: string;
 };

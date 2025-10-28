@@ -85,6 +85,11 @@ export class TauriSqliteRepository {
       await this.executeMigration004();
       await this.markMigration(4);
     }
+    // Migración 005: Teléfono de emergencia
+    if (!(await this.hasMigration(5))) {
+      await this.executeMigration005();
+      await this.markMigration(5);
+    }
   }
 
   private async executeMigration002() {
@@ -259,6 +264,17 @@ export class TauriSqliteRepository {
     );
   }
 
+  private async executeMigration005() {
+    // Agregar campo emergency_phone a patients
+    try {
+      await this.db!.execute(
+        "ALTER TABLE patients ADD COLUMN emergency_phone TEXT",
+      );
+    } catch {
+      // Ya existe, ignorar
+    }
+  }
+
   private get conn(): Database {
     if (!this.db) throw new Error("DB no inicializada. Llama a initialize().");
     return this.db!;
@@ -274,6 +290,7 @@ export class TauriSqliteRepository {
               full_name,
               doc_id,
               phone,
+              emergency_phone,
               age,
               anamnesis,
               allergy_detail AS allergyDetail
@@ -292,6 +309,7 @@ export class TauriSqliteRepository {
               full_name,
               doc_id,
               phone,
+              emergency_phone,
               age,
               anamnesis,
               allergy_detail AS allergyDetail
@@ -310,15 +328,17 @@ export class TauriSqliteRepository {
             SET full_name = $1,
                 doc_id    = $2,
                 phone     = $3,
-                age       = $4,
-                anamnesis = $5,
-                allergy_detail = $6,
+                emergency_phone = $4,
+                age       = $5,
+                anamnesis = $6,
+                allergy_detail = $7,
                 updated_at = datetime('now')
-          WHERE id = $7`,
+          WHERE id = $8`,
         [
           p.full_name,
           p.doc_id ?? null,
           p.phone ?? null,
+          p.emergency_phone ?? null,
           p.age ?? null,
           p.anamnesis ?? null,
           p.allergyDetail ?? null,
@@ -339,14 +359,16 @@ export class TauriSqliteRepository {
           `UPDATE patients
               SET full_name = $1,
                   phone     = $2,
-                  age       = $3,
-                  anamnesis = $4,
-                  allergy_detail = $5,
+                  emergency_phone = $3,
+                  age       = $4,
+                  anamnesis = $5,
+                  allergy_detail = $6,
                   updated_at = datetime('now')
-            WHERE id = $6`,
+            WHERE id = $7`,
           [
             p.full_name,
             p.phone ?? null,
+            p.emergency_phone ?? null,
             p.age ?? null,
             p.anamnesis ?? null,
             p.allergyDetail ?? null,
@@ -359,12 +381,13 @@ export class TauriSqliteRepository {
 
     // Insert nuevo
     const res = await this.conn.execute(
-      `INSERT INTO patients (full_name, doc_id, phone, age, anamnesis, allergy_detail)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
+      `INSERT INTO patients (full_name, doc_id, phone, emergency_phone, age, anamnesis, allergy_detail)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [
         p.full_name,
         p.doc_id ?? null,
         p.phone ?? null,
+        p.emergency_phone ?? null,
         p.age ?? null,
         p.anamnesis ?? null,
         p.allergyDetail ?? null,
