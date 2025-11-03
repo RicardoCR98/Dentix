@@ -179,6 +179,11 @@ export default function App() {
         sessions,
       });
 
+      // Pequeño delay para asegurar que la DB libere el lock después del COMMIT
+      if (attachments.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
       for (const a of attachments) {
         const { storage_key, bytes } = await saveAttachmentFile(
           a.file!,
@@ -210,8 +215,9 @@ export default function App() {
       setShowSaveAlert(true);
       setTimeout(() => setShowSaveAlert(false), 3000);
     } catch (e) {
-      console.error(e);
-      alert("Error al guardar la historia clínica.");
+      console.error("Error al guardar:", e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      alert(`Error al guardar la historia clínica:\n\n${errorMessage}`);
     }
   }, [
     patient,

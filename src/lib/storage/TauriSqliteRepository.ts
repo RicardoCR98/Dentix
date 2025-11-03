@@ -40,7 +40,27 @@ export class TauriSqliteRepository {
   async initialize() {
     // clinic.db ya se crea y migra desde Rust (tauri-plugin-sql)
     this.db = await Database.load("sqlite:clinic.db");
+
+    // Configuraciones críticas de SQLite para prevenir locks
     await this.db.execute("PRAGMA foreign_keys = ON;");
+    // WAL mode permite lecturas concurrentes con escrituras (evita muchos locks)
+    await this.db.execute("PRAGMA journal_mode = WAL;");
+    // Timeout de 5 segundos cuando la DB está bloqueada (en milisegundos)
+    await this.db.execute("PRAGMA busy_timeout = 5000;");
+    // Sincronización normal (más seguro que OFF pero más rápido que FULL)
+    await this.db.execute("PRAGMA synchronous = NORMAL;");
+
+    // Intentar limpiar locks residuales múltiples veces
+    for (let i = 0; i < 3; i++) {
+      try {
+        await this.db.execute("ROLLBACK").catch(() => {});
+        await this.db.execute("PRAGMA wal_checkpoint(TRUNCATE);");
+        break; // Si funcionó, salir del loop
+      } catch (e) {
+        if (i === 2) console.warn("No se pudieron limpiar locks después de 3 intentos");
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
 
     // Crear tabla de versiones de migración si no existe
     await this.db.execute(`
@@ -52,6 +72,13 @@ export class TauriSqliteRepository {
 
     // Ejecutar migraciones pendientes
     await this.runMigrations();
+  }
+
+  /**
+   * Limpia locks y hace checkpoint del WAL (uso público para emergencias)
+   */
+  async forceClearLocks(): Promise<void> {
+    await this.clearLocks();
   }
 
   private async hasMigration(version: number): Promise<boolean> {
@@ -278,6 +305,58 @@ export class TauriSqliteRepository {
   private get conn(): Database {
     if (!this.db) throw new Error("DB no inicializada. Llama a initialize().");
     return this.db!;
+  }
+
+  /**
+   * Limpia locks residuales y hace checkpoint del WAL
+   */
+  private async clearLocks(): Promise<void> {
+    try {
+      // Intenta cerrar cualquier transacción pendiente
+      await this.db!.execute("ROLLBACK").catch(() => {});
+      // Checkpoint del WAL para liberar locks
+      await this.db!.execute("PRAGMA wal_checkpoint(RESTART);");
+    } catch (e) {
+      console.warn("No se pudieron limpiar locks:", e);
+    }
+  }
+
+  /**
+   * Ejecuta una función con retry automático en caso de lock
+   */
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    maxRetries = 5,
+    delayMs = 200
+  ): Promise<T> {
+    let lastError: any;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Limpiar locks antes de reintentar
+        if (attempt > 0) {
+          await this.clearLocks();
+          // Delay exponencial: 200ms, 400ms, 600ms, 800ms, 1000ms
+          const waitTime = delayMs * (attempt + 1);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+        return await fn();
+      } catch (e: any) {
+        lastError = e;
+        const errorMsg = String(e?.message || e);
+
+        // Solo reintentar si es un error de lock
+        if (errorMsg.includes("database is locked") || errorMsg.includes("SQLITE_BUSY")) {
+          console.warn(`Intento ${attempt + 1}/${maxRetries} falló por lock, reintentando en ${delayMs * (attempt + 2)}ms...`);
+          continue;
+        }
+
+        // Si es otro tipo de error, fallar inmediatamente
+        throw e;
+      }
+    }
+
+    throw lastError;
   }
 
   // -------------------------------------------------------------------------
@@ -507,29 +586,44 @@ export class TauriSqliteRepository {
 
   /** Elimina una visita y todo su contenido (sesiones, items y adjuntos de esa visita). */
   async deleteVisit(visitId: number): Promise<void> {
-    const db = this.conn;
-    await db.execute("BEGIN");
-    try {
-      // 1) Items de sesiones de esa visita
-      await db.execute(
-        `DELETE FROM session_items
-          WHERE session_id IN (SELECT id FROM sessions WHERE visit_id = $1)`,
-        [visitId],
-      );
-      // 2) Sesiones de esa visita
-      await db.execute(`DELETE FROM sessions WHERE visit_id = $1`, [visitId]);
-      // 3) Adjuntos asociados a esa visita (solo metadatos; los archivos quedan en disco)
-      await db.execute(`DELETE FROM attachments WHERE visit_id = $1`, [
-        visitId,
-      ]);
-      // 4) Visita
-      await db.execute(`DELETE FROM visits WHERE id = $1`, [visitId]);
+    // Usar retry automático para manejar locks
+    return this.withRetry(async () => {
+      const db = this.conn;
+      let transactionActive = false;
 
-      await db.execute("COMMIT");
-    } catch (e) {
-      await db.execute("ROLLBACK");
-      throw e;
-    }
+      try {
+        await db.execute("BEGIN IMMEDIATE");
+        transactionActive = true;
+
+        // 1) Items de sesiones de esa visita
+        await db.execute(
+          `DELETE FROM session_items
+            WHERE session_id IN (SELECT id FROM sessions WHERE visit_id = $1)`,
+          [visitId],
+        );
+        // 2) Sesiones de esa visita
+        await db.execute(`DELETE FROM sessions WHERE visit_id = $1`, [visitId]);
+        // 3) Adjuntos asociados a esa visita (solo metadatos; los archivos quedan en disco)
+        await db.execute(`DELETE FROM attachments WHERE visit_id = $1`, [
+          visitId,
+        ]);
+        // 4) Visita
+        await db.execute(`DELETE FROM visits WHERE id = $1`, [visitId]);
+
+        await db.execute("COMMIT");
+        transactionActive = false;
+      } catch (e) {
+        // Solo hacer rollback si la transacción sigue activa
+        if (transactionActive) {
+          try {
+            await db.execute("ROLLBACK");
+          } catch (rollbackError) {
+            // Ignorar errores de rollback
+          }
+        }
+        throw e;
+      }
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -719,21 +813,39 @@ export class TauriSqliteRepository {
     };
     sessions: SessionRow[];
   }): Promise<{ patientId: number; visitId: number }> {
-    const db = this.conn;
-    await db.execute("BEGIN");
-    try {
-      const patientId = await this.upsertPatient(payload.patient);
-      const visitId = await this.insertVisit(patientId, payload.visit);
-      for (const s of payload.sessions) {
-        const sid = await this.insertSession(visitId, s);
-        await this.insertSessionItems(sid, s.items || []);
+    // Usar retry automático para manejar locks
+    return this.withRetry(async () => {
+      const db = this.conn;
+      let transactionActive = false;
+
+      try {
+        await db.execute("BEGIN IMMEDIATE");
+        transactionActive = true;
+
+        const patientId = await this.upsertPatient(payload.patient);
+        const visitId = await this.insertVisit(patientId, payload.visit);
+
+        for (const s of payload.sessions) {
+          const sid = await this.insertSession(visitId, s);
+          await this.insertSessionItems(sid, s.items || []);
+        }
+
+        await db.execute("COMMIT");
+        transactionActive = false;
+
+        return { patientId, visitId };
+      } catch (e) {
+        // Solo hacer rollback si la transacción sigue activa
+        if (transactionActive) {
+          try {
+            await db.execute("ROLLBACK");
+          } catch (rollbackError) {
+            // Ignorar errores de rollback
+          }
+        }
+        throw e;
       }
-      await db.execute("COMMIT");
-      return { patientId, visitId };
-    } catch (e) {
-      await db.execute("ROLLBACK");
-      throw e;
-    }
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -795,23 +907,26 @@ export class TauriSqliteRepository {
     checksum?: string | null;
     note?: string | null;
   }): Promise<number> {
-    const res = await this.conn.execute(
-      `INSERT INTO attachments
-         (patient_id, visit_id, kind, filename, mime_type, bytes, storage_key, checksum, note)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [
-        meta.patient_id,
-        meta.visit_id ?? null,
-        meta.kind ?? null,
-        meta.filename,
-        meta.mime_type,
-        meta.bytes,
-        meta.storage_key,
-        meta.checksum ?? null,
-        meta.note ?? null,
-      ],
-    );
-    return Number(res.lastInsertId);
+    // Usar retry automático para manejar locks
+    return this.withRetry(async () => {
+      const res = await this.conn.execute(
+        `INSERT INTO attachments
+           (patient_id, visit_id, kind, filename, mime_type, bytes, storage_key, checksum, note)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          meta.patient_id,
+          meta.visit_id ?? null,
+          meta.kind ?? null,
+          meta.filename,
+          meta.mime_type,
+          meta.bytes,
+          meta.storage_key,
+          meta.checksum ?? null,
+          meta.note ?? null,
+        ],
+      );
+      return Number(res.lastInsertId);
+    });
   }
 
   async moveAttachmentToVisit(attachmentId: number, visitId: number | null) {
