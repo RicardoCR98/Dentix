@@ -1,10 +1,11 @@
 // src/components/Odontogram.tsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, memo } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { ToothDx, DiagnosisOption } from "../lib/types";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
 import { CheckboxRoot } from "./ui/Checkbox";
+import { Input } from "./ui/Input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/Tabs";
 import { X, Check, Trash2, Plus, Save, Edit3 } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -15,16 +16,28 @@ type Props = {
   onChange: (next: ToothDx) => void;
 };
 
-export default function Odontogram({ value, onChange }: Props) {
+const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
   const [openTooth, setOpenTooth] = useState<string | null>(null);
   const [diagOptions, setDiagOptions] = useState<DiagnosisOption[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingOptions, setEditingOptions] = useState<DiagnosisOption[]>([]);
   const [activeTab, setActiveTab] = useState<"adult" | "child">("adult");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Cargar opciones de diagnóstico desde la base de datos
   useEffect(() => {
-    loadDiagnosisOptions();
+    // OPTIMIZACIÓN: Evitar múltiples cargas simultáneas con debounce
+    let isMounted = true;
+    const timeoutId = setTimeout(async () => {
+      if (isMounted) {
+        await loadDiagnosisOptions();
+      }
+    }, 100);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const loadDiagnosisOptions = async () => {
@@ -32,41 +45,15 @@ export default function Odontogram({ value, onChange }: Props) {
       const repo = await getRepository();
       const options = await repo.getDiagnosisOptions();
 
-      // Si no hay opciones en la BD (primera vez), usar las por defecto
-      if (options.length === 0) {
-        const defaultOptions: DiagnosisOption[] = [
-          { label: "Caries", color: "info", sort_order: 1 },
-          { label: "Gingivitis", color: "info", sort_order: 2 },
-          { label: "Fractura", color: "info", sort_order: 3 },
-          { label: "Pérdida", color: "info", sort_order: 4 },
-          { label: "Obturación", color: "info", sort_order: 5 },
-          { label: "Endodoncia", color: "info", sort_order: 6 },
-        ];
-        setDiagOptions(defaultOptions);
-
-        // Guardar las opciones por defecto en la BD para la próxima vez
-        await repo.saveDiagnosisOptions(
-          defaultOptions.map((opt, idx) => ({
-            label: opt.label,
-            color: opt.color,
-            sort_order: idx + 1,
-          })),
-        );
-      } else {
-        setDiagOptions(options);
-      }
+      // OPTIMIZACIÓN: Los datos por defecto ya están en la BD (migración 003)
+      // Solo cargar y usar lo que viene de la BD
+      setDiagOptions(options);
     } catch (error) {
       console.error("Error cargando opciones de diagnóstico:", error);
-      // En caso de error, cargar opciones por defecto
-      const fallbackOptions: DiagnosisOption[] = [
-        { label: "Caries", color: "info", sort_order: 1 },
-        { label: "Gingivitis", color: "info", sort_order: 2 },
-        { label: "Fractura", color: "info", sort_order: 3 },
-        { label: "Pérdida", color: "info", sort_order: 4 },
-        { label: "Obturación", color: "info", sort_order: 5 },
-        { label: "Endodoncia", color: "info", sort_order: 6 },
-      ];
-      setDiagOptions(fallbackOptions);
+      // En caso de error de BD, mostrar al usuario pero no insertar nada
+      alert(
+        "Error al cargar opciones de diagnóstico. Por favor recarga la aplicación.",
+      );
     }
   };
 
@@ -81,6 +68,10 @@ export default function Odontogram({ value, onChange }: Props) {
   };
 
   const handleSaveOptions = async () => {
+    // Prevenir múltiples clics
+    if (isSaving) return;
+
+    setIsSaving(true);
     try {
       const repo = await getRepository();
       await repo.saveDiagnosisOptions(
@@ -90,12 +81,17 @@ export default function Odontogram({ value, onChange }: Props) {
           sort_order: idx + 1,
         })),
       );
-      await loadDiagnosisOptions();
+
+      // OPTIMIZACIÓN: Actualizar estado local SIN recargar desde BD
+      // para evitar race condition entre WRITE y READ
+      setDiagOptions(editingOptions);
       setIsEditMode(false);
       setEditingOptions([]);
     } catch (error) {
       console.error("Error guardando opciones:", error);
-      alert("Error al guardar las opciones");
+      alert("Error al guardar las opciones. Intenta nuevamente.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -323,12 +319,14 @@ export default function Odontogram({ value, onChange }: Props) {
                               </Button>
                             )}
                             <Popover.Close asChild>
-                              <button
-                                className="cursor-pointer w-6 h-6 rounded hover:bg-[hsl(var(--muted))] flex items-center justify-center transition-colors"
-                                aria-label="Cerrar"
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-8 h-8 p-0"
+                                title="Cerrar"
                               >
                                 <X size={14} />
-                              </button>
+                              </Button>
                             </Popover.Close>
                           </div>
                         </div>
@@ -362,10 +360,11 @@ export default function Odontogram({ value, onChange }: Props) {
                                 variant="primary"
                                 size="sm"
                                 onClick={handleSaveOptions}
+                                disabled={isSaving}
                                 className="flex-1 cursor-pointer"
                               >
                                 <Save size={14} />
-                                Guardar
+                                {isSaving ? "Guardando..." : "Guardar"}
                               </Button>
                             </div>
 
@@ -376,7 +375,7 @@ export default function Odontogram({ value, onChange }: Props) {
                                   key={idx}
                                   className="flex items-center gap-2 p-2 rounded-md bg-[hsl(var(--muted))]"
                                 >
-                                  <input
+                                  <Input
                                     type="text"
                                     value={opt.label}
                                     onChange={(e) =>
@@ -386,16 +385,18 @@ export default function Odontogram({ value, onChange }: Props) {
                                         e.target.value,
                                       )
                                     }
-                                    className="flex-1 px-2 py-1 text-sm bg-[hsl(var(--surface))] border border-[hsl(var(--border))] rounded"
                                     placeholder="Nombre de la opción"
+                                    className="flex-1 h-9 text-sm"
                                   />
-                                  <button
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={() => handleDeleteOption(idx)}
-                                    className="cursor-pointer w-7 h-7 rounded hover:bg-[hsl(var(--surface))] flex items-center justify-center transition-colors text-red-500"
-                                    aria-label="Eliminar"
+                                    className="w-9 h-9 p-0 hover:bg-red-500/20 hover:text-red-600"
+                                    title="Eliminar"
                                   >
                                     <Trash2 size={14} />
-                                  </button>
+                                  </Button>
                                 </div>
                               ))}
                             </div>
@@ -538,4 +539,8 @@ export default function Odontogram({ value, onChange }: Props) {
       </Tabs>
     </div>
   );
-}
+});
+
+Odontogram.displayName = "Odontogram";
+
+export default Odontogram;

@@ -1,10 +1,11 @@
 // src/components/SessionsTable.tsx
-import { useMemo, useState, memo } from "react";
+import { useMemo, useState, memo, useCallback, useRef, useEffect } from "react";
 import { toInt } from "../lib/utils";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { Badge } from "./ui/Badge";
 import { Alert } from "./ui/Alert";
+import { CheckboxRoot } from "./ui/Checkbox";
 import {
   Plus,
   DollarSign,
@@ -25,26 +26,81 @@ import { cn } from "../lib/cn";
 import type { SessionRow, ProcItem, ProcedureTemplate } from "../lib/types";
 import { DatePicker } from "./ui/DatePicker";
 import SignerSelect from "./SignerSelect";
+import { Textarea } from "./ui/Textarea";
 
 interface SessionsTableProps {
   sessions: SessionRow[];
   onSessionsChange: (sessions: SessionRow[]) => void;
   procedureTemplates: ProcedureTemplate[];
   onUpdateTemplates: (
-    items: Array<{ name: string; unit: number }>,
+    items: Array<{ name: string; unit: number; procedure_template_id?: number }>,
   ) => Promise<void>;
   signers: Array<{ id: number; name: string }>;
   onSignersChange: () => Promise<void>;
 
-  /** NUEVO — control externo de qué sesión está expandida (opcional) */
-  activeId?: string | null;
-  /** NUEVO — cuando el usuario abre una sesión (opcional) */
-  onOpenSession?: (sessionId: string) => void;
-  /** NUEVO — al pulsar el "ojo" para ver en modo lectura (opcional) */
-  onViewReadOnly?: (sessionId: string, visitId?: number) => void;
+  /** Control externo de qué sesión está expandida (opcional) */
+  activeId?: number | null;
+  /** Cuando el usuario abre una sesión (opcional) */
+  onOpenSession?: (sessionId: number) => void;
+  /** Al pulsar el "ojo" para ver en modo lectura (opcional) */
+  onViewReadOnly?: (sessionId: number, visitId?: number) => void;
 }
 
 const PAGE_SIZE = 5;
+
+// Componente optimizado para el textarea de observaciones con debounce
+const ObservationsTextarea = memo(
+  ({
+    value,
+    onChange,
+    disabled,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    disabled: boolean;
+  }) => {
+    const [localValue, setLocalValue] = useState(value);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Sincronizar cuando cambia el valor externo
+    useEffect(() => {
+      setLocalValue(value);
+    }, [value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newValue = e.target.value;
+      setLocalValue(newValue);
+
+      // Limpiar timeout anterior
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Debounce de 500ms antes de propagar el cambio
+      timeoutRef.current = setTimeout(() => {
+        onChange(newValue);
+      }, 500);
+    };
+
+    // Limpiar timeout al desmontar
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }, []);
+
+    return (
+      <Textarea
+        value={localValue}
+        onChange={handleChange}
+        placeholder="Notas adicionales sobre esta sesión..."
+        disabled={disabled}
+      />
+    );
+  }
+);
 
 // Componente memoizado para las filas de procedimientos (evita re-renders innecesarios)
 const ProcedureRow = memo(
@@ -70,8 +126,8 @@ const ProcedureRow = memo(
         className={cn(
           "grid gap-2 items-center p-2 rounded-md",
           inEditMode
-            ? "grid-cols-[1fr_90px_80px_90px_50px] min-w-[400px]"
-            : "grid-cols-[1fr_90px_80px_90px] min-w-[350px]",
+            ? "grid-cols-[2fr_110px_90px_100px_50px] min-w-[500px]"
+            : "grid-cols-[2fr_110px_90px_100px] min-w-[450px]",
           item.qty > 0 && "bg-[hsl(var(--muted))]",
         )}
       >
@@ -96,7 +152,7 @@ const ProcedureRow = memo(
           value={item.unit || ""}
           onChange={(e) => onUnitChange(e.target.value)}
           icon={<DollarSign size={14} />}
-          className="h-9 text-center text-xs"
+          className="h-9 text-center text-sm"
           placeholder="0"
           disabled={!isEditable}
         />
@@ -108,13 +164,13 @@ const ProcedureRow = memo(
           step={1}
           value={item.qty || ""}
           onChange={(e) => onQtyChange(e.target.value)}
-          className="h-9 text-center font-semibold text-xs"
+          className="h-9 text-center font-semibold text-sm"
           placeholder="0"
           disabled={!isEditable}
         />
 
         {/* Subtotal */}
-        <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center text-xs">
+        <div className="text-center font-semibold rounded-md h-9 flex items-center justify-center text-sm">
           ${item.sub}
         </div>
 
@@ -137,7 +193,7 @@ const ProcedureRow = memo(
 
 ProcedureRow.displayName = "ProcedureRow";
 
-export default function SessionsTable({
+const SessionsTable = memo(function SessionsTable({
   sessions,
   onSessionsChange,
   procedureTemplates,
@@ -186,22 +242,27 @@ export default function SessionsTable({
     return mostRecent.id;
   }, [sessions]);
 
-  const newRow = (): SessionRow => {
+  const newRow = useCallback((): SessionRow => {
     // Usar plantilla global de procedimientos
     console.log("🆕 Creando nueva sesión con plantillas:", procedureTemplates);
-    const baseItems: ProcItem[] = procedureTemplates.map((template) => ({
-      id: crypto.randomUUID(),
+    const baseItems: ProcItem[] = procedureTemplates.map((template, index) => ({
+      // Generar ID temporal único para items nuevos (negativo para diferenciar de BD)
+      id: -(Date.now() + index),  // ID temporal negativo único
       name: template.name,
       unit: template.default_price,
       qty: 0,
       sub: 0,
+      procedure_template_id: template.id, // Guardar ID de plantilla para preservarlo
     }));
 
     console.log("📦 Items generados:", baseItems);
 
     const today = new Date().toISOString().slice(0, 10);
+    // Generar ID temporal único para la sesión
+    const tempSessionId = `temp-${Date.now()}`;
+
     return {
-      id: crypto.randomUUID(),
+      id: tempSessionId,  // ID temporal único
       date: today,
       items: baseItems,
       auto: true,
@@ -210,8 +271,9 @@ export default function SessionsTable({
       payment: 0,
       balance: 0,
       signer: "",
+      observations: "",
     };
-  };
+  }, [procedureTemplates]);
 
   // Lista ordenada por fecha (YYYY-MM-DD compara bien como string)
   // Siempre descendente: más reciente arriba
@@ -235,7 +297,7 @@ export default function SessionsTable({
   );
 
   // Agregar: respeta orden, y deja la NUEVA como activa
-  const addRow = () => {
+  const addRow = useCallback(() => {
     // Encontrar la sesión más reciente (para copiar cantidades)
     let previousSession: SessionRow | null = null;
     if (sessions.length > 0) {
@@ -258,8 +320,10 @@ export default function SessionsTable({
       );
 
       // Aplicar las cantidades de la sesión anterior a los procedimientos de la nueva sesión
-      row.items = row.items.map((item) => ({
+      // IMPORTANTE: Generar nuevos IDs temporales únicos para cada item
+      row.items = row.items.map((item, index) => ({
         ...item,
+        id: -(Date.now() + index + 1000),  // Nuevo ID temporal único
         qty: prevQtyMap.get(item.name) || 0, // Copiar qty si existe, sino 0
         sub: item.unit * (prevQtyMap.get(item.name) || 0), // Recalcular subtotal
       }));
@@ -281,81 +345,102 @@ export default function SessionsTable({
 
     // La nueva sesión siempre queda en la primera página
     setPage(0);
-  };
+  }, [sessions, onSessionsChange, onOpenSession, newRow]);
 
   // —— Ya no se elimina por requerimiento legal; quitamos UI de borrado —— //
 
   // Recalcular montos (no toca fecha)
-  const recalcRow = (idxOriginal: number, mutate?: (r: SessionRow) => void) => {
-    const next = [...sessions];
-    const r = { ...next[idxOriginal] };
-    mutate?.(r);
-    r.items = r.items.map((it) => ({
-      ...it,
-      sub: toInt(it.unit) * toInt(it.qty),
-    }));
-    const totalProcs = r.items.reduce((sum, it) => sum + it.sub, 0);
-    r.budget = r.auto ? totalProcs : toInt(r.budget);
-    const maxPayment = Math.max(r.budget - toInt(r.discount), 0);
-    r.payment = Math.min(toInt(r.payment), maxPayment);
-    r.balance = Math.max(r.budget - toInt(r.discount) - r.payment, 0);
-    next[idxOriginal] = r;
-    onSessionsChange(next);
-  };
+  const recalcRow = useCallback(
+    (idxOriginal: number, mutate?: (r: SessionRow) => void) => {
+      const next = [...sessions];
+      const r = { ...next[idxOriginal] };
+      mutate?.(r);
+      r.items = r.items.map((it) => ({
+        ...it,
+        sub: toInt(it.unit) * toInt(it.qty),
+      }));
+      const totalProcs = r.items.reduce((sum, it) => sum + it.sub, 0);
+      r.budget = r.auto ? totalProcs : toInt(r.budget);
+      const maxPayment = Math.max(r.budget - toInt(r.discount), 0);
+      r.payment = Math.min(toInt(r.payment), maxPayment);
+      r.balance = Math.max(r.budget - toInt(r.discount) - r.payment, 0);
+      next[idxOriginal] = r;
+      onSessionsChange(next);
+    },
+    [sessions, onSessionsChange],
+  );
 
-  const goFirst = () => setPage(0);
-  const goPrev = () => setPage((p) => Math.max(0, p - 1));
-  const goNext = () => setPage((p) => Math.min(totalPages - 1, p + 1));
-  const goLast = () => setPage(totalPages - 1);
+  const goFirst = useCallback(() => setPage(0), []);
+  const goPrev = useCallback(() => setPage((p) => Math.max(0, p - 1)), []);
+  const goNext = useCallback(
+    () => setPage((p) => Math.min(totalPages - 1, p + 1)),
+    [totalPages],
+  );
+  const goLast = useCallback(() => setPage(totalPages - 1), [totalPages]);
 
-  const handleToggleRow = (id: string) => {
-    // Si ya está activa → la colapsamos (solo en modo no-controlado)
-    if (activeId !== undefined) {
-      // controlado por el padre
-      if (onOpenSession) onOpenSession(id);
-      return;
-    }
-    setInternalActiveId((cur) => (cur === id ? null : id));
-  };
+  const handleToggleRow = useCallback(
+    (id: string) => {
+      // Si ya está activa → la colapsamos (solo en modo no-controlado)
+      if (activeId !== undefined) {
+        // controlado por el padre
+        if (onOpenSession) onOpenSession(id);
+        return;
+      }
+      setInternalActiveId((cur) => (cur === id ? null : id));
+    },
+    [activeId, onOpenSession],
+  );
 
   // Agregar un procedimiento vacío a una sesión
-  const addProcedure = (idxOriginal: number) => {
-    const next = [...sessions];
-    const r = { ...next[idxOriginal] };
-    r.items = [
-      ...r.items,
-      {
-        id: crypto.randomUUID(),
-        name: "",
-        unit: 0,
-        qty: 0,
-        sub: 0,
-      },
-    ];
-    next[idxOriginal] = r;
-    onSessionsChange(next);
-  };
+  const addProcedure = useCallback(
+    (idxOriginal: number) => {
+      const next = [...sessions];
+      const r = { ...next[idxOriginal] };
+      r.items = [
+        ...r.items,
+        {
+          // Generar ID temporal único (negativo para diferenciar de BD)
+          id: -(Date.now()),
+          name: "",
+          unit: 0,
+          qty: 0,
+          sub: 0,
+        },
+      ];
+      next[idxOriginal] = r;
+      onSessionsChange(next);
+    },
+    [sessions, onSessionsChange],
+  );
 
   // Eliminar un procedimiento de una sesión
-  const removeProcedure = (idxOriginal: number, procId: string) => {
-    recalcRow(idxOriginal, (r) => {
-      r.items = r.items.filter((it) => it.id !== procId);
-    });
-  };
+  const removeProcedure = useCallback(
+    (sessionIdx: number, itemIdx: number) => {
+      recalcRow(sessionIdx, (r) => {
+        r.items = r.items.filter((_, idx) => idx !== itemIdx);
+      });
+    },
+    [recalcRow],
+  );
 
   // Entrar al modo edición de plantilla
-  const enterEditMode = (sessionId: string) => {
-    const session = sessions.find((s) => s.id === sessionId);
-    if (session) {
-      // Guardar snapshot profundo de los items originales
-      const snapshot = JSON.parse(JSON.stringify(session.items)) as ProcItem[];
-      setItemsSnapshot((prev) => new Map(prev).set(sessionId, snapshot));
-    }
-    setEditModeSessionId(sessionId);
-  };
+  const enterEditMode = useCallback(
+    (sessionId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (session) {
+        // Guardar snapshot profundo de los items originales
+        const snapshot = JSON.parse(
+          JSON.stringify(session.items),
+        ) as ProcItem[];
+        setItemsSnapshot((prev) => new Map(prev).set(sessionId, snapshot));
+      }
+      setEditModeSessionId(sessionId);
+    },
+    [sessions],
+  );
 
   // Salir del modo edición de plantilla
-  const exitEditMode = async () => {
+  const exitEditMode = useCallback(async () => {
     if (!editModeSessionId) return;
 
     // Buscar la sesión que está en modo edición
@@ -375,10 +460,10 @@ export default function SessionsTable({
     // en session.items (son los que el usuario acaba de editar)
 
     setEditModeSessionId(null);
-  };
+  }, [editModeSessionId, sessions, onUpdateTemplates]);
 
   // Cancelar la edición de plantilla y restaurar items originales
-  const cancelEditMode = () => {
+  const cancelEditMode = useCallback(() => {
     if (!editModeSessionId) return;
 
     const snapshot = itemsSnapshot.get(editModeSessionId);
@@ -403,7 +488,7 @@ export default function SessionsTable({
     }
 
     setEditModeSessionId(null);
-  };
+  }, [editModeSessionId, itemsSnapshot, sessions, onSessionsChange]);
 
   return (
     <div className="space-y-4">
@@ -441,7 +526,7 @@ export default function SessionsTable({
         </Alert>
       ) : (
         <div className="space-y-3">
-          {visibleSessions.map((row) => {
+          {visibleSessions.map((row, sessionIdx) => {
             const isExpanded = currentActiveId === row.id;
             const activeProcs = row.items.filter((it) => it.qty > 0);
 
@@ -457,7 +542,7 @@ export default function SessionsTable({
 
             return (
               <div
-                key={row.id}
+                key={row.id || `session-${sessionIdx}-${row.date}`}
                 className={cn(
                   "card p-4 pt-6 hover:border-[hsl(var(--brand))] transition-all",
                   isExpanded && "ring-2 ring-[hsl(var(--brand))]",
@@ -653,23 +738,24 @@ export default function SessionsTable({
                             )}
                           </div>
 
-                          {/* Contenedor flex con tabla de procedimientos a la izquierda y campos financieros a la derecha */}
-                          <div className="flex gap-4">
-                            {/* Tabla de procedimientos - lado izquierdo */}
-                            <div className="flex-1">
-                              <div className="overflow-x-auto">
+                          {/* Tabla unificada con layout flex */}
+                          <div className="overflow-x-auto">
+                            <div className="flex gap-0 min-w-[1000px]">
+                              {/* Sección izquierda: Procedimientos */}
+                              <div className="flex-1">
+                                {/* Headers de procedimientos */}
                                 <div
                                   className={cn(
                                     "grid gap-2 px-3 pb-2 mb-2 border-b-2 border-blue-200 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide",
                                     inEditMode
-                                      ? "grid-cols-[1fr_90px_80px_90px_50px] min-w-[400px]"
-                                      : "grid-cols-[1fr_90px_80px_90px] min-w-[350px]",
+                                      ? "grid-cols-[2fr_110px_90px_100px_50px] min-w-[500px]"
+                                      : "grid-cols-[2fr_110px_90px_100px] min-w-[450px]",
                                   )}
                                 >
                                   <div>Procedimiento</div>
-                                  <div className="text-center">Precio U.</div>
-                                  <div className="text-center">Cant.</div>
-                                  <div className="text-center">Subtotal</div>
+                                  <div className="text-center">Precio Unit</div>
+                                  <div className="text-center">Cantidad</div>
+                                  <div className="text-center">Total</div>
                                   {inEditMode && <div></div>}
                                 </div>
 
@@ -690,165 +776,206 @@ export default function SessionsTable({
                                   </div>
                                 ) : (
                                   <div className="space-y-1">
-                                    {displayItems.map((item) => {
-                                      const fullIdx = row.items.findIndex(
-                                        (it) => it.id === item.id,
-                                      );
+                                    {displayItems.map((item, displayIdx) => {
+                                      // CRÍTICO: Encontrar el índice REAL del item en row.items usando ID único
+                                      const itemId = item.id;
+                                      const fullIdx = row.items.findIndex((it) => it.id === itemId);
+
+                                      // Si no se encuentra por ID (no debería pasar), usar el índice de displayación
+                                      const actualIdx = fullIdx >= 0 ? fullIdx : displayIdx;
 
                                       return (
                                         <ProcedureRow
-                                          key={item.id}
+                                          key={item.id || `${row.id}-${item.name}-${displayIdx}`}
                                           item={item}
                                           inEditMode={inEditMode}
                                           isEditable={isEditable}
                                           onNameChange={(value) =>
                                             recalcRow(idxReal, (r) => {
-                                              r.items[fullIdx].name = value;
+                                              if (r.items[actualIdx]) {
+                                                r.items[actualIdx].name = value;
+                                              }
                                             })
                                           }
                                           onUnitChange={(value) =>
                                             recalcRow(idxReal, (r) => {
-                                              r.items[fullIdx].unit =
-                                                toInt(value);
+                                              if (r.items[actualIdx]) {
+                                                r.items[actualIdx].unit = toInt(value);
+                                              }
                                             })
                                           }
                                           onQtyChange={(value) =>
                                             recalcRow(idxReal, (r) => {
-                                              r.items[fullIdx].qty =
-                                                toInt(value);
+                                              if (r.items[actualIdx]) {
+                                                r.items[actualIdx].qty = toInt(value);
+                                              }
                                             })
                                           }
                                           onRemove={() =>
-                                            removeProcedure(idxReal, item.id!)
+                                            removeProcedure(idxReal, actualIdx)
                                           }
                                         />
                                       );
                                     })}
                                   </div>
                                 )}
-
-                                {/* Total de procedimientos */}
-                                <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed border-[hsl(var(--border))]"></div>
                               </div>
-                            </div>
 
-                            {/* Campos financieros - lado derecho, centrados verticalmente */}
-                            <div className="w-[280px] flex flex-col justify-center">
-                              <div className="bg-[hsl(var(--muted))] border-l-4 border-blue-500 p-4 rounded-md space-y-3">
-                                <h5 className="font-semibold text-sm mb-3">
-                                  Información financiera
-                                </h5>
+                              {/* Sección derecha: 2 columnas fijas */}
+                              <div className="flex">
+                                {/* Headers de las 2 columnas */}
+                                <div className="flex">
+                                  {/* Columna 1: Información financiera */}
+                                  <div className="w-[230px] border-l-2 border-blue-200 flex flex-col">
+                                    <div className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide px-3 pb-2 mb-2 border-b-2 border-blue-200 text-center">
+                                      Información Financiera
+                                    </div>
+                                    <div className="flex-1 flex items-center">
+                                      <div className="w-full px-3 py-2 space-y-2">
+                                        {/* Presupuesto */}
+                                        <div>
+                                          <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
+                                            Presupuesto
+                                          </label>
+                                          <div className="flex items-center gap-1">
+                                            <Input
+                                              type="number"
+                                              min={0}
+                                              step={1}
+                                              value={row.budget}
+                                              onChange={(e) =>
+                                                recalcRow(idxReal, (r) => {
+                                                  r.auto = false;
+                                                  r.budget = toInt(
+                                                    e.target.value,
+                                                  );
+                                                })
+                                              }
+                                              disabled={row.auto || !isEditable}
+                                              icon={<DollarSign size={14} />}
+                                              className="h-9 text-sm"
+                                            />
+                                            <label
+                                              className="inline-flex items-center gap-1"
+                                              title="Presupuesto automático"
+                                            >
+                                              <CheckboxRoot
+                                                checked={row.auto}
+                                                onCheckedChange={(checked) =>
+                                                  recalcRow(idxReal, (r) => {
+                                                    r.auto = checked === true;
+                                                  })
+                                                }
+                                                disabled={!isEditable}
+                                              />
+                                            </label>
+                                          </div>
+                                        </div>
 
-                                {/* Presupuesto */}
-                                <div>
-                                  <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
-                                    Presupuesto
-                                  </label>
-                                  <div className="flex items-center gap-1">
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      step={1}
-                                      value={row.budget}
-                                      onChange={(e) =>
-                                        recalcRow(idxReal, (r) => {
-                                          r.auto = false;
-                                          r.budget = toInt(e.target.value);
-                                        })
-                                      }
-                                      disabled={row.auto || !isEditable}
-                                      icon={<DollarSign size={12} />}
-                                      className="h-9 text-xs"
-                                    />
-                                    <label
-                                      className="inline-flex items-center gap-1"
-                                      title="Presupuesto automático"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        className="h-3 w-3"
-                                        checked={row.auto}
-                                        onChange={(e) =>
-                                          recalcRow(idxReal, (r) => {
-                                            r.auto = e.target.checked;
-                                          })
-                                        }
-                                        disabled={!isEditable}
-                                      />
-                                    </label>
+                                        {/* Descuento */}
+                                        <div>
+                                          <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
+                                            Descuento
+                                          </label>
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            step={1}
+                                            value={row.discount || ""}
+                                            onChange={(e) =>
+                                              recalcRow(idxReal, (r) => {
+                                                r.discount = toInt(
+                                                  e.target.value,
+                                                );
+                                              })
+                                            }
+                                            icon={<DollarSign size={14} />}
+                                            placeholder="0"
+                                            disabled={!isEditable}
+                                            className="h-9 text-sm"
+                                          />
+                                        </div>
+
+                                        {/* Abono */}
+                                        <div>
+                                          <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
+                                            Abono
+                                          </label>
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            step={1}
+                                            value={row.payment || ""}
+                                            onChange={(e) =>
+                                              recalcRow(idxReal, (r) => {
+                                                r.payment = toInt(
+                                                  e.target.value,
+                                                );
+                                              })
+                                            }
+                                            icon={<DollarSign size={14} />}
+                                            placeholder="0"
+                                            disabled={!isEditable}
+                                            className="h-9 text-sm"
+                                          />
+                                        </div>
+
+                                        {/* Saldo */}
+                                        <div>
+                                          <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
+                                            Saldo
+                                          </label>
+                                          <div className="text-center font-bold rounded-md h-9 flex items-center justify-center text-sm bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-400">
+                                            ${row.balance}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
 
-                                {/* Descuento */}
-                                <div>
-                                  <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
-                                    Descuento
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    step={1}
-                                    value={row.discount || ""}
-                                    onChange={(e) =>
-                                      recalcRow(idxReal, (r) => {
-                                        r.discount = toInt(e.target.value);
-                                      })
-                                    }
-                                    icon={<DollarSign size={12} />}
-                                    placeholder="0"
-                                    disabled={!isEditable}
-                                    className="h-9 text-xs"
-                                  />
-                                </div>
+                                  {/* Columna 2: Firma y Observaciones */}
+                                  <div className="w-[230px] border-l-2 border-blue-200 flex flex-col">
+                                    <div className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide px-3 pb-2 mb-2 border-b-2 border-blue-200 text-center">
+                                      Firma y Observaciones
+                                    </div>
+                                    <div className="flex-1 flex items-center">
+                                      <div className="w-full px-3 py-2 space-y-3">
+                                        {/* Firma del responsable */}
+                                        <div>
+                                          <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
+                                            Firma del responsable
+                                          </label>
+                                          <SignerSelect
+                                            value={row.signer || ""}
+                                            onChange={(value) =>
+                                              recalcRow(idxReal, (r) => {
+                                                r.signer = value;
+                                              })
+                                            }
+                                            disabled={!isEditable}
+                                            signers={signers}
+                                            onSignersChange={onSignersChange}
+                                          />
+                                        </div>
 
-                                {/* Abono */}
-                                <div>
-                                  <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
-                                    Abono
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    step={1}
-                                    value={row.payment || ""}
-                                    onChange={(e) =>
-                                      recalcRow(idxReal, (r) => {
-                                        r.payment = toInt(e.target.value);
-                                      })
-                                    }
-                                    icon={<DollarSign size={12} />}
-                                    placeholder="0"
-                                    disabled={!isEditable}
-                                    className="h-9 text-xs"
-                                  />
-                                </div>
-
-                                {/* Saldo */}
-                                <div>
-                                  <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
-                                    Saldo
-                                  </label>
-                                  <div className="text-center font-bold rounded-md h-9 flex items-center justify-center text-sm bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-400">
-                                    ${row.balance}
+                                        {/* Observaciones */}
+                                        <div>
+                                          <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
+                                            Observaciones
+                                          </label>
+                                          <ObservationsTextarea
+                                            value={row.observations || ""}
+                                            onChange={(value) =>
+                                              recalcRow(idxReal, (r) => {
+                                                r.observations = value;
+                                              })
+                                            }
+                                            disabled={!isEditable}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
-
-                                {/* Campo de firma del responsable */}
-                                <div>
-                                  <label className="block text-sm font-medium mb-2">
-                                    Firma del responsable
-                                  </label>
-                                  <SignerSelect
-                                    value={row.signer || ""}
-                                    onChange={(value) =>
-                                      recalcRow(idxReal, (r) => {
-                                        r.signer = value;
-                                      })
-                                    }
-                                    disabled={!isEditable}
-                                    signers={signers}
-                                    onSignersChange={onSignersChange}
-                                  />
                                 </div>
                               </div>
                             </div>
@@ -940,4 +1067,8 @@ export default function SessionsTable({
       )}
     </div>
   );
-}
+});
+
+SessionsTable.displayName = "SessionsTable";
+
+export default SessionsTable;

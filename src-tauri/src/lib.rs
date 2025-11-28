@@ -1,3 +1,13 @@
+// Módulo de comandos Tauri
+pub mod commands;
+
+use sqlx::sqlite::SqlitePool;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+// Estado compartido para el pool de base de datos
+pub struct DbPool(pub Arc<Mutex<SqlitePool>>);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()

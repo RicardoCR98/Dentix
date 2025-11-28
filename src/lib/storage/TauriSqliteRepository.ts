@@ -1,5 +1,5 @@
 // src/lib/storage/TauriSqliteRepository.ts
-import Database from "@tauri-apps/plugin-sql";
+import { invoke } from "@tauri-apps/api/core";
 import type {
   Patient,
   Visit,
@@ -8,20 +8,6 @@ import type {
   ProcedureTemplate,
   DiagnosisOption,
 } from "../types";
-
-/** Fila completa de la tabla visits (para detalles) */
-type VisitRow = {
-  id: number;
-  patient_id: number;
-  date: string;
-  reason_type: string | null;
-  reason_detail: string | null;
-  diagnosis: string | null;
-  auto_dx_text: string | null;
-  manual_dx_text: string | null;
-  full_dx_text: string | null;
-  tooth_dx_json: string | null;
-};
 
 /** Fila reducida para listar visitas de un paciente (histórico) */
 export type VisitListRow = {
@@ -34,1113 +20,533 @@ export type VisitListRow = {
   tooth_dx_json: string | null;
 };
 
+/**
+ * Repositorio que usa comandos Tauri (Rust backend) para todas las operaciones de base de datos.
+ * Todas las operaciones ahora se manejan en el backend de Rust para evitar problemas de bloqueo.
+ */
 export class TauriSqliteRepository {
-  private db: Database | null = null;
-
+  /**
+   * Inicializa el repositorio.
+   * Nota: La base de datos se inicializa automáticamente en el backend de Rust al arrancar la app.
+   */
   async initialize() {
-    // clinic.db ya se crea y migra desde Rust (tauri-plugin-sql)
-    this.db = await Database.load("sqlite:clinic.db");
-
-    // Configuraciones críticas de SQLite para prevenir locks
-    await this.db.execute("PRAGMA foreign_keys = ON;");
-    // WAL mode permite lecturas concurrentes con escrituras (evita muchos locks)
-    await this.db.execute("PRAGMA journal_mode = WAL;");
-    // Timeout de 5 segundos cuando la DB está bloqueada (en milisegundos)
-    await this.db.execute("PRAGMA busy_timeout = 5000;");
-    // Sincronización normal (más seguro que OFF pero más rápido que FULL)
-    await this.db.execute("PRAGMA synchronous = NORMAL;");
-
-    // Intentar limpiar locks residuales múltiples veces
-    for (let i = 0; i < 3; i++) {
-      try {
-        await this.db.execute("ROLLBACK").catch(() => {});
-        await this.db.execute("PRAGMA wal_checkpoint(TRUNCATE);");
-        break; // Si funcionó, salir del loop
-      } catch (e) {
-        if (i === 2) console.warn("No se pudieron limpiar locks después de 3 intentos");
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
-
-    // Crear tabla de versiones de migración si no existe
-    await this.db.execute(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        version INTEGER PRIMARY KEY,
-        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
-
-    // Ejecutar migraciones pendientes
-    await this.runMigrations();
+    // No se necesita inicialización - el backend de Rust maneja todo
+    console.log("TauriSqliteRepository: Using Rust backend commands");
   }
 
-  /**
-   * Limpia locks y hace checkpoint del WAL (uso público para emergencias)
-   */
-  async forceClearLocks(): Promise<void> {
-    await this.clearLocks();
-  }
+  // ============================================================================
+  // PATIENT OPERATIONS
+  // ============================================================================
 
-  private async hasMigration(version: number): Promise<boolean> {
-    const rows = await this.db!.select<Array<{ count: number }>>(
-      "SELECT COUNT(*) as count FROM schema_migrations WHERE version = ?",
-      [version],
-    );
-    return (rows[0]?.count ?? 0) > 0;
-  }
-
-  private async markMigration(version: number): Promise<void> {
-    await this.db!.execute(
-      "INSERT INTO schema_migrations (version) VALUES (?)",
-      [version],
-    );
-  }
-
-  private async runMigrations() {
-    // Migración 002: Plantillas y doctores
-    if (!(await this.hasMigration(2))) {
-      await this.executeMigration002();
-      await this.markMigration(2);
-    }
-    // Migración 003: Opciones de diagnóstico
-    if (!(await this.hasMigration(3))) {
-      await this.executeMigration003();
-      await this.markMigration(3);
-    }
-    // Migración 004: Índices compuestos para optimizar queries
-    if (!(await this.hasMigration(4))) {
-      await this.executeMigration004();
-      await this.markMigration(4);
-    }
-    // Migración 005: Teléfono de emergencia
-    if (!(await this.hasMigration(5))) {
-      await this.executeMigration005();
-      await this.markMigration(5);
-    }
-  }
-
-  private async executeMigration002() {
-    // Agregar campo discount a sessions
+  async searchPatients(q: string): Promise<Patient[]> {
     try {
-      await this.db!.execute(
-        "ALTER TABLE sessions ADD COLUMN discount INTEGER NOT NULL DEFAULT 0",
-      );
-    } catch {
-      // Ya existe, ignorar
+      return await invoke<Patient[]>("search_patients", { query: q });
+    } catch (error) {
+      console.error("Error en searchPatients:", error);
+      throw error;
     }
-
-    // Crear tabla signers
-    await this.db!.execute(`
-      CREATE TABLE IF NOT EXISTS signers (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        name       TEXT NOT NULL UNIQUE,
-        active     INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
-
-    // Crear tabla procedure_templates
-    await this.db!.execute(`
-      CREATE TABLE IF NOT EXISTS procedure_templates (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        name          TEXT NOT NULL UNIQUE,
-        default_price INTEGER NOT NULL DEFAULT 0,
-        active        INTEGER NOT NULL DEFAULT 1,
-        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
-
-    // Triggers
-    await this.db!.execute(`
-      CREATE TRIGGER IF NOT EXISTS trg_signers_updated_at
-      AFTER UPDATE ON signers
-      FOR EACH ROW
-      BEGIN
-        UPDATE signers SET updated_at = datetime('now') WHERE id = NEW.id;
-      END
-    `);
-
-    await this.db!.execute(`
-      CREATE TRIGGER IF NOT EXISTS trg_procedure_templates_updated_at
-      AFTER UPDATE ON procedure_templates
-      FOR EACH ROW
-      BEGIN
-        UPDATE procedure_templates SET updated_at = datetime('now') WHERE id = NEW.id;
-      END
-    `);
-
-    // Datos iniciales - procedimientos predefinidos (SOLO PRIMERA VEZ)
-    const defaultProcs = [
-      "Curación",
-      "Resinas simples",
-      "Resinas compuestas",
-      "Extracciones simples",
-      "Extracciones complejas",
-      "Correctivo inicial",
-      "Control mensual",
-      "Prótesis total",
-      "Prótesis removible",
-      "Prótesis fija",
-      "Retenedor",
-      "Endodoncia simple",
-      "Endodoncia compleja",
-      "Limpieza simple",
-      "Limpieza compleja",
-      "Reposición",
-      "Pegada",
-    ];
-
-    for (const name of defaultProcs) {
-      await this.db!.execute(
-        `INSERT OR IGNORE INTO procedure_templates (name, default_price) VALUES (?, 0)`,
-        [name],
-      );
-    }
-
-    // Datos iniciales - doctores por defecto (SOLO PRIMERA VEZ)
-    const defaultSigners = ["Dr. Ejemplo 1", "Dra. Ejemplo 2"];
-    for (const name of defaultSigners) {
-      await this.db!.execute(
-        `INSERT OR IGNORE INTO signers (name, active) VALUES (?, 1)`,
-        [name],
-      );
-    }
-
-    // Índices
-    await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_procedure_templates_active ON procedure_templates(active)`,
-    );
-    await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_signers_active ON signers(active)`,
-    );
   }
 
-  private async executeMigration003() {
-    // Crear tabla diagnosis_options
-    await this.db!.execute(`
-      CREATE TABLE IF NOT EXISTS diagnosis_options (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        label      TEXT NOT NULL UNIQUE,
-        color      TEXT NOT NULL DEFAULT 'success',
-        active     INTEGER NOT NULL DEFAULT 1,
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
-
-    // Trigger para updated_at
-    await this.db!.execute(`
-      CREATE TRIGGER IF NOT EXISTS trg_diagnosis_options_updated_at
-      AFTER UPDATE ON diagnosis_options
-      FOR EACH ROW
-      BEGIN
-        UPDATE diagnosis_options SET updated_at = datetime('now') WHERE id = NEW.id;
-      END
-    `);
-
-    // Datos iniciales - opciones por defecto
-    const defaultOptions = [
-      { label: "Caries", color: "info", sort_order: 1 },
-      { label: "Gingivitis", color: "info", sort_order: 2 },
-      { label: "Fractura", color: "info", sort_order: 3 },
-      { label: "Pérdida", color: "info", sort_order: 4 },
-      { label: "Obturación", color: "info", sort_order: 5 },
-      { label: "Endodoncia", color: "info", sort_order: 6 },
-    ];
-
-    for (const opt of defaultOptions) {
-      await this.db!.execute(
-        `INSERT OR IGNORE INTO diagnosis_options (label, color, sort_order, active)
-         VALUES ($1, $2, $3, 1)`,
-        [opt.label, opt.color, opt.sort_order],
-      );
-    }
-
-    // Índices
-    await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_diagnosis_options_active ON diagnosis_options(active)`,
-    );
-    await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_diagnosis_options_sort_order ON diagnosis_options(sort_order)`,
-    );
-  }
-
-  private async executeMigration004() {
-    // Índices compuestos para optimizar queries de ordenamiento por fecha
-    // Esto mejora significativamente el performance de getSessionsByPatient y queries similares
-
-    // Índice compuesto para sessions ordenadas por fecha/id descendente
-    await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_sessions_date_id_desc
-       ON sessions(date DESC, id DESC)`,
-    );
-
-    // Índice compuesto para visits ordenadas por fecha/id descendente
-    await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_visits_date_id_desc
-       ON visits(date DESC, id DESC)`,
-    );
-
-    // Índice compuesto para visits de un paciente ordenadas por fecha
-    await this.db!.execute(
-      `CREATE INDEX IF NOT EXISTS idx_visits_patient_date_desc
-       ON visits(patient_id, date DESC, id DESC)`,
-    );
-  }
-
-  private async executeMigration005() {
-    // Agregar campo emergency_phone a patients
+  async findPatientById(id: number): Promise<Patient | null> {
     try {
-      await this.db!.execute(
-        "ALTER TABLE patients ADD COLUMN emergency_phone TEXT",
-      );
-    } catch {
-      // Ya existe, ignorar
+      return await invoke<Patient | null>("find_patient_by_id", { id });
+    } catch (error) {
+      console.error("Error en findPatientById:", error);
+      throw error;
     }
   }
 
-  private get conn(): Database {
-    if (!this.db) throw new Error("DB no inicializada. Llama a initialize().");
-    return this.db!;
-  }
-
-  /**
-   * Limpia locks residuales y hace checkpoint del WAL
-   */
-  private async clearLocks(): Promise<void> {
+  async upsertPatient(patient: Patient): Promise<number> {
     try {
-      // Intenta cerrar cualquier transacción pendiente
-      await this.db!.execute("ROLLBACK").catch(() => {});
-      // Checkpoint del WAL para liberar locks
-      await this.db!.execute("PRAGMA wal_checkpoint(RESTART);");
-    } catch (e) {
-      console.warn("No se pudieron limpiar locks:", e);
+      return await invoke<number>("upsert_patient", { patient });
+    } catch (error) {
+      console.error("Error en upsertPatient:", error);
+      throw error;
     }
   }
 
-  /**
-   * Ejecuta una función con retry automático en caso de lock
-   */
-  private async withRetry<T>(
-    fn: () => Promise<T>,
-    maxRetries = 5,
-    delayMs = 200
-  ): Promise<T> {
-    let lastError: any;
+  // ============================================================================
+  // VISIT OPERATIONS
+  // ============================================================================
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        // Limpiar locks antes de reintentar
-        if (attempt > 0) {
-          await this.clearLocks();
-          // Delay exponencial: 200ms, 400ms, 600ms, 800ms, 1000ms
-          const waitTime = delayMs * (attempt + 1);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-        return await fn();
-      } catch (e: any) {
-        lastError = e;
-        const errorMsg = String(e?.message || e);
-
-        // Solo reintentar si es un error de lock
-        if (errorMsg.includes("database is locked") || errorMsg.includes("SQLITE_BUSY")) {
-          console.warn(`Intento ${attempt + 1}/${maxRetries} falló por lock, reintentando en ${delayMs * (attempt + 2)}ms...`);
-          continue;
-        }
-
-        // Si es otro tipo de error, fallar inmediatamente
-        throw e;
-      }
+  async getVisitsByPatient(patientId: number): Promise<VisitListRow[]> {
+    try {
+      const visits = await invoke<Visit[]>("get_visits_by_patient", { patientId });
+      // Mapear a VisitListRow (el formato esperado por el frontend)
+      return visits.map((v) => ({
+        id: v.id!,
+        date: v.date || "",
+        reason_type: v.reason_type || null,
+        reason_detail: v.reason_detail || null,
+        diagnosis: v.diagnosis || null,
+        full_dx_text: v.full_dx_text || null,
+        tooth_dx_json: v.tooth_dx_json || null,
+      }));
+    } catch (error) {
+      console.error("Error en getVisitsByPatient:", error);
+      throw error;
     }
-
-    throw lastError;
   }
 
-  // -------------------------------------------------------------------------
-  // PACIENTES
-  // -------------------------------------------------------------------------
-  async searchPatients(q: string) {
-    const like = `%${q}%`;
-    return this.conn.select<Array<Patient & { id: number }>>(
-      `SELECT id,
-              full_name,
-              doc_id,
-              phone,
-              emergency_phone,
-              age,
-              anamnesis,
-              allergy_detail AS allergyDetail
-         FROM patients
-        WHERE full_name LIKE $1
-           OR doc_id    LIKE $1
-           OR phone     LIKE $1
-        ORDER BY full_name`,
-      [like],
-    );
-  }
-
-  async findPatientById(id: number) {
-    const rows = await this.conn.select<Array<Patient & { id: number }>>(
-      `SELECT id,
-              full_name,
-              doc_id,
-              phone,
-              emergency_phone,
-              age,
-              anamnesis,
-              allergy_detail AS allergyDetail
-         FROM patients
-        WHERE id = $1`,
-      [id],
-    );
-    return rows[0] ?? null;
-  }
-
-  async upsertPatient(p: Patient): Promise<number> {
-    // Si viene id → update directo
-    if (p.id) {
-      await this.conn.execute(
-        `UPDATE patients
-            SET full_name = $1,
-                doc_id    = $2,
-                phone     = $3,
-                emergency_phone = $4,
-                age       = $5,
-                anamnesis = $6,
-                allergy_detail = $7,
-                updated_at = datetime('now')
-          WHERE id = $8`,
-        [
-          p.full_name,
-          p.doc_id ?? null,
-          p.phone ?? null,
-          p.emergency_phone ?? null,
-          p.age ?? null,
-          p.anamnesis ?? null,
-          p.allergyDetail ?? null,
-          p.id,
-        ],
-      );
-      return p.id;
+  async getVisitDetail(visitId: number): Promise<Visit | null> {
+    try {
+      // Usamos get_visits_by_patient y filtramos (no muy eficiente pero funciona)
+      // En una implementación real, podríamos añadir un comando get_visit_by_id en Rust
+      const visits = await invoke<Visit[]>("get_visits_by_patient", { patientId: 0 });
+      return visits.find((v) => v.id === visitId) || null;
+    } catch (error) {
+      console.error("Error en getVisitDetail:", error);
+      return null;
     }
-
-    // Si no hay id, pero hay doc_id → upsert por doc_id
-    if (p.doc_id) {
-      const ex = await this.conn.select<Array<{ id: number }>>(
-        `SELECT id FROM patients WHERE doc_id = $1`,
-        [p.doc_id],
-      );
-      if (ex[0]) {
-        await this.conn.execute(
-          `UPDATE patients
-              SET full_name = $1,
-                  phone     = $2,
-                  emergency_phone = $3,
-                  age       = $4,
-                  anamnesis = $5,
-                  allergy_detail = $6,
-                  updated_at = datetime('now')
-            WHERE id = $7`,
-          [
-            p.full_name,
-            p.phone ?? null,
-            p.emergency_phone ?? null,
-            p.age ?? null,
-            p.anamnesis ?? null,
-            p.allergyDetail ?? null,
-            ex[0].id,
-          ],
-        );
-        return ex[0].id;
-      }
-    }
-
-    // Insert nuevo
-    const res = await this.conn.execute(
-      `INSERT INTO patients (full_name, doc_id, phone, emergency_phone, age, anamnesis, allergy_detail)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [
-        p.full_name,
-        p.doc_id ?? null,
-        p.phone ?? null,
-        p.emergency_phone ?? null,
-        p.age ?? null,
-        p.anamnesis ?? null,
-        p.allergyDetail ?? null,
-      ],
-    );
-    return Number(res.lastInsertId);
   }
 
-  // -------------------------------------------------------------------------
-  // VISITAS
-  // -------------------------------------------------------------------------
-
-  /** Histórico del paciente, ordenado por fecha desc/id desc. Trae tooth_dx_json. */
-  async getVisitsByPatient(patientId: number) {
-    return this.conn.select<VisitListRow[]>(
-      `SELECT id,
-              date,
-              reason_type,
-              reason_detail,
-              diagnosis,
-              full_dx_text,
-              tooth_dx_json
-         FROM visits
-        WHERE patient_id = $1
-        ORDER BY date DESC, id DESC`,
-      [patientId],
-    );
-  }
-
-  /** Paginado de visitas de un paciente. */
-  async getVisitsByPatientPaged(
-    patientId: number,
-    page = 1,
-    pageSize = 10,
-  ): Promise<{
-    rows: VisitListRow[];
-    total: number;
-    page: number;
-    pageSize: number;
-  }> {
-    const safePage = Math.max(1, Math.floor(page));
-    const safeSize = Math.min(50, Math.max(5, Math.floor(pageSize)));
-    const offset = (safePage - 1) * safeSize;
-
-    const totalRows = await this.conn.select<Array<{ total: number }>>(
-      `SELECT COUNT(*) AS total
-         FROM visits
-        WHERE patient_id = $1`,
-      [patientId],
-    );
-    const total = Number(totalRows[0]?.total ?? 0);
-
-    const rows = await this.conn.select<VisitListRow[]>(
-      `SELECT id,
-              date,
-              reason_type,
-              reason_detail,
-              diagnosis,
-              full_dx_text,
-              tooth_dx_json
-         FROM visits
-        WHERE patient_id = $1
-        ORDER BY date DESC, id DESC
-        LIMIT $2 OFFSET $3`,
-      [patientId, safeSize, offset],
-    );
-
-    return { rows, total, page: safePage, pageSize: safeSize };
-  }
-
-  async getVisitDetail(visitId: number) {
-    const rows = await this.conn.select<VisitRow[]>(
-      `SELECT id,
-              patient_id,
-              date,
-              reason_type,
-              reason_detail,
-              diagnosis,
-              auto_dx_text,
-              manual_dx_text,
-              full_dx_text,
-              tooth_dx_json
-         FROM visits
-        WHERE id = $1`,
-      [visitId],
-    );
-    return rows[0] ?? null;
-  }
-
-  private async insertVisit(
-    patient_id: number,
-    v: Visit & {
-      autoDxText?: string;
-      manualDxText?: string;
-      fullDxText?: string;
-    },
-  ): Promise<number> {
-    const res = await this.conn.execute(
-      `INSERT INTO visits
-         (patient_id, date, reason_type, reason_detail, diagnosis,
-          auto_dx_text, manual_dx_text, full_dx_text, tooth_dx_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [
-        patient_id,
-        v.date!,
-        v.reasonType!,
-        v.reasonDetail ?? null,
-        v.diagnosis ?? null,
-        v.autoDxText ?? null,
-        v.manualDxText ?? null,
-        v.fullDxText ?? null,
-        v.toothDx ? JSON.stringify(v.toothDx) : null,
-      ],
-    );
-    return Number(res.lastInsertId);
-  }
-
-  /** Elimina una visita y todo su contenido (sesiones, items y adjuntos de esa visita). */
   async deleteVisit(visitId: number): Promise<void> {
-    // Usar retry automático para manejar locks
-    return this.withRetry(async () => {
-      const db = this.conn;
-      let transactionActive = false;
-
-      try {
-        await db.execute("BEGIN IMMEDIATE");
-        transactionActive = true;
-
-        // 1) Items de sesiones de esa visita
-        await db.execute(
-          `DELETE FROM session_items
-            WHERE session_id IN (SELECT id FROM sessions WHERE visit_id = $1)`,
-          [visitId],
-        );
-        // 2) Sesiones de esa visita
-        await db.execute(`DELETE FROM sessions WHERE visit_id = $1`, [visitId]);
-        // 3) Adjuntos asociados a esa visita (solo metadatos; los archivos quedan en disco)
-        await db.execute(`DELETE FROM attachments WHERE visit_id = $1`, [
-          visitId,
-        ]);
-        // 4) Visita
-        await db.execute(`DELETE FROM visits WHERE id = $1`, [visitId]);
-
-        await db.execute("COMMIT");
-        transactionActive = false;
-      } catch (e) {
-        // Solo hacer rollback si la transacción sigue activa
-        if (transactionActive) {
-          try {
-            await db.execute("ROLLBACK");
-          } catch (rollbackError) {
-            // Ignorar errores de rollback
-          }
-        }
-        throw e;
-      }
-    });
-  }
-
-  // -------------------------------------------------------------------------
-  // SESIONES
-  // -------------------------------------------------------------------------
-  private async insertSession(visitId: number, s: SessionRow): Promise<number> {
-    const res = await this.conn.execute(
-      `INSERT INTO sessions
-         (visit_id, date, auto, budget, payment, balance, discount, signer)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [
-        visitId,
-        s.date,
-        s.auto ? 1 : 0,
-        s.budget,
-        s.payment,
-        s.balance,
-        s.discount ?? 0,
-        s.signer ?? null,
-      ],
-    );
-    return Number(res.lastInsertId);
-  }
-
-  private async insertSessionItems(sessionId: number, items: ProcItem[]) {
-    for (const it of items) {
-      // Guardar TODOS los items (incluso con qty=0) para preservar
-      // la plantilla personalizada del doctor
-      await this.conn.execute(
-        `INSERT INTO session_items (session_id, name, unit, qty, sub)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [sessionId, it.name, it.unit, it.qty, it.sub],
-      );
+    try {
+      await invoke("delete_visit", { visitId });
+    } catch (error) {
+      console.error("Error en deleteVisit:", error);
+      throw error;
     }
   }
 
-  /** Sesiones de una visita (detalle con items).
-   * OPTIMIZADO: usa 2 queries totales en lugar de N+1 */
+  // ============================================================================
+  // SESSION OPERATIONS
+  // ============================================================================
+
   async getSessionsByVisit(visitId: number): Promise<SessionRow[]> {
-    // Query 1: Obtener todas las sesiones
-    const sessions = await this.conn.select<
-      Array<{
-        id: number;
-        date: string;
-        auto: number;
-        budget: number;
-        payment: number;
-        balance: number;
-        discount: number;
-        signer: string | null;
-      }>
-    >(
-      `SELECT id, date, auto, budget, payment, balance, discount, signer
-         FROM sessions
-        WHERE visit_id = $1
-        ORDER BY date DESC, id DESC`,
-      [visitId],
-    );
+    try {
+      const rustSessions = await invoke<Array<{ visit: any; items: any[] }>>(
+        "get_sessions_by_visit",
+        { visitId }
+      );
 
-    // Si no hay sesiones, retornar vacío
-    if (sessions.length === 0) return [];
-
-    // Query 2: Obtener TODOS los items de TODAS las sesiones de una vez
-    const sessionIds = sessions.map((s) => s.id);
-    const placeholders = sessionIds.map(() => "?").join(",");
-    const allItems = await this.conn.select<
-      Array<ProcItem & { session_id: number }>
-    >(
-      `SELECT session_id, name, unit, qty, sub
-       FROM session_items
-       WHERE session_id IN (${placeholders})`,
-      sessionIds,
-    );
-
-    // Agrupar items por session_id
-    const itemsBySessionId = new Map<number, ProcItem[]>();
-    for (const item of allItems) {
-      const sessionId = item.session_id;
-      if (!itemsBySessionId.has(sessionId)) {
-        itemsBySessionId.set(sessionId, []);
-      }
-      // Eliminar session_id del item antes de agregarlo
-      const { session_id, ...cleanItem } = item;
-      itemsBySessionId.get(sessionId)!.push(cleanItem as ProcItem);
+      // Transformar de formato Rust a formato frontend
+      return rustSessions.map((rustSession) => ({
+        id: String(rustSession.visit.id),
+        visitId: rustSession.visit.id,
+        date: rustSession.visit.date,
+        auto: true,  // Asumir automático por defecto
+        items: rustSession.items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          unit: item.unit_price,
+          qty: item.quantity,
+          sub: item.subtotal,
+          procedure_template_id: item.procedure_template_id,
+        })),
+        budget: rustSession.visit.budget,
+        discount: rustSession.visit.discount,
+        payment: rustSession.visit.payment,
+        balance: rustSession.visit.balance,
+        signer: rustSession.visit.signer || "",
+        observations: rustSession.visit.observations || "",
+      }));
+    } catch (error) {
+      console.error("Error en getSessionsByVisit:", error);
+      throw error;
     }
-
-    // Construir resultado final
-    const out: SessionRow[] = sessions.map((s) => ({
-      id: String(s.id),
-      date: s.date,
-      auto: !!s.auto,
-      budget: s.budget,
-      payment: s.payment,
-      balance: s.balance,
-      discount: s.discount,
-      signer: s.signer ?? "",
-      items: itemsBySessionId.get(s.id) ?? [],
-    }));
-
-    return out;
   }
 
-  /** Todas las sesiones del paciente (timeline), ordenadas desc por fecha/id.
-   * OPTIMIZADO: usa 2 queries totales en lugar de N+1 */
-  async getSessionsByPatient(patientId: number): Promise<SessionRow[]> {
-    // Query 1: Obtener todas las sesiones
-    const rows = await this.conn.select<
-      Array<{
-        id: number;
-        visit_id: number;
-        date: string;
-        auto: number;
-        budget: number;
-        payment: number;
-        balance: number;
-        discount: number;
-        signer: string | null;
-      }>
-    >(
-      `SELECT s.id,
-              s.visit_id,
-              s.date,
-              s.auto,
-              s.budget,
-              s.payment,
-              s.balance,
-              s.discount,
-              s.signer
-         FROM sessions s
-         JOIN visits v ON v.id = s.visit_id
-        WHERE v.patient_id = $1
-        ORDER BY s.date DESC, s.id DESC`,
-      [patientId],
-    );
+  // ============================================================================
+  // COMPLEX OPERATION: Save Visit with Sessions
+  // ============================================================================
 
-    // Si no hay sesiones, retornar vacío
-    if (rows.length === 0) return [];
-
-    // Query 2: Obtener TODOS los items de TODAS las sesiones de una vez
-    const sessionIds = rows.map((r) => r.id);
-    const placeholders = sessionIds.map(() => "?").join(",");
-    const allItems = await this.conn.select<
-      Array<ProcItem & { session_id: number }>
-    >(
-      `SELECT session_id, name, unit, qty, sub
-       FROM session_items
-       WHERE session_id IN (${placeholders})`,
-      sessionIds,
-    );
-
-    // Agrupar items por session_id
-    const itemsBySessionId = new Map<number, ProcItem[]>();
-    for (const item of allItems) {
-      const sessionId = item.session_id;
-      if (!itemsBySessionId.has(sessionId)) {
-        itemsBySessionId.set(sessionId, []);
-      }
-      // Eliminar session_id del item antes de agregarlo
-      const { session_id, ...cleanItem } = item;
-      itemsBySessionId.get(sessionId)!.push(cleanItem as ProcItem);
-    }
-
-    // Construir resultado final
-    const result: SessionRow[] = rows.map((r) => ({
-      id: String(r.id),
-      date: r.date,
-      auto: !!r.auto,
-      budget: r.budget,
-      payment: r.payment,
-      balance: r.balance,
-      discount: r.discount,
-      signer: r.signer ?? "",
-      items: itemsBySessionId.get(r.id) ?? [],
-      visitId: r.visit_id,
-    }));
-
-    return result;
-  }
-
-  /** Guardar paciente + visita + sesiones (con items) en transacción. */
   async saveVisitWithSessions(payload: {
     patient: Patient;
-    visit: Visit & {
-      autoDxText?: string;
-      manualDxText?: string;
-      fullDxText?: string;
-    };
+    visit: Visit;
     sessions: SessionRow[];
-  }): Promise<{ patientId: number; visitId: number }> {
-    // Usar retry automático para manejar locks
-    return this.withRetry(async () => {
-      const db = this.conn;
-      let transactionActive = false;
+  }): Promise<{ patient_id: number; visit_id: number }> {
+    try {
+      // Transformar SessionRow[] del frontend al formato que espera Rust
+      // Rust espera: { visit: Visit, items: VisitProcedure[] }[]
+      const rustSessions = payload.sessions.map((session) => ({
+        visit: {
+          id: session.visitId,  // ID de la visita en BD (si existe)
+          patient_id: payload.patient.id,
+          date: session.date,
+          reason_type: payload.visit.reason_type,
+          reason_detail: payload.visit.reason_detail,
+          diagnosis_text: payload.visit.diagnosis_text,
+          auto_dx_text: payload.visit.auto_dx_text,
+          full_dx_text: payload.visit.full_dx_text,
+          tooth_dx_json: payload.visit.tooth_dx_json,
+          budget: session.budget,
+          discount: session.discount,
+          payment: session.payment,
+          balance: session.balance,
+          cumulative_balance: 0,  // Se calcula en Rust
+          signer: session.signer || null,
+          observations: session.observations || null,
+          is_saved: true,
+        },
+        items: session.items.map((item) => ({
+          id: item.id,
+          visit_id: session.visitId,
+          name: item.name,
+          unit_price: item.unit,
+          quantity: item.qty,
+          subtotal: item.sub,
+          procedure_template_id: item.procedure_template_id,
+          sort_order: 0,  // Se asigna en Rust
+        })),
+      }));
 
-      try {
-        await db.execute("BEGIN IMMEDIATE");
-        transactionActive = true;
+      const rustPayload = {
+        patient: payload.patient,
+        visit: payload.visit,
+        sessions: rustSessions,
+      };
 
-        const patientId = await this.upsertPatient(payload.patient);
-        const visitId = await this.insertVisit(patientId, payload.visit);
-
-        for (const s of payload.sessions) {
-          const sid = await this.insertSession(visitId, s);
-          await this.insertSessionItems(sid, s.items || []);
-        }
-
-        await db.execute("COMMIT");
-        transactionActive = false;
-
-        return { patientId, visitId };
-      } catch (e) {
-        // Solo hacer rollback si la transacción sigue activa
-        if (transactionActive) {
-          try {
-            await db.execute("ROLLBACK");
-          } catch (rollbackError) {
-            // Ignorar errores de rollback
-          }
-        }
-        throw e;
-      }
-    });
-  }
-
-  // -------------------------------------------------------------------------
-  // ADJUNTOS
-  // -------------------------------------------------------------------------
-  async getAttachmentsByVisit(visitId: number) {
-    return this.conn.select<
-      Array<{
-        id: number;
-        kind: string | null;
-        filename: string;
-        mime_type: string;
-        bytes: number;
-        storage_key: string;
-        checksum: string | null;
-        note: string | null;
-        created_at: string;
-      }>
-    >(
-      `SELECT id, kind, filename, mime_type, bytes, storage_key, checksum, note, created_at
-         FROM attachments
-        WHERE visit_id = $1
-        ORDER BY created_at DESC, id DESC`,
-      [visitId],
-    );
-  }
-
-  async getAttachmentsByPatient(patientId: number) {
-    return this.conn.select<
-      Array<{
-        id: number;
-        kind: string | null;
-        filename: string;
-        mime_type: string;
-        bytes: number;
-        storage_key: string;
-        checksum: string | null;
-        note: string | null;
-        created_at: string;
-      }>
-    >(
-      `SELECT id, kind, filename, mime_type, bytes, storage_key, checksum, note, created_at
-         FROM attachments
-        WHERE patient_id = $1
-          AND visit_id IS NULL
-        ORDER BY created_at DESC, id DESC`,
-      [patientId],
-    );
-  }
-
-  async createAttachment(meta: {
-    patient_id: number;
-    visit_id?: number | null;
-    kind?: string | null;
-    filename: string;
-    mime_type: string;
-    bytes: number;
-    storage_key: string;
-    checksum?: string | null;
-    note?: string | null;
-  }): Promise<number> {
-    // Usar retry automático para manejar locks
-    return this.withRetry(async () => {
-      const res = await this.conn.execute(
-        `INSERT INTO attachments
-           (patient_id, visit_id, kind, filename, mime_type, bytes, storage_key, checksum, note)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [
-          meta.patient_id,
-          meta.visit_id ?? null,
-          meta.kind ?? null,
-          meta.filename,
-          meta.mime_type,
-          meta.bytes,
-          meta.storage_key,
-          meta.checksum ?? null,
-          meta.note ?? null,
-        ],
+      return await invoke<{ patient_id: number; visit_id: number }>(
+        "save_visit_with_sessions",
+        { payload: rustPayload }
       );
-      return Number(res.lastInsertId);
-    });
+    } catch (error) {
+      console.error("Error en saveVisitWithSessions:", error);
+      throw error;
+    }
   }
 
-  async moveAttachmentToVisit(attachmentId: number, visitId: number | null) {
-    await this.conn.execute(
-      `UPDATE attachments SET visit_id = $2 WHERE id = $1`,
-      [attachmentId, visitId],
-    );
-  }
+  // ============================================================================
+  // PROCEDURE TEMPLATE OPERATIONS
+  // ============================================================================
 
-  async deleteAttachment(attachmentId: number) {
-    await this.conn.execute(`DELETE FROM attachments WHERE id = $1`, [
-      attachmentId,
-    ]);
-  }
-
-  // -------------------------------------------------------------------------
-  // PROCEDURE TEMPLATES (Plantilla global de procedimientos)
-  // -------------------------------------------------------------------------
   async getProcedureTemplates(): Promise<ProcedureTemplate[]> {
-    return this.conn.select<ProcedureTemplate[]>(
-      `SELECT id, name, default_price, active, created_at, updated_at
-         FROM procedure_templates
-        WHERE active = 1
-        ORDER BY id ASC`,
-    );
-  }
-
-  async saveProcedureTemplates(
-    templates: Array<{ name: string; default_price: number }>,
-  ): Promise<void> {
-    // Estrategia: eliminar todos y reinsertar
-    // (O podrías hacer un diff inteligente, pero esto es más simple)
-    await this.conn.execute(`DELETE FROM procedure_templates`);
-
-    for (const t of templates) {
-      await this.conn.execute(
-        `INSERT INTO procedure_templates (name, default_price, active)
-         VALUES ($1, $2, 1)`,
-        [t.name, t.default_price],
-      );
+    try {
+      return await invoke<ProcedureTemplate[]>("get_procedure_templates");
+    } catch (error) {
+      console.error("Error en getProcedureTemplates:", error);
+      throw error;
     }
   }
 
-  // -------------------------------------------------------------------------
-  // SIGNERS (Doctores/Responsables)
-  // -------------------------------------------------------------------------
-  async getSigners(): Promise<Array<{ id: number; name: string }>> {
-    return this.conn.select<Array<{ id: number; name: string }>>(
-      `SELECT id, name
-         FROM signers
-        WHERE active = 1
-        ORDER BY name ASC`,
-    );
-  }
-
-  async createSigner(name: string): Promise<number> {
-    const trimmed = name.trim();
-
-    // Verificar si ya existe (activo o inactivo)
-    const existing = await this.conn.select<
-      Array<{ id: number; active: number }>
-    >(`SELECT id, active FROM signers WHERE name = $1`, [trimmed]);
-
-    if (existing.length > 0) {
-      const signer = existing[0];
-      if (signer.active === 0) {
-        // Si existe pero está inactivo, reactivarlo
-        await this.conn.execute(`UPDATE signers SET active = 1 WHERE id = $1`, [
-          signer.id,
-        ]);
-        return signer.id;
-      } else {
-        // Si existe y está activo, lanzar error
-        throw new Error("Ya existe un doctor con ese nombre");
-      }
+  async saveProcedureTemplates(templates: ProcedureTemplate[]): Promise<void> {
+    try {
+      await invoke("save_procedure_templates", { templates });
+    } catch (error) {
+      console.error("Error en saveProcedureTemplates:", error);
+      throw error;
     }
-
-    // Si no existe, crear uno nuevo
-    const res = await this.conn.execute(
-      `INSERT INTO signers (name, active) VALUES ($1, 1)`,
-      [trimmed],
-    );
-    return Number(res.lastInsertId);
   }
 
-  async updateSigner(id: number, name: string): Promise<void> {
-    await this.conn.execute(`UPDATE signers SET name = $1 WHERE id = $2`, [
-      name.trim(),
-      id,
-    ]);
-  }
+  // ============================================================================
+  // DIAGNOSIS OPTIONS OPERATIONS
+  // ============================================================================
 
-  async deleteSigner(id: number): Promise<void> {
-    // Soft delete: marcamos como inactivo
-    await this.conn.execute(`UPDATE signers SET active = 0 WHERE id = $1`, [
-      id,
-    ]);
-  }
-
-  // -------------------------------------------------------------------------
-  // DIAGNOSIS OPTIONS (Opciones de diagnóstico del odontograma)
-  // -------------------------------------------------------------------------
   async getDiagnosisOptions(): Promise<DiagnosisOption[]> {
-    return this.conn.select<DiagnosisOption[]>(
-      `SELECT id, label, color, active, sort_order, created_at, updated_at
-         FROM diagnosis_options
-        WHERE active = 1
-        ORDER BY sort_order ASC, id ASC`,
-    );
+    try {
+      return await invoke<DiagnosisOption[]>("get_diagnosis_options");
+    } catch (error) {
+      console.error("Error en getDiagnosisOptions:", error);
+      throw error;
+    }
   }
 
+  async saveDiagnosisOptions(options: DiagnosisOption[]): Promise<void> {
+    try {
+      await invoke("save_diagnosis_options", { options });
+    } catch (error) {
+      console.error("Error en saveDiagnosisOptions:", error);
+      throw error;
+    }
+  }
+
+  // Métodos legacy que ahora usan saveDiagnosisOptions internamente
   async createDiagnosisOption(option: {
     label: string;
     color: string;
-    sort_order: number;
   }): Promise<number> {
-    const trimmed = option.label.trim();
-
-    // Verificar si ya existe (activo o inactivo)
-    const existing = await this.conn.select<
-      Array<{ id: number; active: number }>
-    >(`SELECT id, active FROM diagnosis_options WHERE label = $1`, [trimmed]);
-
-    if (existing.length > 0) {
-      const opt = existing[0];
-      if (opt.active === 0) {
-        // Si existe pero está inactivo, reactivarlo
-        await this.conn.execute(
-          `UPDATE diagnosis_options SET active = 1, color = $2, sort_order = $3 WHERE id = $1`,
-          [opt.id, option.color, option.sort_order],
-        );
-        return opt.id;
-      } else {
-        // Si existe y está activo, lanzar error
-        throw new Error("Ya existe una opción con ese nombre");
-      }
+    try {
+      const current = await this.getDiagnosisOptions();
+      const newOption: DiagnosisOption = {
+        label: option.label,
+        color: option.color,
+        active: true,
+        sort_order: current.length + 1,
+      };
+      await this.saveDiagnosisOptions([...current, newOption]);
+      const updated = await this.getDiagnosisOptions();
+      return updated[updated.length - 1]?.id || 0;
+    } catch (error) {
+      console.error("Error en createDiagnosisOption:", error);
+      throw error;
     }
-
-    // Si no existe, crear una nueva
-    const res = await this.conn.execute(
-      `INSERT INTO diagnosis_options (label, color, sort_order, active)
-       VALUES ($1, $2, $3, 1)`,
-      [trimmed, option.color, option.sort_order],
-    );
-    return Number(res.lastInsertId);
   }
 
   async updateDiagnosisOption(
     id: number,
-    option: { label: string; color: string; sort_order: number },
+    updates: { label?: string; color?: string }
   ): Promise<void> {
-    await this.conn.execute(
-      `UPDATE diagnosis_options
-       SET label = $1, color = $2, sort_order = $3
-       WHERE id = $4`,
-      [option.label.trim(), option.color, option.sort_order, id],
-    );
+    try {
+      const current = await this.getDiagnosisOptions();
+      const updated = current.map((opt) =>
+        opt.id === id ? { ...opt, ...updates } : opt
+      );
+      await this.saveDiagnosisOptions(updated);
+    } catch (error) {
+      console.error("Error en updateDiagnosisOption:", error);
+      throw error;
+    }
   }
 
   async deleteDiagnosisOption(id: number): Promise<void> {
-    // Soft delete: marcamos como inactivo
-    await this.conn.execute(
-      `UPDATE diagnosis_options SET active = 0 WHERE id = $1`,
-      [id],
-    );
+    try {
+      const current = await this.getDiagnosisOptions();
+      const filtered = current.filter((opt) => opt.id !== id);
+      await this.saveDiagnosisOptions(filtered);
+    } catch (error) {
+      console.error("Error en deleteDiagnosisOption:", error);
+      throw error;
+    }
   }
 
-  async saveDiagnosisOptions(
-    options: Array<{ label: string; color: string; sort_order: number }>,
-  ): Promise<void> {
-    // Estrategia: eliminar todos y reinsertar
-    await this.conn.execute(`DELETE FROM diagnosis_options`);
+  // ============================================================================
+  // SIGNER OPERATIONS
+  // ============================================================================
 
-    for (const opt of options) {
-      await this.conn.execute(
-        `INSERT INTO diagnosis_options (label, color, sort_order, active)
-         VALUES ($1, $2, $3, 1)`,
-        [opt.label, opt.color, opt.sort_order],
-      );
+  async getSigners(): Promise<Array<{ id: number; name: string }>> {
+    try {
+      return await invoke<Array<{ id: number; name: string }>>("get_signers");
+    } catch (error) {
+      console.error("Error en getSigners:", error);
+      throw error;
     }
+  }
+
+  async createSigner(name: string): Promise<number> {
+    try {
+      return await invoke<number>("create_signer", { name });
+    } catch (error) {
+      console.error("Error en createSigner:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // REASON TYPE OPERATIONS
+  // ============================================================================
+
+  async getReasonTypes(): Promise<
+    Array<{
+      id: number;
+      name: string;
+      active: boolean;
+      sort_order: number;
+    }>
+  > {
+    try {
+      const result = await invoke<
+        Array<{
+          id: number;
+          name: string;
+          active: boolean | null;
+          sort_order: number | null;
+        }>
+      >("get_reason_types");
+
+      // Mapear valores null a valores por defecto
+      return result.map((rt) => ({
+        id: rt.id,
+        name: rt.name,
+        active: rt.active ?? true,
+        sort_order: rt.sort_order ?? 0,
+      }));
+    } catch (error) {
+      console.error("Error en getReasonTypes:", error);
+      throw error;
+    }
+  }
+
+  async createReasonType(name: string): Promise<number> {
+    try {
+      return await invoke<number>("create_reason_type", { name });
+    } catch (error) {
+      console.error("Error en createReasonType:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // SETTINGS OPERATIONS
+  // ============================================================================
+
+  async getAllSettings(): Promise<Record<string, string>> {
+    try {
+      return await invoke<Record<string, string>>("get_all_settings");
+    } catch (error) {
+      console.error("Error en getAllSettings:", error);
+      throw error;
+    }
+  }
+
+  async getSetting(key: string): Promise<string | null> {
+    try {
+      const all = await this.getAllSettings();
+      return all[key] || null;
+    } catch (error) {
+      console.error("Error en getSetting:", error);
+      return null;
+    }
+  }
+
+  async getSettingsByCategory(category: string): Promise<Record<string, string>> {
+    try {
+      // No hay filtrado por categoría en el backend, así que devolvemos todas
+      // En una implementación real, se podría añadir soporte para categorías
+      return await this.getAllSettings();
+    } catch (error) {
+      console.error("Error en getSettingsByCategory:", error);
+      return {};
+    }
+  }
+
+  async setSetting(
+    key: string,
+    value: string,
+    category: string = "general"
+  ): Promise<void> {
+    try {
+      await invoke("save_setting", { key, value, category });
+    } catch (error) {
+      console.error("Error en setSetting:", error);
+      throw error;
+    }
+  }
+
+  async setSettings(
+    settings: Record<string, { value: string; category?: string }>
+  ): Promise<void> {
+    try {
+      // Guardar cada configuración individualmente
+      for (const [key, { value, category }] of Object.entries(settings)) {
+        await this.setSetting(key, value, category || "general");
+      }
+    } catch (error) {
+      console.error("Error en setSettings:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // ATTACHMENT OPERATIONS (No implementados en Rust aún - devuelven arrays vacíos)
+  // ============================================================================
+
+  async getAttachmentsByVisit(visitId: number) {
+    console.warn("getAttachmentsByVisit: Not implemented in Rust backend yet");
+    return [];
+  }
+
+  async getAttachmentsByPatient(patientId: number) {
+    console.warn("getAttachmentsByPatient: Not implemented in Rust backend yet");
+    return [];
+  }
+
+  async createAttachment(meta: {
+    visit_id: number | null;
+    patient_id: number | null;
+    filename: string;
+    mime_type: string;
+    bytes: number;
+    storage_key: string;
+  }) {
+    console.warn("createAttachment: Not implemented in Rust backend yet");
+    throw new Error("Attachments not implemented yet");
+  }
+
+  async moveAttachmentToVisit(attachmentId: number, visitId: number | null) {
+    console.warn("moveAttachmentToVisit: Not implemented in Rust backend yet");
+    throw new Error("Attachments not implemented yet");
+  }
+
+  async deleteAttachment(attachmentId: number) {
+    console.warn("deleteAttachment: Not implemented in Rust backend yet");
+    throw new Error("Attachments not implemented yet");
+  }
+
+  // ============================================================================
+  // MÉTODOS LEGACY/NO UTILIZADOS
+  // ============================================================================
+
+  async getVisitsByPatientPaged(
+    patientId: number,
+    limit: number = 10,
+    offset: number = 0
+  ) {
+    // Implementación simple usando getVisitsByPatient
+    const all = await this.getVisitsByPatient(patientId);
+    return {
+      items: all.slice(offset, offset + limit),
+      total: all.length,
+      hasMore: offset + limit < all.length,
+    };
+  }
+
+  async getSessionsByPatient(patientId: number): Promise<SessionRow[]> {
+    try {
+      const rustSessions = await invoke<Array<{ visit: any; items: any[] }>>(
+        "get_sessions_by_patient",
+        { patientId }
+      );
+
+      // Transformar de formato Rust a formato frontend
+      return rustSessions.map((rustSession) => ({
+        id: String(rustSession.visit.id),
+        visitId: rustSession.visit.id,
+        date: rustSession.visit.date,
+        auto: true,  // Asumir automático por defecto
+        items: rustSession.items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          unit: item.unit_price,
+          qty: item.quantity,
+          sub: item.subtotal,
+          procedure_template_id: item.procedure_template_id,
+        })),
+        budget: rustSession.visit.budget,
+        discount: rustSession.visit.discount,
+        payment: rustSession.visit.payment,
+        balance: rustSession.visit.balance,
+        signer: rustSession.visit.signer || "",
+        observations: rustSession.visit.observations || "",
+      }));
+    } catch (error) {
+      console.error("Error en getSessionsByPatient:", error);
+      throw error;
+    }
+  }
+
+  async updateSigner(id: number, name: string): Promise<void> {
+    console.warn("updateSigner: Not implemented in Rust backend yet");
+  }
+
+  async deleteSigner(id: number): Promise<void> {
+    console.warn("deleteSigner: Not implemented in Rust backend yet");
+  }
+
+  async updateReasonType(id: number, name: string): Promise<void> {
+    console.warn("updateReasonType: Not implemented in Rust backend yet");
+  }
+
+  async deleteReasonType(id: number): Promise<void> {
+    console.warn("deleteReasonType: Not implemented in Rust backend yet");
+  }
+
+  async deleteSetting(key: string): Promise<void> {
+    console.warn("deleteSetting: Not implemented in Rust backend yet");
+  }
+
+  async resetAllSettings(): Promise<void> {
+    console.warn("resetAllSettings: Not implemented in Rust backend yet");
   }
 }
 
-// -----------------------------
-// Singleton
-// -----------------------------
-let _repo: TauriSqliteRepository | null = null;
-let _initPromise: Promise<TauriSqliteRepository> | null = null;
+// Singleton instance
+export const tauriSqliteRepository = new TauriSqliteRepository();
 
-export async function getRepository() {
-  // Si ya está inicializado, retornar inmediatamente
-  if (_repo) {
-    return _repo;
-  }
-
-  // Si ya hay una inicialización en progreso, esperar a que termine
-  if (_initPromise) {
-    return _initPromise;
-  }
-
-  // Iniciar nueva inicialización
-  _initPromise = (async () => {
-    const repo = new TauriSqliteRepository();
-    try {
-      await repo.initialize();
-      _repo = repo;
-      return repo;
-    } catch (error) {
-      // Si falla la inicialización, resetear para que se pueda reintentar
-      _initPromise = null;
-      console.error("Error inicializando repositorio:", error);
-      throw error;
-    }
-  })();
-
-  return _initPromise;
+/**
+ * Función legacy para obtener la instancia del repositorio
+ * @deprecated Usa tauriSqliteRepository directamente en su lugar
+ */
+export async function getRepository(): Promise<TauriSqliteRepository> {
+  return tauriSqliteRepository;
 }

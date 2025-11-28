@@ -1,9 +1,10 @@
 // src/components/PatientForm.tsx
 import type { Patient } from "../lib/types";
 import { Input } from "./ui/Input";
-import { User, CreditCard, Calendar, Phone, PhoneCall } from "lucide-react";
+import { User, CreditCard, Calendar, Phone, PhoneCall, Mail } from "lucide-react";
 import { Textarea } from "./ui/Textarea";
-import React from "react";
+import { DatePicker } from "./ui/DatePicker";
+import React, { memo } from "react";
 
 type Props = {
   value: Patient;
@@ -11,9 +12,24 @@ type Props = {
   errors?: Partial<Record<keyof Patient, string>>;
 };
 
-export default function PatientForm({ value, onChange, errors }: Props) {
+const PatientForm = memo(function PatientForm({ value, onChange, errors }: Props) {
   const set = <K extends keyof Patient>(k: K, v: Patient[K]) =>
     onChange({ ...value, [k]: v });
+
+  // Calcular edad desde fecha de nacimiento
+  const calculateAge = (birthDate: string): number | null => {
+    if (!birthDate) return null;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : null;
+  };
+
+  const age = calculateAge(value.date_of_birth);
 
   // Palabras críticas a resaltar dentro del detalle de alergias
   const CRITICAL = React.useMemo(
@@ -103,25 +119,30 @@ export default function PatientForm({ value, onChange, errors }: Props) {
         />
       </div>
 
-      {/* Fila 2: Edad y Teléfono */}
+      {/* Fila 2: Fecha de nacimiento y Teléfono */}
       <div className="grid md:grid-cols-2 gap-4">
-        <Input
-          label="Edad"
-          type="number"
-          min={0}
-          max={120}
-          value={value.age || ""}
-          placeholder="Ej: 35"
-          onChange={(e) => set("age", Number(e.target.value) || undefined)}
-          error={!!errors?.age}
-          helperText={errors?.age || "Años cumplidos"}
-          icon={
-            <Calendar
-              size={16}
-              className="text-[hsl(var(--muted-foreground))]"
-            />
-          }
-        />
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--foreground))] mb-2">
+            <Calendar size={16} className="text-[hsl(var(--muted-foreground))]" />
+            Fecha de nacimiento
+            <span className="text-red-500">*</span>
+          </label>
+          <DatePicker
+            mode="birthdate"
+            value={value.date_of_birth || ""}
+            onChange={(date) => set("date_of_birth", date)}
+            placeholder="Selecciona fecha de nacimiento"
+            className="w-full"
+          />
+          {errors?.date_of_birth && (
+            <p className="text-xs text-red-600 mt-1">{errors.date_of_birth}</p>
+          )}
+          {!errors?.date_of_birth && age !== null && (
+            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+              {age} año{age !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
 
         <Input
           label="Teléfono de contacto"
@@ -139,7 +160,39 @@ export default function PatientForm({ value, onChange, errors }: Props) {
         />
       </div>
 
-      {/* Fila 3: Anamnesis y Alergias */}
+      {/* Fila 3: Email y Teléfono de emergencia */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <Input
+          label="Correo electrónico"
+          type="email"
+          value={value.email || ""}
+          placeholder="Ej: paciente@ejemplo.com"
+          onChange={(e) => set("email", e.target.value)}
+          error={!!errors?.email}
+          helperText={errors?.email || "Opcional"}
+          icon={
+            <Mail size={16} className="text-[hsl(var(--muted-foreground))]" />
+          }
+        />
+
+        <Input
+          label="Teléfono de emergencia"
+          type="tel"
+          value={value.emergency_phone || ""}
+          placeholder="Ej: 0991234567"
+          onChange={(e) => set("emergency_phone", e.target.value)}
+          helperText={errors?.emergency_phone || "Contacto en caso de emergencia"}
+          maxLength={10}
+          icon={
+            <PhoneCall
+              size={16}
+              className="text-[hsl(var(--muted-foreground))]"
+            />
+          }
+        />
+      </div>
+
+      {/* Fila 4: Anamnesis y Alergias */}
       <div className="grid md:grid-cols-2 gap-4">
         <Textarea
           label="Anamnesis"
@@ -166,23 +219,6 @@ export default function PatientForm({ value, onChange, errors }: Props) {
           )}
         </div>
       </div>
-
-      {/* Campo de teléfono de emergencia (solo si hay alergias) */}
-      {hasAllergy && (
-        <div className="grid">
-          <div></div>
-          <Input
-            label="Teléfono de emergencia"
-            type="tel"
-            value={value.emergency_phone || ""}
-            placeholder="Ej: 0991234567"
-            onChange={(e) => set("emergency_phone", e.target.value)}
-            helperText="Contacto en caso de emergencia médica"
-            maxLength={10}
-            icon={<PhoneCall size={16} className="text-red-600" />}
-          />
-        </div>
-      )}
 
       {/* Información adicional */}
       {(value.full_name || value.doc_id) && (
@@ -216,10 +252,16 @@ export default function PatientForm({ value, onChange, errors }: Props) {
                     {value.doc_id}
                   </span>
                 )}
-                {value.age && (
+                {age !== null && (
                   <span className="flex items-center gap-1">
                     <Calendar size={12} />
-                    {value.age} años
+                    {age} años
+                  </span>
+                )}
+                {value.email && (
+                  <span className="flex items-center gap-1">
+                    <Mail size={12} />
+                    {value.email}
                   </span>
                 )}
                 {value.phone && (
@@ -259,4 +301,8 @@ export default function PatientForm({ value, onChange, errors }: Props) {
       )}
     </div>
   );
-}
+});
+
+PatientForm.displayName = "PatientForm";
+
+export default PatientForm;

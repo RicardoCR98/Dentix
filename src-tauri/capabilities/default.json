@@ -12,10 +12,6 @@
     "fs:allow-read-file",
     "fs:allow-remove",
     "fs:allow-rename",
-
-    "sql:allow-load",
-    "sql:allow-select",
-    "sql:allow-execute",
     "log:allow-log"
   ]
 }

@@ -1,5 +1,5 @@
 // src/components/ui/Input.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import { cn } from "../../lib/cn";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -9,7 +9,9 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   icon?: React.ReactNode;
 }
 
-export function Input({
+let idCounter = 0;
+
+export const Input = React.memo(function Input({
   error,
   label,
   helperText,
@@ -19,7 +21,10 @@ export function Input({
   required,
   ...props
 }: InputProps) {
-  const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
+  const inputId = useMemo(
+    () => id || `input-${++idCounter}`,
+    [id]
+  );
 
   return (
     <div className="w-full">
@@ -60,4 +65,4 @@ export function Input({
       )}
     </div>
   );
-}
+});

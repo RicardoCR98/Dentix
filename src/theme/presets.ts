@@ -1,4 +1,4 @@
-export type ThemeName = 'light' | 'dark' | 'greenapple'
+export type ThemeName = 'light' | 'dark'
 export type FontName = 'Inter' | 'Poppins' | 'Roboto' | 'System'
 
 export const fontMap: Record<FontName, string> = {
@@ -8,4 +8,4 @@ export const fontMap: Record<FontName, string> = {
   System: 'ui-sans-serif, system-ui, sans-serif',
 }
 
-export const presets: ThemeName[] = ['light', 'dark', 'greenapple']
+export const presets: ThemeName[] = ['light', 'dark']

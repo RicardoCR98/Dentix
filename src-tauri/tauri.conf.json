@@ -34,7 +34,6 @@
     ]
   },
   "plugins": {
-    "sql": { "preload": ["sqlite:clinic.db"] },
     "fs": { "requireLiteralLeadingDot": false }
   }
 }

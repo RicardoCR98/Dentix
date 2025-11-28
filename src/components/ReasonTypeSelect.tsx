@@ -1,27 +1,30 @@
-// src/components/SignerSelect.tsx
+// src/components/ReasonTypeSelect.tsx
 import { useState, useRef, useEffect } from "react";
 import * as RSelect from "@radix-ui/react-select";
-import { ChevronDown, ChevronUp, Check, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, Plus, Save, X } from "lucide-react";
 import { cn } from "../lib/cn";
 import { getRepository } from "../lib/storage/TauriSqliteRepository";
-import { Input } from "./ui/Input";
+import type { ReasonType } from "../lib/types";
 import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
 
-interface SignerSelectProps {
+interface ReasonTypeSelectProps {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
-  signers: Array<{ id: number; name: string }>;
-  onSignersChange: () => Promise<void>;
+  reasonTypes: ReasonType[];
+  onReasonTypesChange: () => Promise<void>;
+  onError?: (title: string, message: string) => void;
 }
 
-export default function SignerSelect({
+export default function ReasonTypeSelect({
   value,
   onChange,
   disabled = false,
-  signers,
-  onSignersChange,
-}: SignerSelectProps) {
+  reasonTypes,
+  onReasonTypesChange,
+  onError,
+}: ReasonTypeSelectProps) {
   const [open, setOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -44,9 +47,7 @@ export default function SignerSelect({
       }
     };
 
-    // Revisar el foco cada vez que cambia
     const interval = setInterval(keepFocus, 50);
-
     return () => clearInterval(interval);
   }, [isAdding]);
 
@@ -56,21 +57,24 @@ export default function SignerSelect({
 
     try {
       const repo = await getRepository();
-      await repo.createSigner(trimmedName);
-      await onSignersChange();
+      await repo.createReasonType(trimmedName);
+      await onReasonTypesChange();
 
-      // Seleccionar automáticamente el doctor recién creado
+      // Seleccionar automáticamente el tipo recién creado
       onChange(trimmedName);
 
       // Resetear estado
       setNewName("");
       setIsAdding(false);
-      // Mantener el select abierto para que el usuario vea el resultado
     } catch (error) {
-      console.error("Error añadiendo doctor:", error);
+      console.error("Error añadiendo tipo de motivo:", error);
       const message =
-        error instanceof Error ? error.message : "Error al añadir el doctor";
-      alert(message);
+        error instanceof Error
+          ? error.message
+          : "Error al añadir el tipo de motivo";
+      if (onError) {
+        onError("Error al añadir", message);
+      }
     }
   };
 
@@ -79,21 +83,23 @@ export default function SignerSelect({
 
     try {
       const repo = await getRepository();
-      await repo.deleteSigner(id);
-      await onSignersChange();
+      await repo.deleteReasonType(id);
+      await onReasonTypesChange();
 
-      // Si el doctor eliminado era el seleccionado, limpiar selección
+      // Si el tipo eliminado era el seleccionado, limpiar selección
       if (value === name) {
         onChange("");
       }
     } catch (error) {
-      console.error("Error eliminando doctor:", error);
-      alert("Error al eliminar el doctor.");
+      console.error("Error eliminando tipo de motivo:", error);
+      if (onError) {
+        onError("Error al eliminar", "No se pudo eliminar el tipo de motivo.");
+      }
     }
   };
 
   const handleValueChange = (val: string) => {
-    onChange(val === "__none__" ? "" : val);
+    onChange(val);
     setOpen(false);
   };
 
@@ -112,32 +118,25 @@ export default function SignerSelect({
       e.stopPropagation();
       handleCancelAdd();
       setOpen(false);
-    }
-    // Para cualquier otra tecla, prevenir que el select capture el evento
-    else {
+    } else {
       e.stopPropagation();
     }
   };
 
   return (
     <RSelect.Root
-      value={value || "__none__"}
+      value={value || "Dolor"}
       onValueChange={handleValueChange}
       disabled={disabled}
       open={open}
       onOpenChange={(newOpen) => {
-        // Si estamos en modo añadir y se intenta cerrar, ignorar
-        if (isAdding && !newOpen) {
-          return;
-        }
+        if (isAdding && !newOpen) return;
         setOpen(newOpen);
-        if (!newOpen) {
-          handleCancelAdd();
-        }
+        if (!newOpen) handleCancelAdd();
       }}
     >
       <RSelect.Trigger className="select-trigger">
-        <RSelect.Value placeholder="Selecciona un doctor…" />
+        <RSelect.Value placeholder="Selecciona un tipo…" />
         <RSelect.Icon className="ml-2 opacity-80">
           <ChevronDown size={16} />
         </RSelect.Icon>
@@ -153,9 +152,7 @@ export default function SignerSelect({
           position="popper"
           sideOffset={6}
           onPointerDownOutside={(e) => {
-            if (isAdding) {
-              e.preventDefault();
-            }
+            if (isAdding) e.preventDefault();
           }}
         >
           <RSelect.ScrollUpButton className="flex items-center justify-center py-1 text-[hsl(var(--muted-foreground))]">
@@ -163,40 +160,11 @@ export default function SignerSelect({
           </RSelect.ScrollUpButton>
 
           <RSelect.Viewport className="p-1 max-h-[300px] overflow-y-auto">
-            {/* Opción "Sin firma" */}
-            <RSelect.Item
-              value="__none__"
-              className={cn(
-                "relative flex w-full cursor-pointer select-none items-center gap-2",
-                "rounded-md py-2 pl-8 pr-3 text-sm outline-none",
-                "text-[hsl(var(--foreground))]",
-                "data-[highlighted]:bg-[hsl(var(--muted))]",
-                "data-[state=checked]:font-medium",
-                "transition-colors",
-              )}
-            >
-              <span className="absolute left-2 top-1/2 -translate-y-1/2">
-                <RSelect.ItemIndicator className="text-[hsl(var(--brand))]">
-                  <Check size={16} />
-                </RSelect.ItemIndicator>
-              </span>
-              <RSelect.ItemText>
-                <span className="text-[hsl(var(--muted-foreground))] italic">
-                  Sin firma
-                </span>
-              </RSelect.ItemText>
-            </RSelect.Item>
-
-            {/* Separador */}
-            {signers.length > 0 && (
-              <div className="h-px bg-[hsl(var(--border))] my-1" />
-            )}
-
-            {/* Lista de doctores */}
-            {signers.map((signer) => (
+            {/* Lista de tipos de motivos */}
+            {reasonTypes.map((type) => (
               <RSelect.Item
-                key={signer.id}
-                value={signer.name}
+                key={type.id}
+                value={type.name}
                 className={cn(
                   "relative flex w-full cursor-pointer select-none items-center gap-2",
                   "rounded-md py-2 pl-8 pr-8 text-sm outline-none",
@@ -211,7 +179,7 @@ export default function SignerSelect({
                     <Check size={16} />
                   </RSelect.ItemIndicator>
                 </span>
-                <RSelect.ItemText>{signer.name}</RSelect.ItemText>
+                <RSelect.ItemText>{type.name}</RSelect.ItemText>
 
                 {/* Botón eliminar */}
                 {!disabled && (
@@ -219,10 +187,9 @@ export default function SignerSelect({
                     variant="ghost"
                     size="sm"
                     onPointerDown={(e) => {
-                      // Usar onPointerDown para capturar ANTES que cualquier otro evento
                       e.preventDefault();
                       e.stopPropagation();
-                      handleDelete(signer.id, signer.name);
+                      handleDelete(type.id!, type.name);
                     }}
                     className={cn(
                       "absolute right-2 top-1/2 -translate-y-1/2 z-10",
@@ -230,7 +197,7 @@ export default function SignerSelect({
                       "hover:text-red-600",
                       "opacity-0 group-hover:opacity-100",
                     )}
-                    title="Eliminar doctor"
+                    title="Eliminar tipo"
                     tabIndex={-1}
                   >
                     <X size={14} />
@@ -242,7 +209,7 @@ export default function SignerSelect({
             {/* Separador antes de "Añadir" */}
             <div className="h-px bg-[hsl(var(--border))] my-1" />
 
-            {/* Formulario inline para añadir (si está en modo añadir) */}
+            {/* Formulario inline para añadir */}
             {isAdding ? (
               <div
                 className="p-2 bg-[hsl(var(--muted))] rounded-md mb-1"
@@ -250,42 +217,36 @@ export default function SignerSelect({
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div className="flex gap-1">
+                <div className="flex gap-3 align-items-center">
                   <Input
                     type="text"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Nombre del doctor"
-                    className={cn(
-                      "flex-1 h-9 px-2 text-sm rounded-md border",
-                      "bg-[hsl(var(--surface))] border-[hsl(var(--border))]",
-                      "text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]",
-                      "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))] focus:border-transparent",
-                    )}
+                    placeholder="Nombre del tipo"
+                    className={cn(" h-9")}
                   />
                   <Button
                     variant="primary"
                     size="sm"
-                    onPointerDown={(e) => {
+                    onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       handleAdd();
                     }}
-                    className="h-8 px-2"
                     title="Guardar"
                   >
-                    <Check size={14} />
+                    <Save size={18} />
+                    Guardar
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onPointerDown={(e) => {
+                    onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       handleCancelAdd();
                     }}
-                    className="h-8 px-2"
                     title="Cancelar"
                   >
                     <X size={14} />
@@ -293,7 +254,6 @@ export default function SignerSelect({
                 </div>
               </div>
             ) : (
-              /* Botón "Añadir nuevo" */
               !disabled && (
                 <div
                   role="button"
@@ -313,7 +273,7 @@ export default function SignerSelect({
                   <span className="absolute left-2 top-1/2 -translate-y-1/2">
                     <Plus size={16} />
                   </span>
-                  <span>Añadir nuevo doctor</span>
+                  <span>Añadir nuevo tipo</span>
                 </div>
               )
             )}

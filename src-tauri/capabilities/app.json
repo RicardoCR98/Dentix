@@ -9,11 +9,6 @@
     "core:path:allow-join",
     "core:path:allow-resolve-directory",
 
-    "sql:default",
-    "sql:allow-load",
-    "sql:allow-select",
-    "sql:allow-execute",
-
     "fs:default",
     "fs:allow-mkdir",
     "fs:allow-open",

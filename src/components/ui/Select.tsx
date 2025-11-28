@@ -9,10 +9,7 @@ export function SelectTrigger({
   ...props
 }: RSelect.SelectTriggerProps) {
   return (
-    <RSelect.Trigger
-      className={cn("select-trigger", className)}
-      {...props}
-    >
+    <RSelect.Trigger className={cn("select-trigger", className)} {...props}>
       <RSelect.Value placeholder="Selecciona…" />
       <RSelect.Icon className="ml-2 opacity-80">
         <ChevronDown size={16} />

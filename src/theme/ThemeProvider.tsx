@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { fontMap, presets, type FontName, type ThemeName } from "./presets";
+import { getRepository } from "../lib/storage/TauriSqliteRepository";
 
 type ThemeContextType = {
   theme: ThemeName;
@@ -10,10 +11,11 @@ type ThemeContextType = {
   setBrand: (brandHslOrHex: string) => void;
   setFont: (f: FontName) => void;
   setSize: (s: 14 | 16 | 18 | 20 | 22 | 24) => void;
+  saveSettings: () => Promise<void>;
+  resetToDefaults: () => Promise<void>;
 };
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
-const STORAGE_KEY = "odonto.theme.v1";
 
 function hexToHsl(hex: string): string {
   const m = hex.replace("#", "");
@@ -50,35 +52,79 @@ function hexToHsl(hex: string): string {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>("dark");
-  const [brandHsl, setBrandHsl] = useState<string>("172 49% 56%"); // default
+  const [brandHsl, setBrandHsl] = useState<string>("172 49% 56%");
   const [font, setFontState] = useState<FontName>("Inter");
-  const [size, setSizeState] = useState<14 | 16 | 18 | 20 | 22 | 24>(16); // Tamaño base balanceado
+  const [size, setSizeState] = useState<14 | 16 | 18 | 20 | 22 | 24>(16);
 
-  // load
+  // Cargar configuración desde la base de datos
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const { theme, brandHsl, font, size } = JSON.parse(raw);
-      if (theme && (presets as string[]).includes(theme)) setThemeState(theme);
-      if (brandHsl) setBrandHsl(brandHsl);
-      if (font) setFontState(font);
-      if (size) setSizeState(size);
-    }
-    // NO detectar preferencia del SO - siempre usar 'light' por defecto
+    const loadSettings = async () => {
+      try {
+        const repo = await getRepository();
+        const settings = await repo.getAllSettings();
+
+        if (settings.theme && (presets as string[]).includes(settings.theme)) {
+          setThemeState(settings.theme as ThemeName);
+        }
+        if (settings.brandHsl) {
+          setBrandHsl(settings.brandHsl);
+        }
+        if (settings.font) {
+          setFontState(settings.font as FontName);
+        }
+        if (settings.size) {
+          setSizeState(Number(settings.size) as 14 | 16 | 18 | 20 | 22 | 24);
+        }
+      } catch (error) {
+        console.error("Error cargando configuración:", error);
+      }
+    };
+
+    loadSettings();
   }, []);
 
-  // apply to document
+  // Aplicar al documento (SOLO CSS, NO guardar automáticamente)
   useEffect(() => {
     const r = document.documentElement;
     r.setAttribute("data-theme", theme);
     r.style.setProperty("--brand", brandHsl);
     r.style.setProperty("--font-sans", fontMap[font]);
     r.style.setProperty("--font-size-base", `${size}px`);
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ theme, brandHsl, font, size }),
-    );
   }, [theme, brandHsl, font, size]);
+
+  // Función para guardar configuración manualmente (llamada desde ThemePanel)
+  const saveSettings = async () => {
+    try {
+      console.log("💾 Guardando configuración en BD...");
+      const repo = await getRepository();
+      await repo.setSettings({
+        theme: { value: theme, category: "appearance" },
+        brandHsl: { value: brandHsl, category: "appearance" },
+        font: { value: font, category: "appearance" },
+        size: { value: String(size), category: "appearance" },
+      });
+      console.log("✅ Configuración guardada exitosamente");
+    } catch (error) {
+      console.error("❌ Error guardando configuración:", error);
+      throw error;
+    }
+  };
+
+  const resetToDefaults = async () => {
+    try {
+      const repo = await getRepository();
+      await repo.resetAllSettings();
+
+      // Aplicar valores por defecto localmente
+      setThemeState("dark");
+      setBrandHsl("172 49% 56%");
+      setFontState("Inter");
+      setSizeState(16);
+    } catch (error) {
+      console.error("Error restaurando configuración:", error);
+      throw error;
+    }
+  };
 
   const api = useMemo<ThemeContextType>(
     () => ({
@@ -89,12 +135,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setTheme: (t) => setThemeState(t),
       setBrand: (value) => {
         if (value.startsWith("#")) setBrandHsl(hexToHsl(value));
-        else setBrandHsl(value); // permitir "217 91% 60%"
+        else setBrandHsl(value);
       },
       setFont: (f) => setFontState(f),
       setSize: (s) => setSizeState(s),
+      saveSettings,
+      resetToDefaults,
     }),
-    [theme, brandHsl, font, size],
+    [theme, brandHsl, font, size, saveSettings, resetToDefaults],
   );
 
   return <ThemeContext.Provider value={api}>{children}</ThemeContext.Provider>;

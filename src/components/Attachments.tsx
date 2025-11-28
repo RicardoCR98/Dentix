@@ -1,15 +1,18 @@
-import { useMemo, useState } from "react";
-import { Upload, File, Image, FileText, X, Paperclip } from "lucide-react";
+import { useMemo, useState, useEffect, memo } from "react";
+import { Upload, File, Image, FileText, X, Paperclip, ExternalLink } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
 import { Alert } from "./ui/Alert";
 import { cn } from "../lib/cn";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/Tabs";
 import type { AttachmentFile } from "../lib/types";
+import { resolveAttachmentPath, openWithOS } from "../lib/files/attachments";
 
 interface Props {
   files: AttachmentFile[];
   onFilesChange: (files: AttachmentFile[]) => void;
+  onFileDelete?: (file: AttachmentFile) => Promise<void>;
+  patientName?: string;
   readOnly?: boolean;
 }
 
@@ -34,7 +37,23 @@ const formatFileSize = (bytes: number): string => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };
 
-export default function Attachments({ files, onFilesChange, readOnly }: Props) {
+const formatFilePath = (storage_key: string, patientName?: string): string => {
+  // storage_key formato: p_1/2025/03/20250311_143022_abc123_archivo.jpg
+  const parts = storage_key.split("/");
+  if (parts.length < 3) return "";
+
+  const year = parts[1];
+  const month = parts[2];
+  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const monthName = monthNames[parseInt(month) - 1] || month;
+
+  if (patientName) {
+    return `${patientName} › ${year} › ${monthName}`;
+  }
+  return `${year} › ${monthName}`;
+};
+
+const Attachments = memo(function Attachments({ files, onFilesChange, onFileDelete, patientName, readOnly }: Props) {
   const [dragActive, setDragActive] = useState(false);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -73,8 +92,24 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
     onFilesChange([...files, ...newFiles]);
   };
 
-  const removeFile = (id: string) => {
+  const removeFile = async (id: string) => {
     if (readOnly) return;
+
+    const fileToRemove = files.find(f => f.id === id);
+    if (!fileToRemove) return;
+
+    // Si tiene callback de eliminación y db_id, eliminar de la DB primero
+    if (onFileDelete && fileToRemove.db_id) {
+      try {
+        await onFileDelete(fileToRemove);
+      } catch (e) {
+        console.error("Error al eliminar archivo de la DB:", e);
+        alert("Error al eliminar el archivo");
+        return;
+      }
+    }
+
+    // Eliminar del estado local
     onFilesChange(files.filter((f) => f.id !== id));
   };
 
@@ -93,10 +128,48 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
     [files],
   );
 
-  const FileCard = ({ file }: { file: AttachmentFile }) => {
+  const FileCard = memo(({ file }: { file: AttachmentFile }) => {
     const isNew = !!file.file;
+    const isSaved = !!file.storage_key;
     const isImage = file.type?.startsWith("image/");
-    const fileName = file.name || file.name || "Archivo";
+    const fileName = file.name || "Archivo";
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const filePath = useMemo(
+      () => isSaved && file.storage_key ? formatFilePath(file.storage_key, patientName) : null,
+      [isSaved, file.storage_key, patientName]
+    );
+
+    // Cargar URL de imagen para archivos guardados
+    useEffect(() => {
+      if (isSaved && isImage && file.storage_key) {
+        (async () => {
+          try {
+            const fullPath = await resolveAttachmentPath(file.storage_key);
+            // Usar convertFileSrc de Tauri para convertir ruta a URL
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+            if (isTauri) {
+              const { convertFileSrc } = await import("@tauri-apps/api/core");
+              const url = convertFileSrc(fullPath);
+              setImageUrl(url);
+            }
+          } catch (e) {
+            console.warn("No se pudo cargar preview de imagen:", e);
+          }
+        })();
+      }
+    }, [isSaved, isImage, file.storage_key]);
+
+    const handleOpenFile = async () => {
+      if (!isSaved || !file.storage_key) return;
+      try {
+        const fullPath = await resolveAttachmentPath(file.storage_key);
+        await openWithOS(fullPath);
+      } catch (e) {
+        console.error("Error al abrir archivo:", e);
+        alert("No se pudo abrir el archivo");
+      }
+    };
 
     return (
       <div
@@ -113,9 +186,13 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
           <div className="w-16 h-16 rounded-lg bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0 overflow-hidden">
             {isImage ? (
               <img
-                src={file.url}
+                src={isNew ? file.url : (imageUrl || "")}
                 alt={fileName}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Fallback si la imagen no se puede cargar
+                  e.currentTarget.style.display = "none";
+                }}
               />
             ) : (
               <div className="text-[hsl(var(--primary))]">
@@ -140,31 +217,59 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
                 {isNew ? "Nuevo" : getFileTypeLabel(file.type)}
               </Badge>
             </div>
-            <div className="text-xs text-[hsl(var(--muted-foreground))]">
-              <span className="font-medium">{formatFileSize(file.size)}</span>
-              <span className="mx-1">•</span>
-              <span>{new Date(file.uploadDate).toLocaleDateString()}</span>
+            <div className="text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+              <div>
+                <span className="font-medium">{formatFileSize(file.size)}</span>
+                <span className="mx-1">•</span>
+                <span>{new Date(file.uploadDate).toLocaleDateString()}</span>
+              </div>
+              {filePath && (
+                <div className="text-[10px] text-[hsl(var(--muted-foreground)/0.7)] flex items-center gap-1">
+                  <span>📁</span>
+                  <span>{filePath}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Delete Button */}
-          {!readOnly && (
-            <button
-              onClick={() => removeFile(file.id)}
-              className={cn(
-                "p-2 rounded-md transition-all opacity-0 group-hover:opacity-100",
-                "hover:bg-red-500/10 text-red-600 hover:text-red-700",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500",
-              )}
-              aria-label="Eliminar archivo"
-            >
-              <X size={18} />
-            </button>
-          )}
+          {/* Actions */}
+          <div className="flex items-center gap-1">
+            {/* Botón Abrir (solo para archivos guardados) */}
+            {isSaved && (
+              <button
+                onClick={handleOpenFile}
+                className={cn(
+                  "p-2 rounded-md transition-all",
+                  "hover:bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))]",
+                )}
+                aria-label="Abrir archivo"
+                title="Abrir archivo"
+              >
+                <ExternalLink size={18} />
+              </button>
+            )}
+
+            {/* Delete Button */}
+            {!readOnly && (
+              <button
+                onClick={() => removeFile(file.id)}
+                className={cn(
+                  "p-2 rounded-md transition-all opacity-0 group-hover:opacity-100",
+                  "hover:bg-red-500/10 text-red-600 hover:text-red-700",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500",
+                )}
+                aria-label="Eliminar archivo"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
-  };
+  });
+  FileCard.displayName = "FileCard";
 
   const EmptyState = ({ type }: { type: "images" | "docs" }) => (
     <div className="py-8 text-center">
@@ -185,6 +290,14 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
 
   return (
     <div className={cn("space-y-4", readOnly && "opacity-75")}>
+      {/* Patient Info */}
+      {patientName && (
+        <div className="text-xs text-[hsl(var(--muted-foreground))] flex items-center gap-2 px-1">
+          <span>📁</span>
+          <span>Archivos de: <strong className="text-[hsl(var(--foreground))]">{patientName}</strong></span>
+        </div>
+      )}
+
       {/* Summary Card */}
       {files.length > 0 && (
         <div className="flex items-center justify-between p-4 rounded-lg bg-[hsl(var(--muted))] border border-[hsl(var(--border))]">
@@ -336,4 +449,8 @@ export default function Attachments({ files, onFilesChange, readOnly }: Props) {
       )}
     </div>
   );
-}
+});
+
+Attachments.displayName = "Attachments";
+
+export default Attachments;

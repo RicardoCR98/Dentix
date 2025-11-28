@@ -15,12 +15,6 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "./components/ui/Popover";
-import {
-  SelectRoot,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-} from "./components/ui/Select";
 import { Label } from "./components/ui/Label";
 import { Button } from "./components/ui/Button";
 import { Textarea } from "./components/ui/Textarea";
@@ -48,17 +42,22 @@ import type {
   ToothDx,
   SessionRow,
   ProcedureTemplate,
+  ReasonType,
 } from "./lib/types";
 import ThemePanel from "./components/ThemePanel";
+import ReasonTypeSelect from "./components/ReasonTypeSelect";
 import { getRepository } from "./lib/storage/TauriSqliteRepository";
 import { saveAttachmentFile } from "./lib/files/attachments";
+import { useToast } from "./components/ToastProvider";
 
 // -------- Estados iniciales --------
 const initialPatient: Patient = {
   full_name: "",
   doc_id: "",
   phone: "",
-  age: undefined,
+  date_of_birth: "",
+  email: "",
+  emergency_phone: "",
 };
 
 const initialVisit: Visit = {
@@ -69,6 +68,9 @@ const initialVisit: Visit = {
 };
 
 export default function App() {
+  // hook de notificaciones
+  const toast = useToast();
+
   // ficha + visita activa
   const [patient, setPatient] = useState<Patient>(initialPatient);
   const [visit, setVisit] = useState<Visit>(initialVisit);
@@ -91,8 +93,10 @@ export default function App() {
     [],
   );
 
+  // lista de tipos de motivos de consulta
+  const [reasonTypes, setReasonTypes] = useState<ReasonType[]>([]);
+
   // diálogos / datos auxiliares
-  const [showSaveAlert, setShowSaveAlert] = useState(false);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [paymentsDialogOpen, setPaymentsDialogOpen] = useState(false);
 
@@ -148,7 +152,7 @@ export default function App() {
   const handleSave = useCallback(async () => {
     const hasPatientData = Boolean(patient.full_name && patient.doc_id);
     if (!hasPatientData) {
-      alert("Completa al menos nombre y cédula del paciente para guardar.");
+      toast.warning("Datos incompletos", "Completa al menos nombre y cédula del paciente para guardar.");
       return;
     }
 
@@ -173,53 +177,78 @@ export default function App() {
         fullDxText: fullDiagnosis || undefined,
       };
 
-      const { patientId, visitId } = await repo.saveVisitWithSessions({
-        patient,
-        visit: visitPayload,
-        sessions,
-      });
+      // Preparar datos de attachments ANTES de la transacción
+      const newAttachments = attachments.filter((a) => a.file);
+      const attachmentMetadata: Array<{
+        filename: string;
+        mime_type: string;
+        bytes: number;
+        storage_key: string;
+      }> = [];
 
-      // Pequeño delay para asegurar que la DB libere el lock después del COMMIT
-      if (attachments.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      for (const a of attachments) {
+      // Guardar archivos en disco ANTES de tocar la BD (operación lenta)
+      for (const a of newAttachments) {
         const { storage_key, bytes } = await saveAttachmentFile(
           a.file!,
-          patientId,
+          patient.id || 0, // Usaremos el ID real después
           visit.date,
         );
-        await repo.createAttachment({
-          patient_id: patientId,
-          visit_id: visitId,
+        attachmentMetadata.push({
           filename: a.name,
           mime_type: a.type || "application/octet-stream",
           bytes,
           storage_key,
         });
       }
-      setAttachments([]);
 
+      // Ahora guardar TODO en una sola transacción
+      const { patientId, visitId } = await repo.saveVisitWithSessions({
+        patient,
+        visit: visitPayload,
+        sessions,
+      });
+
+      // Guardar attachments metadata (operación rápida)
+      for (const meta of attachmentMetadata) {
+        await repo.createAttachment({
+          patient_id: patientId,
+          visit_id: visitId,
+          ...meta,
+        });
+      }
+
+      // Actualizar estado local SIN recargar desde BD
       setPatient((prev) => ({ ...prev, id: patientId }));
       setVisit((prev) => ({ ...prev, id: visitId, patient_id: patientId }));
 
-      // Recargar todas las sesiones del paciente para actualizar
-      if (patientId) {
-        const allSess = await (
-          await getRepository()
-        ).getSessionsByPatient(patientId);
-        setSessions(allSess);
-      }
+      // Actualizar sessions con IDs si es necesario
+      setSessions((prevSessions) =>
+        prevSessions.map((s) => ({ ...s, visitId })),
+      );
 
-      setShowSaveAlert(true);
-      setTimeout(() => setShowSaveAlert(false), 3000);
+      // Marcar attachments como guardados (sin recargar)
+      setAttachments((prev) =>
+        prev.map((att, idx) => {
+          if (att.file) {
+            return {
+              ...att,
+              file: undefined, // Ya no es "nuevo"
+              db_id: idx + 1, // ID temporal, será correcto al recargar
+            };
+          }
+          return att;
+        }),
+      );
+
+      // Notificación de éxito
+      toast.success("Guardado exitoso", "La historia clínica se ha guardado correctamente");
     } catch (e) {
       console.error("Error al guardar:", e);
       const errorMessage = e instanceof Error ? e.message : String(e);
-      alert(`Error al guardar la historia clínica:\n\n${errorMessage}`);
+      toast.error("Error al guardar", `No se pudo guardar la historia clínica: ${errorMessage}`);
     }
   }, [
+    toast,
     patient,
     visit,
     toothDx,
@@ -230,77 +259,123 @@ export default function App() {
     attachments,
   ]);
 
+  // ---------- Eliminar attachment ----------
+  const handleDeleteAttachment = useCallback(async (file: AttachmentFile) => {
+    if (!file.db_id) return;
+
+    try {
+      const repo = await getRepository();
+      await repo.deleteAttachment(file.db_id);
+    } catch (e) {
+      console.error("Error al eliminar attachment:", e);
+      throw e; // Re-lanzar para que el componente maneje el error
+    }
+  }, []);
+
   // ---------- Seleccionar paciente ----------
   const handleSelectPatient = useCallback(async (selectedPatient: Patient) => {
     if (!selectedPatient?.id) return;
-    const repo = await getRepository();
 
-    const p = await repo.findPatientById(selectedPatient.id);
-    if (!p) return;
-    setPatient(p);
+    try {
+      const repo = await getRepository();
 
-    const list = await repo.getVisitsByPatient(p.id!);
-    const today = new Date().toISOString().slice(0, 10);
+      const p = await repo.findPatientById(selectedPatient.id);
+      if (!p) return;
+      setPatient(p);
 
-    if (list.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const last = list[0] as any;
-      const lastToothDx =
-        last.toothDx ??
-        (last.tooth_dx_json
-          ? (JSON.parse(last.tooth_dx_json) as ToothDx)
-          : undefined);
+      const list = await repo.getVisitsByPatient(p.id!);
+      const today = new Date().toISOString().slice(0, 10);
 
-      setVisit({
-        date: today,
-        reasonType: undefined,
-        reasonDetail: "",
-        diagnosis: "",
-        toothDx: lastToothDx,
-      });
+      if (list.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const last = list[0] as any;
+        const lastToothDx =
+          last.toothDx ??
+          (last.tooth_dx_json
+            ? (JSON.parse(last.tooth_dx_json) as ToothDx)
+            : undefined);
 
-      setToothDx(lastToothDx || {});
-    } else {
-      setVisit({ ...initialVisit, date: today, reasonDetail: "" });
-      setToothDx({});
+        setVisit({
+          date: today,
+          reasonType: undefined,
+          reasonDetail: "",
+          diagnosis: "",
+          toothDx: lastToothDx,
+        });
+
+        setToothDx(lastToothDx || {});
+      } else {
+        setVisit({ ...initialVisit, date: today, reasonDetail: "" });
+        setToothDx({});
+      }
+
+      // Cargar sessions y attachments en paralelo (operaciones de LECTURA)
+      const [allSess, savedAttachments] = await Promise.all([
+        repo.getSessionsByPatient(p.id!),
+        repo.getAttachmentsByPatient(p.id!),
+      ]);
+
+      setSessions(allSess);
+
+      const attachmentFiles: AttachmentFile[] = savedAttachments.map((att) => ({
+        id: `saved-${att.id}`,
+        name: att.filename,
+        size: att.bytes,
+        type: att.mime_type,
+        url: "", // Se generará bajo demanda al visualizar
+        uploadDate: att.created_at,
+        storage_key: att.storage_key,
+        db_id: att.id,
+      }));
+      setAttachments(attachmentFiles);
+    } catch (e) {
+      console.error("Error al seleccionar paciente:", e);
+      alert("Error al cargar los datos del paciente");
     }
-
-    const allSess = await repo.getSessionsByPatient(p.id!);
-    setSessions(allSess);
-
-    setAttachments([]);
   }, []);
 
-  // ---------- Diálogos ----------
+  // ---------- Diálogos (con debounce para evitar race conditions) ----------
   useEffect(() => {
     if (!searchDialogOpen) return;
-    (async () => {
-      const repo = await getRepository();
-      const all = await repo.searchPatients("");
-      setPatientsForDialogs(all);
-    })();
+
+    // Debounce de 150ms para evitar conflictos con guardado
+    const timeoutId = setTimeout(async () => {
+      try {
+        const repo = await getRepository();
+        const all = await repo.searchPatients("");
+        setPatientsForDialogs(all);
+      } catch (e) {
+        console.error("Error cargando pacientes para búsqueda:", e);
+      }
+    }, 150);
+
+    return () => clearTimeout(timeoutId);
   }, [searchDialogOpen]);
 
   useEffect(() => {
     if (!paymentsDialogOpen) return;
-    (async () => {
-      const repo = await getRepository();
-      const all = await repo.searchPatients("");
-      setPatientsForDialogs(all);
 
-      const map: Record<number, SessionRow[]> = {};
-      for (const p of all) {
-        if (!p.id) continue;
-        const vlist = await repo.getVisitsByPatient(p.id);
-        const allSessions: SessionRow[] = [];
-        for (const v of vlist) {
-          const sess = await repo.getSessionsByVisit(v.id);
-          allSessions.push(...sess);
+    // Debounce de 150ms para evitar conflictos con guardado
+    const timeoutId = setTimeout(async () => {
+      try {
+        const repo = await getRepository();
+        const all = await repo.searchPatients("");
+        setPatientsForDialogs(all);
+
+        // OPTIMIZADO: Cargar sesiones usando getSessionsByPatient
+        // en lugar de loops anidados (N+M queries → N queries)
+        const map: Record<number, SessionRow[]> = {};
+        for (const p of all) {
+          if (!p.id) continue;
+          map[p.id] = await repo.getSessionsByPatient(p.id);
         }
-        map[p.id] = allSessions;
+        setPatientSessionsMap(map);
+      } catch (e) {
+        console.error("Error cargando datos de cartera:", e);
       }
-      setPatientSessionsMap(map);
-    })();
+    }, 150);
+
+    return () => clearTimeout(timeoutId);
   }, [paymentsDialogOpen]);
 
   // ---------- Inicializar y cargar datos ----------
@@ -310,58 +385,27 @@ export default function App() {
         // Primero obtener el repositorio (esto inicializa la DB)
         const repo = await getRepository();
 
-        // Luego cargar todos los datos necesarios
-        let templates = await repo.getProcedureTemplates();
-        let signersList = await repo.getSigners();
+        // OPTIMIZACIÓN: Los datos por defecto ya están en la BD (migraciones 002, 003 y 007)
+        // Solo cargar lo que viene de la BD, sin insertar nada
+        const templates = await repo.getProcedureTemplates();
+        const signersList = await repo.getSigners();
+        const reasonTypesList = await repo.getReasonTypes();
 
-        // Si no hay plantillas de procedimientos, insertar las por defecto
-        if (templates.length === 0) {
-          console.log("📋 No hay plantillas en BD, insertando valores por defecto...");
-          const defaultProcs = [
-            "Curación",
-            "Resinas simples",
-            "Resinas compuestas",
-            "Extracciones simples",
-            "Extracciones complejas",
-            "Correctivo inicial",
-            "Control mensual",
-            "Prótesis total",
-            "Prótesis removible",
-            "Prótesis fija",
-            "Retenedor",
-            "Endodoncia simple",
-            "Endodoncia compleja",
-            "Limpieza simple",
-            "Limpieza compleja",
-            "Reposición",
-            "Pegada",
-          ];
+        console.log("✅ Plantillas cargadas desde BD:", templates.length);
+        console.log("✅ Firmantes cargados desde BD:", signersList.length);
+        console.log(
+          "✅ Tipos de motivos cargados desde BD:",
+          reasonTypesList.length,
+        );
 
-          await repo.saveProcedureTemplates(
-            defaultProcs.map((name) => ({ name, default_price: 0 }))
-          );
-
-          // Recargar después de insertar
-          templates = await repo.getProcedureTemplates();
-          console.log("✅ Plantillas insertadas:", templates.length);
-        } else {
-          console.log("✅ Plantillas cargadas desde BD:", templates.length);
-        }
-
-        // Si no hay firmantes, insertar los por defecto
-        if (signersList.length === 0) {
-          await repo.createSigner("Dr. Ejemplo 1");
-          await repo.createSigner("Dra. Ejemplo 2");
-
-          // Recargar después de insertar
-          signersList = await repo.getSigners();
-        }
-
-        console.log("🔄 Actualizando estado con templates:", templates);
         setProcedureTemplates(templates);
         setSigners(signersList);
+        setReasonTypes(reasonTypesList);
       } catch (error) {
         console.error("Error inicializando datos:", error);
+        alert(
+          "Error al cargar datos iniciales. Por favor recarga la aplicación.",
+        );
         setProcedureTemplates([]);
         setSigners([]);
       }
@@ -370,23 +414,34 @@ export default function App() {
 
   // Función para actualizar plantilla global
   const updateProcedureTemplates = useCallback(
-    async (items: Array<{ name: string; unit: number }>) => {
-      // Filtrar solo items con nombre (ignorar vacíos)
-      const validItems = items.filter((it) => it.name.trim().length > 0);
+    async (items: Array<{ name: string; unit: number; procedure_template_id?: number }>) => {
+      try {
+        // Filtrar solo items con nombre (ignorar vacíos)
+        const validItems = items.filter((it) => it.name.trim().length > 0);
 
-      const templates = validItems.map((it) => ({
-        name: it.name.trim(),
-        default_price: it.unit,
-      }));
+        const templates = validItems.map((it) => ({
+          id: it.procedure_template_id, // Preservar ID de plantilla si existe
+          name: it.name.trim(),
+          default_price: it.unit,
+        }));
 
-      const repo = await getRepository();
-      await repo.saveProcedureTemplates(templates);
+        const repo = await getRepository();
+        await repo.saveProcedureTemplates(templates);
 
-      // Recargar desde BD
-      const saved = await repo.getProcedureTemplates();
-      setProcedureTemplates(saved);
+        // CRÍTICO: Recargar desde BD para obtener IDs correctos
+        // Esto garantiza sincronización perfecta entre BD y estado local
+        const updatedTemplates = await repo.getProcedureTemplates();
+        console.log("✅ Plantillas actualizadas desde BD:", updatedTemplates.length);
+        setProcedureTemplates(updatedTemplates);
+
+        toast.success("Plantilla actualizada", "La plantilla de procedimientos se guardó correctamente");
+      } catch (error) {
+        console.error("Error actualizando plantillas:", error);
+        toast.error("Error", "No se pudo guardar la plantilla de procedimientos");
+        throw error;
+      }
     },
-    [],
+    [toast],
   );
 
   // Función para recargar lista de doctores
@@ -397,6 +452,17 @@ export default function App() {
       setSigners(list);
     } catch (error) {
       console.error("Error recargando doctores:", error);
+    }
+  }, []);
+
+  // Función para recargar lista de tipos de motivos
+  const reloadReasonTypes = useCallback(async () => {
+    try {
+      const repo = await getRepository();
+      const list = await repo.getReasonTypes();
+      setReasonTypes(list);
+    } catch (error) {
+      console.error("Error recargando tipos de motivos:", error);
     }
   }, []);
 
@@ -455,13 +521,6 @@ export default function App() {
         patientSessions={patientSessionsMap}
         onSelectPatient={handleSelectPatient}
       />
-      {showSaveAlert && (
-        <div className="mb-6">
-          <Alert variant="success" title="¡Guardado exitoso!">
-            La historia clínica se ha guardado correctamente.
-          </Alert>
-        </div>
-      )}
       {/* Acciones rápidas */}
       <Section
         title="Acciones Rápidas"
@@ -552,24 +611,18 @@ export default function App() {
         <div className="grid mb-4">
           <div>
             <Label required>Tipo de consulta</Label>
-            <SelectRoot
+            <ReasonTypeSelect
               value={visit.reasonType || "Dolor"}
-              onValueChange={(v) =>
+              onChange={(v) =>
                 setVisit((vv) => ({
                   ...vv,
                   reasonType: v as Visit["reasonType"],
                 }))
               }
-            >
-              <SelectTrigger />
-              <SelectContent>
-                <SelectItem value="Dolor">🦷 Dolor</SelectItem>
-                <SelectItem value="Control">✅ Control</SelectItem>
-                <SelectItem value="Emergencia">🚨 Emergencia</SelectItem>
-                <SelectItem value="Estetica">✨ Estética</SelectItem>
-                <SelectItem value="Otro">📋 Otro</SelectItem>
-              </SelectContent>
-            </SelectRoot>
+              reasonTypes={reasonTypes}
+              onReasonTypesChange={reloadReasonTypes}
+              onError={(title, message) => toast.error(title, message)}
+            />
           </div>
         </div>
 
@@ -639,7 +692,12 @@ export default function App() {
         title="Adjuntos (Radiografías, Fotos, Documentos)"
         icon={<Paperclip size={20} />}
       >
-        <Attachments files={attachments} onFilesChange={setAttachments} />
+        <Attachments
+          files={attachments}
+          onFilesChange={setAttachments}
+          onFileDelete={handleDeleteAttachment}
+          patientName={patient.full_name}
+        />
       </Section>
 
       {/* Botonera final */}

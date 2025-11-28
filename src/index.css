@@ -50,6 +50,17 @@
     }
 }
 
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
 /* Animaciones minimalistas estilo iOS/macOS */
 @keyframes fadeIn {
     from {
@@ -230,10 +241,11 @@
 
         --radius: 7px;
 
-        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.04);
+        --shadow-sm:
+            0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.04);
         --shadow: 0 2px 4px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.06);
         --shadow-lg:
-            0 8px 16px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.10);
+            0 8px 16px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.1);
 
         --font-sans:
             "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
@@ -332,14 +344,17 @@
         -moz-osx-font-smoothing: grayscale;
         /* NO aplicar overflow aquí para que html maneje el scroll */
         /* Transiciones suaves para cambios de tema */
-        transition: background-color 200ms ease, color 200ms ease;
+        transition:
+            background-color 200ms ease,
+            color 200ms ease;
     }
 
     /* Transiciones globales para elementos que cambian con el tema */
     *,
     *::before,
     *::after {
-        transition-property: background-color, border-color, color, fill, stroke;
+        transition-property:
+            background-color, border-color, color, fill, stroke;
         transition-timing-function: ease;
         transition-duration: 200ms;
     }

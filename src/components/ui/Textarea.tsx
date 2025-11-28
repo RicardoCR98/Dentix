@@ -1,5 +1,5 @@
 // src/components/ui/Textarea.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import { cn } from "../../lib/cn";
 
 interface TextareaProps
@@ -9,7 +9,9 @@ interface TextareaProps
   helperText?: string;
 }
 
-export function Textarea({
+let textareaCounter = 0;
+
+export const Textarea = React.memo(function Textarea({
   error,
   label,
   helperText,
@@ -18,8 +20,10 @@ export function Textarea({
   required,
   ...props
 }: TextareaProps) {
-  const textareaId =
-    id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
+  const textareaId = useMemo(
+    () => id || `textarea-${++textareaCounter}`,
+    [id]
+  );
 
   return (
     <div className="w-full">
@@ -46,4 +50,4 @@ export function Textarea({
       )}
     </div>
   );
-}
+});
