@@ -1,0 +1,297 @@
+@startuml Dentix Database Schema
+
+!define TABLE(x) class x << (T,#FFAAAA) >>
+!define PK(x) <u>x</u>
+!define FK(x) <i>x</i>
+
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor<<Table>> LightYellow
+  BorderColor Black
+  ArrowColor Black
+}
+
+' =========================
+' CORE
+' =========================
+package "Core" {
+
+  TABLE(doctor_profile) {
+    PK(id): INTEGER
+    --
+    doctor_id: TEXT UNIQUE NOT NULL
+    name: TEXT NOT NULL
+    email: TEXT UNIQUE NOT NULL
+    clinic_name: TEXT NOT NULL
+    clinic_hours: TEXT
+    clinic_slogan: TEXT
+    phone: TEXT
+    location: TEXT
+    app_version: TEXT
+    agreed_to_terms: INTEGER
+    last_sync: TEXT
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(patients) {
+    PK(id): INTEGER
+    --
+    full_name: TEXT NOT NULL
+    doc_id: TEXT UNIQUE NOT NULL
+    email: TEXT
+    phone: TEXT NOT NULL
+    emergency_phone: TEXT
+    date_of_birth: TEXT NOT NULL
+    anamnesis: TEXT
+    allergy_detail: TEXT
+    status: TEXT DEFAULT 'active'
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(sessions) {
+    PK(id): INTEGER
+    --
+    FK(patient_id): INTEGER
+    date: TEXT NOT NULL
+    .. Motivo ..
+    reason_type: TEXT
+    reason_detail: TEXT
+    .. Clínico ..
+    diagnosis_text: TEXT
+    auto_dx_text: TEXT
+    full_dx_text: TEXT
+    tooth_dx_json: TEXT
+    clinical_notes: TEXT
+    signer: TEXT
+    .. Financiero ..
+    budget: REAL DEFAULT 0
+    discount: REAL DEFAULT 0
+    payment: REAL DEFAULT 0
+    balance: REAL DEFAULT 0
+    cumulative_balance: REAL DEFAULT 0
+    FK(payment_method_id): INTEGER
+    payment_notes: TEXT
+    .. Metadata ..
+    is_saved: INTEGER DEFAULT 0
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(session_items) {
+    PK(id): INTEGER
+    --
+    FK(session_id): INTEGER
+    .. Facturación ..
+    name: TEXT NOT NULL
+    unit_price: REAL NOT NULL
+    quantity: INTEGER NOT NULL
+    subtotal: REAL NOT NULL
+    is_active: INTEGER DEFAULT 1
+    .. Clínico opcional ..
+    tooth_number: TEXT
+    procedure_notes: TEXT
+    .. Auditoría ..
+    FK(procedure_template_id): INTEGER
+    sort_order: INTEGER DEFAULT 0
+    created_at: TEXT
+  }
+
+  TABLE(attachments) {
+    PK(id): INTEGER
+    --
+    FK(patient_id): INTEGER
+    FK(session_id): INTEGER
+    kind: TEXT
+    filename: TEXT NOT NULL
+    mime_type: TEXT NOT NULL
+    size_bytes: INTEGER NOT NULL
+    storage_key: TEXT NOT NULL
+    note: TEXT
+    created_at: TEXT
+  }
+}
+
+' =========================
+' CATÁLOGOS (MASTER DATA)
+' =========================
+package "catalogs" {
+
+  TABLE(procedure_templates) {
+    PK(id): INTEGER
+    --
+    name: TEXT UNIQUE NOT NULL
+    default_price: REAL DEFAULT 0
+    active: INTEGER DEFAULT 1
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(signers) {
+    PK(id): INTEGER
+    --
+    name: TEXT UNIQUE NOT NULL
+    active: INTEGER DEFAULT 1
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(diagnosis_options) {
+    PK(id): INTEGER
+    --
+    label: TEXT UNIQUE NOT NULL
+    color: TEXT DEFAULT 'info'
+    active: INTEGER DEFAULT 1
+    sort_order: INTEGER DEFAULT 0
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(reason_types) {
+    PK(id): INTEGER
+    --
+    name: TEXT UNIQUE NOT NULL
+    active: INTEGER DEFAULT 1
+    sort_order: INTEGER DEFAULT 0
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(payment_methods) {
+    PK(id): INTEGER
+    --
+    name: TEXT UNIQUE NOT NULL
+    active: INTEGER DEFAULT 1
+    sort_order: INTEGER DEFAULT 0
+    created_at: TEXT
+    updated_at: TEXT
+  }
+
+  TABLE(user_settings) {
+    PK(id): INTEGER
+    --
+    key: TEXT UNIQUE NOT NULL
+    value: TEXT NOT NULL
+    category: TEXT NOT NULL
+    updated_at: TEXT
+  }
+}
+
+' =========================
+' TELEMETRÍA Y SYNC
+' =========================
+package "telemetry" {
+
+  TABLE(telemetry_events) {
+    PK(id): INTEGER
+    --
+    FK(doctor_id): TEXT
+    event_type: TEXT NOT NULL
+    event_data: TEXT NOT NULL
+    timestamp: TEXT
+    sent: INTEGER DEFAULT 0
+    sent_at: TEXT
+  }
+
+  TABLE(error_logs) {
+    PK(id): INTEGER
+    --
+    doctor_id: TEXT NOT NULL
+    error_message: TEXT NOT NULL
+    stack_trace: TEXT
+    app_version: TEXT
+    timestamp: TEXT
+    sent: INTEGER DEFAULT 0
+    sent_at: TEXT
+  }
+
+  TABLE(sync_queue) {
+    PK(id): INTEGER
+    --
+    table_name: TEXT NOT NULL
+    record_id: INTEGER NOT NULL
+    operation: TEXT NOT NULL
+    data: TEXT NOT NULL
+    timestamp: TEXT
+    sent: INTEGER DEFAULT 0
+    sent_at: TEXT
+  }
+}
+
+' =========================
+' RELACIONES
+' =========================
+
+' Paciente → Sesiones (1:N)
+patients "1" --> "0..*" sessions : tiene
+
+' Paciente → Adjuntos (1:N)
+patients "1" --> "0..*" attachments : tiene
+
+' Sesión → Items (1:N)
+sessions "1" --> "0..*" session_items : contiene
+
+' Sesión → Adjuntos (1:N, opcional)
+sessions "1" --> "0..*" attachments : puede tener
+
+' Sesión → Método de pago (N:1, opcional)
+sessions "0..*" --> "0..1" payment_methods : usa
+
+' Item → Plantilla (N:1, opcional - para auditoría)
+session_items "0..*" --> "0..1" procedure_templates : basado en
+
+' Telemetría → Doctor (N:1)
+telemetry_events "0..*" --> "1" doctor_profile : pertenece a
+
+' =========================
+' NOTAS
+' =========================
+
+note right of sessions
+  **Corazón de la app**
+  Combina info clínica + financiera
+
+  **Snapshots inmutables**:
+  - tooth_dx_json: Estado del odontograma
+  - signer: Nombre del doctor
+  - reason_type: Motivo de consulta
+
+  **Auto-calculados**:
+  - budget = sum(items.subtotal WHERE is_active=1)
+  - balance = budget - discount - payment
+end note
+
+note right of session_items
+  **Items de facturación**
+
+  Snapshots de precio:
+  - name, unit_price: Copiados de template
+  - No cambian si template cambia después
+
+  Metadata clínica opcional:
+  - tooth_number: ¿En qué diente?
+  - procedure_notes: Notas específicas
+end note
+
+note bottom of procedure_templates
+  **Catálogos maestros**
+
+  Plantillas reutilizables para:
+  - Procedimientos
+  - Doctores (signers)
+  - Diagnósticos (diagnosis_options)
+  - Motivos de consulta (reason_types)
+  - Métodos de pago (payment_methods)
+end note
+
+note bottom of telemetry_events
+  **Sistema de telemetría offline-first**
+
+  Buffer local de eventos que se envían
+  cuando hay conexión:
+  - Eventos de uso
+  - Logs de errores
+  - Cola de sincronización (CDC)
+end note
+@enduml
