@@ -9,8 +9,7 @@ use tokio::sync::Mutex;
 // Importar el módulo lib que contiene DbPool y commands
 use app_lib::{commands::*, DbPool};
 
-#[tokio::main]
-async fn main() {
+fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_log::Builder::default().build())
@@ -35,23 +34,21 @@ async fn main() {
 
             println!("Database URL: {}", database_url);
 
-            // Obtener el handle de la app para usarlo en el spawn
-            let app_handle = app.handle().clone();
-
-            // Inicializar el pool de base de datos de forma asíncrona
-            tauri::async_runtime::spawn(async move {
+            // ✅ FIX: Inicializar el pool de forma BLOQUEANTE durante setup
+            // Esto evita el race condition donde comandos llegaban antes del .manage()
+            tauri::async_runtime::block_on(async move {
                 let pool = SqlitePoolOptions::new()
                     .max_connections(1) // Una sola conexión para evitar locks
                     .connect(&database_url)
                     .await
                     .expect("Failed to create database pool");
 
-                // Ejecutar migraciones
-                let migration_sql = include_str!("../migrations/001_dentix_schema_final.sql");
-                sqlx::raw_sql(migration_sql)
+                // Ejecutar migración unificada
+                let migration_001 = include_str!("../migrations/001_dentix_schema_final.sql");
+                sqlx::raw_sql(migration_001)
                     .execute(&pool)
                     .await
-                    .expect("Failed to run migrations");
+                    .expect("Failed to run migration 001");
 
                 // Configurar WAL mode y otros pragmas para mejor concurrencia
                 sqlx::query("PRAGMA journal_mode = WAL")
@@ -66,7 +63,7 @@ async fn main() {
 
                 // Crear el DbPool y agregarlo al state de Tauri
                 let db_pool = DbPool(Arc::new(Mutex::new(pool)));
-                app_handle.manage(db_pool);
+                app.manage(db_pool);
 
                 println!("Database initialized successfully");
             });
@@ -76,15 +73,16 @@ async fn main() {
         // Registrar TODOS los comandos Tauri
         .invoke_handler(tauri::generate_handler![
             // Patient commands
+            get_all_patients_list,
             search_patients,
             find_patient_by_id,
             upsert_patient,
-            // Visit commands
+            // Session commands (antes Visit)
             get_visits_by_patient,
             delete_visit,
-            // Session commands
             get_sessions_by_visit,
             get_sessions_by_patient,
+            get_procedures_by_visit,
             // Procedure Template commands
             get_procedure_templates,
             save_procedure_templates,
@@ -94,14 +92,36 @@ async fn main() {
             // Signers commands
             get_signers,
             create_signer,
+            delete_signer,
             // Reason Types commands
             get_reason_types,
             create_reason_type,
+            // Payment Methods commands (NEW)
+            get_payment_methods,
+            create_payment_method,
+            // Doctor Profile commands
+            get_doctor_profile,
+            upsert_doctor_profile,
             // Settings commands
             get_all_settings,
             save_setting,
             // Complex command
             save_visit_with_sessions,
+            // Reports
+            get_pending_payments_summary,
+            // Payments commands
+            get_payments_by_patient,
+            create_payment,
+            update_payment,
+            delete_payment,
+            // Attachments commands
+            get_attachments_by_patient,
+            create_attachment,
+            delete_attachment,
+            // NEW: Granular save commands
+            update_patient_only,
+            save_attachments_without_session,
+            create_diagnostic_update_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

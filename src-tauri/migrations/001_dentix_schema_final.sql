@@ -1,11 +1,15 @@
 -- =========================
--- DENTIX - SCHEMA FINAL
+-- DENTIX - SCHEMA FINAL v2.0
 -- =========================
--- Arquitectura: Tauri + SQLite (mono-doctor, offline-first)
--- Decisiones: Desnormalización intencional, un solo punto de escritura para cálculos
+-- Fecha: 09 Diciembre 2024
+-- Arquitectura: Tauri + SQLite (offline-first)
+-- Decisión: Separación visual Clínica/Finanzas en UI, esquema híbrido en BD
 -- =========================
 
 PRAGMA foreign_keys = ON;
+PRAGMA journal_mode = WAL;
+PRAGMA busy_timeout = 10000;
+PRAGMA synchronous = NORMAL;
 
 -- =========================
 -- DOCTOR PROFILE (Info única del doctor)
@@ -49,115 +53,120 @@ CREATE INDEX IF NOT EXISTS idx_patients_doc_id ON patients(doc_id);
 CREATE INDEX IF NOT EXISTS idx_patients_status ON patients(status);
 
 -- =========================
--- VISITS (Corazón de la app)
+-- SESSIONS (antes "visits")
 -- =========================
--- DECISIÓN: Desnormalizado intencionalmente
--- - reason_type: guardamos el TEXT como está hoy (snapshot)
--- - signer: guardamos el nombre como está hoy (snapshot)
--- - diagnosis, odontograma: guardamos snapshots (no cambian retroactivamente)
--- - balance/cumulative_balance: calculados por servicio centralizado
+-- Corazón de la app: combina info clínica + financiera
+-- Cada sesión representa un evento (visita clínica, pago, presupuesto, etc.)
 -- =========================
-CREATE TABLE IF NOT EXISTS visits (
+CREATE TABLE IF NOT EXISTS sessions (
   id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   patient_id           INTEGER NOT NULL,
   date                 TEXT NOT NULL,
 
-  -- Motivo de consulta (snapshot del catálogo)
-  reason_type          TEXT,              -- Ej: "Dolor", "Control" (copia, no FK)
-  reason_detail        TEXT,
+  -- MOTIVO (específico de esta sesión)
+  reason_type          TEXT,              -- "Dolor", "Control", "Emergencia", "Abono a cuenta", etc.
+  reason_detail        TEXT,              -- Descripción detallada del motivo
 
-  -- Diagnósticos (snapshots)
-  diagnosis_text       TEXT,
-  auto_dx_text         TEXT,
-  full_dx_text         TEXT,
+  -- CLÍNICO (snapshots para inmutabilidad)
+  diagnosis_text       TEXT,              -- Diagnóstico general
+  auto_dx_text         TEXT,              -- Diagnóstico auto-generado del odontograma
+  full_dx_text         TEXT,              -- Diagnóstico completo (auto + manual)
+  tooth_dx_json        TEXT,              -- Snapshot del odontograma: {"16": ["Caries"], "17": ["Obturación"]}
+  clinical_notes       TEXT,              -- Notas clínicas del doctor (antes "observations")
+  signer               TEXT,              -- Nombre del doctor que firmó (snapshot)
 
-  -- Odontograma (JSON snapshot)
-  -- Formato: {"11": ["Caries", "Sensibilidad"], "12": ["Obturación"]}
-  tooth_dx_json        TEXT,
+  -- FINANCIERO (calculados automáticamente por el sistema)
+  budget               REAL NOT NULL DEFAULT 0,      -- Presupuesto total (suma de items activos)
+  discount             REAL NOT NULL DEFAULT 0,      -- Descuento aplicado
+  payment              REAL NOT NULL DEFAULT 0,      -- Abono/pago de esta sesión
+  balance              REAL NOT NULL DEFAULT 0,      -- Saldo de esta sesión (budget - discount - payment)
+  cumulative_balance   REAL NOT NULL DEFAULT 0,      -- Saldo acumulado histórico
+  payment_method_id    INTEGER,                      -- FK a payment_methods
+  payment_notes        TEXT,                         -- Notas específicas del pago
 
-  -- Financiero
-  -- REGLA: Solo se actualizan desde servicio_financiero() en Rust
-  budget               REAL NOT NULL DEFAULT 0,
-  discount             REAL NOT NULL DEFAULT 0,
-  payment              REAL NOT NULL DEFAULT 0,
-  balance              REAL NOT NULL DEFAULT 0,      -- budget - discount - payment
-  cumulative_balance   REAL NOT NULL DEFAULT 0,      -- suma de balances previos
-
-  -- Responsable (snapshot)
-  signer               TEXT,              -- Nombre del doctor que firmó (copia)
-
-  -- Notas y control
-  observations         TEXT,
-  is_saved             INTEGER DEFAULT 0,            -- Sesión histórica o en progreso
-
+  -- METADATA
+  is_saved             INTEGER DEFAULT 0,            -- 0 = borrador editable, 1 = guardado inmutable
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
 
-  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+  FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+  FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id) ON DELETE SET NULL
 );
 
--- Índices para queries frecuentes
-CREATE INDEX IF NOT EXISTS idx_visits_patient ON visits(patient_id);
-CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(date);
-CREATE INDEX IF NOT EXISTS idx_visits_saved ON visits(is_saved);
+CREATE INDEX IF NOT EXISTS idx_sessions_patient ON sessions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date);
+CREATE INDEX IF NOT EXISTS idx_sessions_saved ON sessions(is_saved);
+CREATE INDEX IF NOT EXISTS idx_sessions_reason_type ON sessions(reason_type);
 
 -- =========================
--- VISIT PROCEDURES (Procedimientos por visita)
+-- SESSION_ITEMS (antes "visit_procedures")
 -- =========================
--- DECISIÓN: Desnormalizado
--- - name: guardamos el nombre como fue cobrado (snapshot)
--- - unit_price: precio ese día (no cambia si cambia el catálogo)
--- - procedure_template_id: opcional, para auditoría (saber de dónde vino)
+-- Items de facturación con metadata clínica opcional
+-- Cada item representa un procedimiento cobrado/realizado
 -- =========================
-CREATE TABLE IF NOT EXISTS visit_procedures (
+CREATE TABLE IF NOT EXISTS session_items (
   id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-  visit_id                INTEGER NOT NULL,
-  name                    TEXT NOT NULL,             -- Snapshot: nombre al momento
-  unit_price              REAL NOT NULL,             -- Snapshot: precio ese día
-  quantity                INTEGER NOT NULL,
-  subtotal                REAL NOT NULL,             -- unit_price * quantity
-  procedure_template_id   INTEGER,                   -- Opcional: ref para auditoría
-  sort_order              INTEGER DEFAULT 0,
+  session_id              INTEGER NOT NULL,
+
+  -- FACTURACIÓN (snapshots - precio del día)
+  name                    TEXT NOT NULL,             -- Nombre del procedimiento (snapshot de template)
+  unit_price              REAL NOT NULL,             -- Precio unitario ese día (snapshot)
+  quantity                INTEGER NOT NULL,          -- Cantidad realizada
+  subtotal                REAL NOT NULL,             -- unit_price * quantity (calculado)
+  is_active               INTEGER NOT NULL DEFAULT 1, -- 1 = cuenta para presupuesto, 0 = inactivo
+
+  -- METADATA CLÍNICA (opcional)
+  tooth_number            TEXT,                      -- En qué diente se aplicó (ej: "16", "11-12")
+  procedure_notes         TEXT,                      -- Notas específicas del procedimiento
+
+  -- AUDITORÍA
+  procedure_template_id   INTEGER,                   -- Referencia a plantilla (opcional, para tracking)
+  sort_order              INTEGER DEFAULT 0,         -- Orden de visualización
   created_at              TEXT NOT NULL DEFAULT (datetime('now')),
 
-  FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE CASCADE,
+  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
   FOREIGN KEY (procedure_template_id) REFERENCES procedure_templates(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_visit_procedures_visit ON visit_procedures(visit_id);
+CREATE INDEX IF NOT EXISTS idx_session_items_session ON session_items(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_items_active ON session_items(is_active);
 
 -- =========================
 -- ATTACHMENTS (Radiografías, fotos, documentos)
 -- =========================
--- visit_id puede ser NULL: adjuntos solo del paciente (radiografía general, consentimientos)
+-- Archivos adjuntos del paciente
+-- session_id puede ser NULL (adjuntos generales no vinculados a sesión específica)
 -- =========================
 CREATE TABLE IF NOT EXISTS attachments (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   patient_id   INTEGER NOT NULL,
-  visit_id     INTEGER,                  -- NULL = adjunto general del paciente
+  session_id   INTEGER,                  -- NULL = adjunto general del paciente
   kind         TEXT,                     -- "xray", "photo", "consent_form", "document"
-  filename     TEXT NOT NULL,
-  mime_type    TEXT NOT NULL,
-  size_bytes   INTEGER NOT NULL,         -- Claridad: bytes del archivo
-  storage_key  TEXT NOT NULL,            -- p_{id}/YYYY/MM/filename
-  note         TEXT,
+  filename     TEXT NOT NULL,            -- Nombre del archivo original
+  mime_type    TEXT NOT NULL,            -- Tipo MIME (image/jpeg, application/pdf, etc.)
+  size_bytes   INTEGER NOT NULL,         -- Tamaño del archivo en bytes
+  storage_key  TEXT NOT NULL,            -- Ruta relativa: p_{id}/YYYY/MM/timestamp_filename
+  note         TEXT,                     -- Nota/descripción del adjunto
   created_at   TEXT NOT NULL DEFAULT (datetime('now')),
 
   FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
-  FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE SET NULL
+  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_attachments_patient ON attachments(patient_id);
-CREATE INDEX IF NOT EXISTS idx_attachments_visit ON attachments(visit_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_session ON attachments(session_id);
 
 -- =========================
--- PROCEDURE TEMPLATES (Catálogo de procedimientos)
+-- PROCEDURE_TEMPLATES (Catálogo global de procedimientos)
+-- =========================
+-- Plantilla reutilizable de procedimientos
+-- Los precios aquí son valores por defecto, el precio real se guarda en session_items
 -- =========================
 CREATE TABLE IF NOT EXISTS procedure_templates (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  name          TEXT NOT NULL UNIQUE,
-  default_price REAL NOT NULL DEFAULT 0,
-  active        INTEGER NOT NULL DEFAULT 1,
+  name          TEXT NOT NULL UNIQUE,    -- Nombre del procedimiento (ej: "Endodoncia")
+  default_price REAL NOT NULL DEFAULT 0, -- Precio por defecto (sugerido)
+  active        INTEGER NOT NULL DEFAULT 1, -- 1 = activo, 0 = desactivado
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -167,10 +176,12 @@ CREATE INDEX IF NOT EXISTS idx_procedure_templates_active ON procedure_templates
 -- =========================
 -- SIGNERS (Doctores/responsables que firman)
 -- =========================
+-- Catálogo de doctores que pueden firmar sesiones
+-- =========================
 CREATE TABLE IF NOT EXISTS signers (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  name       TEXT NOT NULL UNIQUE,
-  active     INTEGER NOT NULL DEFAULT 1,
+  name       TEXT NOT NULL UNIQUE,      -- Nombre completo del doctor
+  active     INTEGER NOT NULL DEFAULT 1, -- 1 = activo, 0 = desactivado
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -178,14 +189,17 @@ CREATE TABLE IF NOT EXISTS signers (
 CREATE INDEX IF NOT EXISTS idx_signers_active ON signers(active);
 
 -- =========================
--- DIAGNOSIS OPTIONS (Opciones de diagnóstico para odontograma)
+-- DIAGNOSIS_OPTIONS (Opciones para odontograma)
+-- =========================
+-- Catálogo de estados/diagnósticos de dientes
+-- Solo estados, NO tratamientos (Caries, Obturación, etc.)
 -- =========================
 CREATE TABLE IF NOT EXISTS diagnosis_options (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  label      TEXT NOT NULL UNIQUE,      -- Ej: "Caries", "Gingivitis"
-  color      TEXT NOT NULL DEFAULT 'info',
-  active     INTEGER NOT NULL DEFAULT 1,
-  sort_order INTEGER NOT NULL DEFAULT 0,
+  label      TEXT NOT NULL UNIQUE,      -- "Caries", "Obturación", "Corona", "Sano", etc.
+  color      TEXT NOT NULL DEFAULT 'info', -- Color del badge: info, danger, warning, success, secondary
+  active     INTEGER NOT NULL DEFAULT 1, -- 1 = activo, 0 = desactivado
+  sort_order INTEGER NOT NULL DEFAULT 0, -- Orden de visualización
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -194,13 +208,15 @@ CREATE INDEX IF NOT EXISTS idx_diagnosis_options_active ON diagnosis_options(act
 CREATE INDEX IF NOT EXISTS idx_diagnosis_options_sort_order ON diagnosis_options(sort_order);
 
 -- =========================
--- REASON TYPES (Motivos de consulta)
+-- REASON_TYPES (Motivos de consulta)
+-- =========================
+-- Catálogo de motivos por los que el paciente visita la clínica
 -- =========================
 CREATE TABLE IF NOT EXISTS reason_types (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  name       TEXT NOT NULL UNIQUE,      -- Ej: "Dolor", "Control", "Emergencia"
-  active     INTEGER NOT NULL DEFAULT 1,
-  sort_order INTEGER NOT NULL DEFAULT 0,
+  name       TEXT NOT NULL UNIQUE,      -- "Dolor", "Control", "Emergencia", "Abono a cuenta", etc.
+  active     INTEGER NOT NULL DEFAULT 1, -- 1 = activo, 0 = desactivado
+  sort_order INTEGER NOT NULL DEFAULT 0, -- Orden de visualización
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -209,12 +225,29 @@ CREATE INDEX IF NOT EXISTS idx_reason_types_active ON reason_types(active);
 CREATE INDEX IF NOT EXISTS idx_reason_types_sort_order ON reason_types(sort_order);
 
 -- =========================
--- USER SETTINGS (Configuración de la app)
+-- PAYMENT_METHODS (Métodos de pago)
+-- =========================
+-- Catálogo de formas de pago aceptadas
+-- =========================
+CREATE TABLE IF NOT EXISTS payment_methods (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL UNIQUE,      -- "Efectivo", "Tarjeta débito", "Transferencia", etc.
+  active     INTEGER NOT NULL DEFAULT 1, -- 1 = activo, 0 = desactivado
+  sort_order INTEGER NOT NULL DEFAULT 0, -- Orden de visualización
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_methods_active ON payment_methods(active);
+CREATE INDEX IF NOT EXISTS idx_payment_methods_sort_order ON payment_methods(sort_order);
+
+-- =========================
+-- USER_SETTINGS (Configuración de la app)
 -- =========================
 CREATE TABLE IF NOT EXISTS user_settings (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  key        TEXT NOT NULL UNIQUE,
-  value      TEXT NOT NULL,
+  key        TEXT NOT NULL UNIQUE,      -- Clave de configuración
+  value      TEXT NOT NULL,             -- Valor de configuración (JSON o texto)
   category   TEXT NOT NULL,             -- "appearance", "sync", "notification"
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -231,7 +264,7 @@ CREATE INDEX IF NOT EXISTS idx_user_settings_category ON user_settings(category)
 CREATE TABLE IF NOT EXISTS telemetry_events (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   doctor_id       TEXT NOT NULL,
-  event_type      TEXT NOT NULL,        -- "patient_created", "visit_saved", etc.
+  event_type      TEXT NOT NULL,        -- "patient_created", "session_saved", etc.
   event_data      TEXT NOT NULL,        -- JSON válido (validado en app)
   timestamp       TEXT NOT NULL DEFAULT (datetime('now')),
   sent            INTEGER DEFAULT 0,
@@ -271,7 +304,7 @@ CREATE INDEX IF NOT EXISTS idx_error_logs_flush ON error_logs(sent, timestamp);
 -- =========================
 CREATE TABLE IF NOT EXISTS sync_queue (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  table_name      TEXT NOT NULL,        -- "patients", "visits", "attachments", etc.
+  table_name      TEXT NOT NULL,        -- "patients", "sessions", "attachments", etc.
   record_id       INTEGER NOT NULL,
   operation       TEXT NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
   data            TEXT NOT NULL,        -- JSON completo del registro
@@ -301,11 +334,11 @@ BEGIN
   UPDATE patients SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_visits_updated_at
-AFTER UPDATE ON visits
+CREATE TRIGGER IF NOT EXISTS trg_sessions_updated_at
+AFTER UPDATE ON sessions
 FOR EACH ROW
 BEGIN
-  UPDATE visits SET updated_at = datetime('now') WHERE id = NEW.id;
+  UPDATE sessions SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_procedure_templates_updated_at
@@ -336,6 +369,13 @@ BEGIN
   UPDATE reason_types SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_payment_methods_updated_at
+AFTER UPDATE ON payment_methods
+FOR EACH ROW
+BEGIN
+  UPDATE payment_methods SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_user_settings_updated_at
 AFTER UPDATE ON user_settings
 FOR EACH ROW
@@ -347,7 +387,7 @@ END;
 -- DATOS INICIALES
 -- =========================
 
--- Plantillas de Procedimientos
+-- Plantillas de Procedimientos (precios en 0, se configuran después)
 INSERT OR IGNORE INTO procedure_templates (name, default_price) VALUES
   ('Curación', 0),
   ('Resinas simples', 0),
@@ -372,14 +412,17 @@ INSERT OR IGNORE INTO signers (name) VALUES
   ('Dr. Ejemplo 1'),
   ('Dra. Ejemplo 2');
 
--- Opciones de Diagnóstico
+-- Opciones de Diagnóstico (solo estados del diente, sin tratamientos)
 INSERT OR IGNORE INTO diagnosis_options (label, color, sort_order) VALUES
+  ('Sano', 'success', 0),
   ('Caries', 'danger', 1),
-  ('Gingivitis', 'warning', 2),
-  ('Fractura', 'danger', 3),
-  ('Pérdida', 'secondary', 4),
-  ('Obturación', 'success', 5),
-  ('Endodoncia', 'info', 6);
+  ('Fractura', 'danger', 2),
+  ('Sensibilidad', 'warning', 3),
+  ('Obturación', 'info', 4),
+  ('Corona', 'info', 5),
+  ('Endodoncia', 'info', 6),
+  ('Implante', 'secondary', 7),
+  ('Ausente', 'secondary', 8);
 
 -- Motivos de Consulta
 INSERT OR IGNORE INTO reason_types (name, sort_order) VALUES
@@ -387,9 +430,21 @@ INSERT OR IGNORE INTO reason_types (name, sort_order) VALUES
   ('Control', 2),
   ('Emergencia', 3),
   ('Estética', 4),
-  ('Otro', 5);
+  ('Ortodoncia', 5),
+  ('Abono a cuenta', 6),
+  ('Presupuesto', 7),
+  ('Otro', 8);
 
--- Configuración por defecto
+-- Métodos de Pago
+INSERT OR IGNORE INTO payment_methods (name, sort_order) VALUES
+  ('Efectivo', 1),
+  ('Tarjeta débito', 2),
+  ('Tarjeta crédito', 3),
+  ('Transferencia bancaria', 4),
+  ('Cheque', 5),
+  ('Otro', 6);
+
+-- Configuración por defecto (tema, fuente, etc.)
 INSERT OR IGNORE INTO user_settings (key, value, category) VALUES
   ('theme', 'dark', 'appearance'),
   ('brandHsl', '172 49% 56%', 'appearance'),
