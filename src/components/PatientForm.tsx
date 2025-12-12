@@ -1,7 +1,16 @@
 // src/components/PatientForm.tsx
 import type { Patient } from "../lib/types";
 import { Input } from "./ui/Input";
-import { User, CreditCard, Calendar, Phone, PhoneCall, Mail } from "lucide-react";
+import {
+  User,
+  CreditCard,
+  Calendar,
+  Phone,
+  PhoneCall,
+  Mail,
+  FileText,
+  AlertTriangle,
+} from "lucide-react";
 import { Textarea } from "./ui/Textarea";
 import { DatePicker } from "./ui/DatePicker";
 import React, { memo } from "react";
@@ -12,7 +21,11 @@ type Props = {
   errors?: Partial<Record<keyof Patient, string>>;
 };
 
-const PatientForm = memo(function PatientForm({ value, onChange, errors }: Props) {
+const PatientForm = memo(function PatientForm({
+  value,
+  onChange,
+  errors,
+}: Props) {
   const set = <K extends keyof Patient>(k: K, v: Patient[K]) =>
     onChange({ ...value, [k]: v });
 
@@ -23,7 +36,10 @@ const PatientForm = memo(function PatientForm({ value, onChange, errors }: Props
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
       age--;
     }
     return age >= 0 ? age : null;
@@ -82,151 +98,17 @@ const PatientForm = memo(function PatientForm({ value, onChange, errors }: Props
     return parts;
   };
 
-  const hasAllergy = Boolean(value.allergyDetail?.trim());
+  const hasAllergy = Boolean(value.allergy_detail?.trim());
 
   return (
-    <div className="space-y-4">
-      {/* Fila 1: Nombre y Cédula */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Input
-          label="Nombre completo"
-          required
-          value={value.full_name}
-          placeholder="Ej: García Pérez Juan Carlos"
-          onChange={(e) => set("full_name", e.target.value)}
-          error={!!errors?.full_name}
-          helperText={errors?.full_name}
-          icon={
-            <User size={16} className="text-[hsl(var(--muted-foreground))]" />
-          }
-        />
-
-        <Input
-          label="Cédula de identidad"
-          required
-          value={value.doc_id || ""}
-          placeholder="Ej: 1234567890"
-          onChange={(e) => set("doc_id", e.target.value)}
-          error={!!errors?.doc_id}
-          helperText={errors?.doc_id}
-          maxLength={10}
-          icon={
-            <CreditCard
-              size={16}
-              className="text-[hsl(var(--muted-foreground))]"
-            />
-          }
-        />
-      </div>
-
-      {/* Fila 2: Fecha de nacimiento y Teléfono */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--foreground))] mb-2">
-            <Calendar size={16} className="text-[hsl(var(--muted-foreground))]" />
-            Fecha de nacimiento
-            <span className="text-red-500">*</span>
-          </label>
-          <DatePicker
-            mode="birthdate"
-            value={value.date_of_birth || ""}
-            onChange={(date) => set("date_of_birth", date)}
-            placeholder="Selecciona fecha de nacimiento"
-            className="w-full"
-          />
-          {errors?.date_of_birth && (
-            <p className="text-xs text-red-600 mt-1">{errors.date_of_birth}</p>
-          )}
-          {!errors?.date_of_birth && age !== null && (
-            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-              {age} año{age !== 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-
-        <Input
-          label="Teléfono de contacto"
-          required
-          type="tel"
-          value={value.phone || ""}
-          placeholder="Ej: 0991234567"
-          onChange={(e) => set("phone", e.target.value)}
-          error={!!errors?.phone}
-          helperText={errors?.phone || "Celular o convencional"}
-          maxLength={10}
-          icon={
-            <Phone size={16} className="text-[hsl(var(--muted-foreground))]" />
-          }
-        />
-      </div>
-
-      {/* Fila 3: Email y Teléfono de emergencia */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Input
-          label="Correo electrónico"
-          type="email"
-          value={value.email || ""}
-          placeholder="Ej: paciente@ejemplo.com"
-          onChange={(e) => set("email", e.target.value)}
-          error={!!errors?.email}
-          helperText={errors?.email || "Opcional"}
-          icon={
-            <Mail size={16} className="text-[hsl(var(--muted-foreground))]" />
-          }
-        />
-
-        <Input
-          label="Teléfono de emergencia"
-          type="tel"
-          value={value.emergency_phone || ""}
-          placeholder="Ej: 0991234567"
-          onChange={(e) => set("emergency_phone", e.target.value)}
-          helperText={errors?.emergency_phone || "Contacto en caso de emergencia"}
-          maxLength={10}
-          icon={
-            <PhoneCall
-              size={16}
-              className="text-[hsl(var(--muted-foreground))]"
-            />
-          }
-        />
-      </div>
-
-      {/* Fila 4: Anamnesis y Alergias */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Textarea
-          label="Anamnesis"
-          value={value.anamnesis || ""}
-          placeholder="Ej: Paciente refiere dolor en el diente 12"
-          onChange={(e) => set("anamnesis", e.target.value)}
-          error={!!errors?.anamnesis}
-          helperText={errors?.anamnesis}
-        />
-        <div className="relative">
-          <Textarea
-            label="Detalles de alergias y novedades"
-            value={value.allergyDetail || ""}
-            placeholder="Ej: Paciente es alérgico a la penicilina"
-            onChange={(e) => set("allergyDetail", e.target.value)}
-            error={!!errors?.allergyDetail}
-            helperText={errors?.allergyDetail}
-          />
-          {hasAllergy && (
-            <>
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full animate-ping" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full animate-glow" />
-            </>
-          )}
-        </div>
-      </div>
-
+    <>
       {/* Información adicional */}
       {(value.full_name || value.doc_id) && (
         <div
           className={[
-            "mt-4 p-4 rounded-lg border-2 relative ",
+            "mt-4 p-4 rounded-lg border-2 relative mb-10",
             hasAllergy
-              ? "border-red-500 bg-red-50 dark:bg-red-950/20 animate-pulseAlert shadow-lg"
+              ? "badge-danger animate-pulseAlert shadow-lg"
               : "border-[hsl(var(--border))] bg-[hsl(var(--muted))]",
           ].join(" ")}
         >
@@ -234,18 +116,18 @@ const PatientForm = memo(function PatientForm({ value, onChange, errors }: Props
           {hasAllergy && (
             <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2  cursor-auto">
               <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
-              ¡ALERTA!
+              ¡ALERTA! Novedad Encontrada
             </div>
           )}
-          <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-full bg-[hsl(var(--brand))] flex items-center justify-center text-white font-bold text-lg shrink-0">
+          <div className="flex items-start gap-6 py-4">
+            <div className="w-20 h-20 rounded-full bg-[hsl(var(--brand)/0.3)] flex items-center justify-center text-white font-bold text-3xl shrink-0 ms-4 mt-4 border-2 border-[hsl(var(--brand))]">
               {value.full_name?.charAt(0)?.toUpperCase() || "?"}
             </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-[hsl(var(--foreground))] truncate">
-                {value.full_name || "Sin nombre"}
+            <div className="flex-1 min-w-0 ">
+              <h4 className="mb-2 font-semibold text-[hsl(var(--foreground))] truncate">
+                {value.full_name.toUpperCase() || "Sin nombre"}
               </h4>
-              <div className="flex flex-wrap gap-3 mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              <div className="flex flex-wrap gap-4 mt-1 text-sm text-[hsl(var(--muted-foreground))]">
                 {value.doc_id && (
                   <span className="flex items-center gap-1">
                     <CreditCard size={12} />
@@ -276,30 +158,191 @@ const PatientForm = memo(function PatientForm({ value, onChange, errors }: Props
                     {value.emergency_phone}
                   </span>
                 )}
-                {hasAllergy && (
-                  <span className="flex items-center gap-1 font-semibold text-red-700">
-                    <span className="inline-block w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-                    Novedad Encontrada
-                  </span>
-                )}
               </div>
 
-              {/* Bloque de detalle de alergias también aquí (opcional) */}
-              {hasAllergy && (
-                <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/5 border border-red-200 dark:border-red-500/30">
-                  <div className="text-xs font-semibold text-red-700 mb-1">
-                    Detalle:
+              <div className="grid gap-2 md:grid-flow-col md:auto-cols-fr">
+                {value.anamnesis && (
+                  <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/6 ">
+                    <div className="text-sm font-semibold mb-1">Anamnesis:</div>
+                    <div className="text-md leading-relaxed text-[hsl(var(--foreground))]">
+                      {value.anamnesis}
+                    </div>
                   </div>
-                  <div className="text-sm leading-relaxed text-[hsl(var(--foreground))]">
-                    {highlightAllergy(value.allergyDetail!)}
+                )}
+
+                {hasAllergy && (
+                  <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/6 border border-red-200 dark:border-red-500/30">
+                    <div className="text-sm font-semibold text-red-700 mb-1">
+                      Detalle:
+                    </div>
+                    <div className="text-md leading-relaxed text-[hsl(var(--foreground))]">
+                      {highlightAllergy(value.allergy_detail!)}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+
+      <div className="space-y-4">
+        {/* 1. Nombre completo - Cédula */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Input
+            label="Nombre completo"
+            required
+            value={value.full_name}
+            placeholder="Ej: García Pérez Juan Carlos"
+            onChange={(e) => set("full_name", e.target.value)}
+            error={!!errors?.full_name}
+            helperText={errors?.full_name}
+            icon={
+              <User size={16} className="text-[hsl(var(--muted-foreground))]" />
+            }
+          />
+
+          <Input
+            label="Cédula de identidad"
+            required
+            value={value.doc_id || ""}
+            placeholder="Ej: 1234567890"
+            onChange={(e) => set("doc_id", e.target.value)}
+            error={!!errors?.doc_id}
+            helperText={errors?.doc_id}
+            maxLength={10}
+            icon={
+              <CreditCard
+                size={16}
+                className="text-[hsl(var(--muted-foreground))]"
+              />
+            }
+          />
+        </div>
+
+        {/* 2. Fecha de nacimiento - Teléfono de contacto */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--foreground))] mb-2.5">
+              <Calendar
+                size={16}
+                className="text-[hsl(var(--muted-foreground))] "
+              />
+              Fecha de nacimiento
+              <span className="text-red-500">*</span>
+            </label>
+            <DatePicker
+              mode="birthdate"
+              value={value.date_of_birth || ""}
+              onChange={(date) => set("date_of_birth", date)}
+              placeholder="Selecciona fecha de nacimiento"
+              className="w-full"
+            />
+            {errors?.date_of_birth && (
+              <p className="text-xs text-red-600 mt-1">
+                {errors.date_of_birth}
+              </p>
+            )}
+            {!errors?.date_of_birth && age !== null && (
+              <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                {age} año{age !== 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+
+          <Input
+            label="Teléfono de contacto"
+            required
+            type="tel"
+            value={value.phone || ""}
+            placeholder="Ej: 0991234567"
+            onChange={(e) => set("phone", e.target.value)}
+            error={!!errors?.phone}
+            helperText={errors?.phone || "Celular o convencional"}
+            maxLength={10}
+            icon={
+              <Phone
+                size={16}
+                className="text-[hsl(var(--muted-foreground))]"
+              />
+            }
+          />
+        </div>
+
+        {/* 3. Correo electrónico - Anamnesis */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Input
+            label="Correo electrónico"
+            type="email"
+            value={value.email || ""}
+            placeholder="Ej: paciente@ejemplo.com"
+            onChange={(e) => set("email", e.target.value)}
+            error={!!errors?.email}
+            helperText={errors?.email || "Opcional"}
+            icon={
+              <Mail size={16} className="text-[hsl(var(--muted-foreground))]" />
+            }
+          />
+
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--foreground))] mb-2.5">
+              <FileText
+                size={16}
+                className="text-[hsl(var(--muted-foreground))]"
+              />
+              Anamnesis
+            </label>
+            <Textarea
+              value={value.anamnesis || ""}
+              placeholder="Ej: Paciente refiere dolor en el diente 12"
+              onChange={(e) => set("anamnesis", e.target.value)}
+              error={!!errors?.anamnesis}
+              helperText={errors?.anamnesis}
+            />
+          </div>
+        </div>
+
+        {/* 4. Detalles de alergias y novedades (full width) */}
+        <div className="relative space-y-1">
+          <label className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--foreground))] mb-2.5">
+            <AlertTriangle
+              size={16}
+              className="text-[hsl(var(--muted-foreground))]"
+            />
+            Detalles de alergias y novedades
+          </label>
+          <Textarea
+            value={value.allergy_detail || ""}
+            placeholder="Ej: Paciente es alérgico a la penicilina"
+            onChange={(e) => set("allergy_detail", e.target.value)}
+            error={!!errors?.allergy_detail}
+            helperText={errors?.allergy_detail}
+          />
+        </div>
+
+        {/* 5. Teléfono de emergencia: solo si hay alergias/novedades */}
+        {hasAllergy && (
+          <Input
+            label="Teléfono de emergencia"
+            type="tel"
+            value={value.emergency_phone || ""}
+            placeholder="Ej: 0991234567"
+            onChange={(e) => set("emergency_phone", e.target.value)}
+            helperText={
+              errors?.emergency_phone ||
+              "Contacto en caso de emergencia relacionado con las alergias/novedades registradas"
+            }
+            maxLength={10}
+            icon={
+              <PhoneCall
+                size={16}
+                className="text-[hsl(var(--muted-foreground))]"
+              />
+            }
+          />
+        )}
+      </div>
+    </>
   );
 });
 

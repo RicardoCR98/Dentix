@@ -1,4 +1,7 @@
 // src/components/VisitHistoryDrawer.tsx
+// Componente para mostrar el historial de visitas de un paciente
+// No se usará por el momento
+// En un futuro se puede usar para mostrar el historial de visitas de un paciente
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   X,
@@ -55,7 +58,7 @@ export default function VisitHistoryDrawer({
 
   const totalPages = useMemo(
     () => (total === 0 ? 1 : Math.max(1, Math.ceil(total / pageSize))),
-    [total, pageSize]
+    [total, pageSize],
   );
 
   const canPrev = page > 1;
@@ -66,11 +69,11 @@ export default function VisitHistoryDrawer({
     setLoading(true);
     try {
       const repo = await getRepository();
-      const { rows, total: t, page: p } = await repo.getVisitsByPatientPaged(
-        patientId,
-        page,
-        pageSize
-      );
+      const {
+        rows,
+        total: t,
+        page: p,
+      } = await repo.getVisitsByPatientPaged(patientId, page, pageSize);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setVisits(rows as any);
       setTotal(t);
@@ -92,7 +95,11 @@ export default function VisitHistoryDrawer({
 
   const onDelete = useCallback(
     async (visitId: number) => {
-      if (!confirm("¿Eliminar esta visita y todo su contenido? Esta acción no se puede deshacer.")) {
+      if (
+        !confirm(
+          "¿Eliminar esta visita y todo su contenido? Esta acción no se puede deshacer.",
+        )
+      ) {
         return;
       }
       const repo = await getRepository();
@@ -105,7 +112,7 @@ export default function VisitHistoryDrawer({
         void reload();
       }
     },
-    [page, visits.length, reload]
+    [page, visits.length, reload],
   );
 
   // Rangos mostrados
@@ -118,7 +125,9 @@ export default function VisitHistoryDrawer({
       <div
         className={cn(
           "fixed inset-0 bg-black/30 transition-opacity z-40",
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          open
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none",
         )}
         onClick={() => onOpenChange(false)}
       />
@@ -126,7 +135,7 @@ export default function VisitHistoryDrawer({
       <div
         className={cn(
           "fixed top-0 right-0 h-full w-full sm:w-[560px] bg-[hsl(var(--background))] shadow-2xl z-50 transition-transform",
-          open ? "translate-x-0" : "translate-x-full"
+          open ? "translate-x-0" : "translate-x-full",
         )}
       >
         <div className="flex items-center justify-between p-4 border-b">
@@ -143,16 +152,24 @@ export default function VisitHistoryDrawer({
 
         <div className="p-4 space-y-3 h-[calc(100%-116px)] overflow-y-auto">
           {!patientId ? (
-            <Alert variant="warning">Busca y selecciona un paciente para ver su histórico.</Alert>
+            <Alert variant="warning">
+              Busca y selecciona un paciente para ver su histórico.
+            </Alert>
           ) : loading ? (
             <Alert variant="info">Cargando visitas…</Alert>
           ) : total === 0 ? (
-            <Alert variant="info">Este paciente no tiene visitas registradas.</Alert>
+            <Alert variant="info">
+              Este paciente no tiene visitas registradas.
+            </Alert>
           ) : (
             visits.map((v) => {
-              const reason = (v.reasonType as string) ?? v.reason_type ?? "—";
-              const det = (v.reasonDetail as string) ?? (v.reason_detail as string) ?? "";
-              const diag = (v.full_dx_text as string) ?? (v.diagnosis as string) ?? "";
+              const reason = (v.reason_type as string) ?? v.reason_type ?? "—";
+              const det =
+                (v.reason_detail as string) ??
+                (v.reason_detail as string) ??
+                "";
+              const diag =
+                (v.full_dx_text as string) ?? (v.diagnosis as string) ?? "";
               return (
                 <div key={v.id} className="card p-3">
                   <div className="flex items-center justify-between gap-3">
@@ -162,10 +179,17 @@ export default function VisitHistoryDrawer({
                         <span className="font-semibold">{v.date}</span>
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-sm">
-                        <Stethoscope size={14} className="text-[hsl(var(--brand))]" />
+                        <Stethoscope
+                          size={14}
+                          className="text-[hsl(var(--brand))]"
+                        />
                         <span className="truncate">
                           <b>{reason}</b>{" "}
-                          {det ? <span className="text-[hsl(var(--muted-foreground))]">· {det}</span> : null}
+                          {det ? (
+                            <span className="text-[hsl(var(--muted-foreground))]">
+                              · {det}
+                            </span>
+                          ) : null}
                         </span>
                       </div>
                       {diag ? (
@@ -216,9 +240,11 @@ export default function VisitHistoryDrawer({
               <div className="flex items-start gap-2 text-xs">
                 <Copy size={14} className="mt-0.5" />
                 <div>
-                  <b>Tips:</b> “Ver visita” carga <u>solo lectura</u> (incluye sesiones y adjuntos).
-                  “Odontograma” crea una nueva visita hoy con ese odontograma. Eliminar borra la visita,
-                  sus sesiones e items y los metadatos de adjuntos (los archivos en disco no se tocan).
+                  <b>Tips:</b> “Ver visita” carga <u>solo lectura</u> (incluye
+                  sesiones y adjuntos). “Odontograma” crea una nueva visita hoy
+                  con ese odontograma. Eliminar borra la visita, sus sesiones e
+                  items y los metadatos de adjuntos (los archivos en disco no se
+                  tocan).
                 </div>
               </div>
             </Alert>
@@ -228,7 +254,9 @@ export default function VisitHistoryDrawer({
         {/* Paginador */}
         <div className="border-t p-3 flex items-center justify-between">
           <div className="text-sm text-[hsl(var(--muted-foreground))]">
-            {total === 0 ? "Sin resultados" : `Mostrando ${rangeFrom}–${rangeTo} de ${total}`}
+            {total === 0
+              ? "Sin resultados"
+              : `Mostrando ${rangeFrom}–${rangeTo} de ${total}`}
           </div>
           <div className="flex items-center gap-2">
             <Button

@@ -1,5 +1,13 @@
 import { useMemo, useState, useEffect, memo } from "react";
-import { Upload, File, Image, FileText, X, Paperclip, ExternalLink } from "lucide-react";
+import {
+  Upload,
+  File,
+  Image,
+  FileText,
+  X,
+  Paperclip,
+  ExternalLink,
+} from "lucide-react";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
 import { Alert } from "./ui/Alert";
@@ -44,7 +52,20 @@ const formatFilePath = (storage_key: string, patientName?: string): string => {
 
   const year = parts[1];
   const month = parts[2];
-  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const monthNames = [
+    "Ene",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dic",
+  ];
   const monthName = monthNames[parseInt(month) - 1] || month;
 
   if (patientName) {
@@ -53,7 +74,13 @@ const formatFilePath = (storage_key: string, patientName?: string): string => {
   return `${year} › ${monthName}`;
 };
 
-const Attachments = memo(function Attachments({ files, onFilesChange, onFileDelete, patientName, readOnly }: Props) {
+const Attachments = memo(function Attachments({
+  files,
+  onFilesChange,
+  onFileDelete,
+  patientName,
+  readOnly,
+}: Props) {
   const [dragActive, setDragActive] = useState(false);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -95,7 +122,7 @@ const Attachments = memo(function Attachments({ files, onFilesChange, onFileDele
   const removeFile = async (id: string) => {
     if (readOnly) return;
 
-    const fileToRemove = files.find(f => f.id === id);
+    const fileToRemove = files.find((f) => f.id === id);
     if (!fileToRemove) return;
 
     // Si tiene callback de eliminación y db_id, eliminar de la DB primero
@@ -135,8 +162,11 @@ const Attachments = memo(function Attachments({ files, onFilesChange, onFileDele
     const fileName = file.name || "Archivo";
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const filePath = useMemo(
-      () => isSaved && file.storage_key ? formatFilePath(file.storage_key, patientName) : null,
-      [isSaved, file.storage_key, patientName]
+      () =>
+        isSaved && file.storage_key
+          ? formatFilePath(file.storage_key, patientName)
+          : null,
+      [isSaved, file.storage_key, patientName],
     );
 
     // Cargar URL de imagen para archivos guardados
@@ -144,7 +174,9 @@ const Attachments = memo(function Attachments({ files, onFilesChange, onFileDele
       if (isSaved && isImage && file.storage_key) {
         (async () => {
           try {
-            const fullPath = await resolveAttachmentPath(file.storage_key);
+            const fullPath = await resolveAttachmentPath(
+              file.storage_key || "",
+            );
             // Usar convertFileSrc de Tauri para convertir ruta a URL
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const isTauri = typeof (window as any).__TAURI__ !== "undefined";
@@ -186,7 +218,7 @@ const Attachments = memo(function Attachments({ files, onFilesChange, onFileDele
           <div className="w-16 h-16 rounded-lg bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0 overflow-hidden">
             {isImage ? (
               <img
-                src={isNew ? file.url : (imageUrl || "")}
+                src={isNew ? file.url : imageUrl || ""}
                 alt={fileName}
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -294,7 +326,12 @@ const Attachments = memo(function Attachments({ files, onFilesChange, onFileDele
       {patientName && (
         <div className="text-xs text-[hsl(var(--muted-foreground))] flex items-center gap-2 px-1">
           <span>📁</span>
-          <span>Archivos de: <strong className="text-[hsl(var(--foreground))]">{patientName}</strong></span>
+          <span>
+            Archivos de:{" "}
+            <strong className="text-[hsl(var(--foreground))]">
+              {patientName}
+            </strong>
+          </span>
         </div>
       )}
 

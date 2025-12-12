@@ -44,7 +44,7 @@ const DiagnosisArea = memo(function DiagnosisArea({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Diagnóstico detallado..."
-        className="min-h-[120px] font-mono text-sm"
+        className="min-h-[150px] font-mono text-sm "
         rows={6}
       />
 

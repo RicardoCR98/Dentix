@@ -38,6 +38,30 @@ export default {
         lg: "calc(var(--font-size-base) * 1.125)",
         xl: "calc(var(--font-size-base) * 1.25)",
       },
+      animation: {
+        fadeIn: "fadeIn 200ms ease-out",
+        fadeOut: "fadeOut 200ms ease-out",
+        scaleIn: "scaleIn 200ms ease-out",
+        scaleOut: "scaleOut 200ms ease-out",
+      },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        fadeOut: {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
+        },
+        scaleIn: {
+          from: { opacity: "0", transform: "scale(0.96)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        scaleOut: {
+          from: { opacity: "1", transform: "scale(1)" },
+          to: { opacity: "0", transform: "scale(0.96)" },
+        },
+      },
     },
   },
   plugins: [],

@@ -35,11 +35,11 @@ const TabsTrigger = React.forwardRef<
       // Estado normal
       "hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]",
       // Estado activo
-      "data-[state=active]:text-[hsl(var(--primary))]",
-      "data-[state=active]:bg-[hsl(var(--muted)/0.5)]",
+      "data-[state=active]:text-[hsl(var(--brand))]",
+      "data-[state=active]:bg-[hsl(var(--brand)/0.1)]",
       // Línea indicadora
       "before:absolute before:bottom-0 before:left-0 before:right-0",
-      "before:h-1 before:bg-[hsl(var(--primary))]",
+      "before:h-1 before:bg-[hsl(var(--brand))]",
       "before:scale-x-0 before:origin-left before:transition-transform before:duration-300",
       "data-[state=active]:before:scale-x-100",
       // Focus visible

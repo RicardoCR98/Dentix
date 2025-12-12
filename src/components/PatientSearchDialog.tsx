@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "./ui/Dialog";
 import { Input } from "./ui/Input";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
-import { Search, User, Phone, Hash, Calendar, FileText } from "lucide-react";
+import { Search, User, Phone, Hash, FileText } from "lucide-react";
 import { cn } from "../lib/cn";
 import type { Patient } from "../lib/types";
 
@@ -44,8 +44,7 @@ export default function PatientSearchDialog({
       (p) =>
         p.full_name?.toLowerCase().includes(term) ||
         p.doc_id?.toLowerCase().includes(term) ||
-        p.phone?.toLowerCase().includes(term) ||
-        String(p.age)?.includes(term)
+        p.phone?.toLowerCase().includes(term),
     );
   }, [patients, hasTyped, searchTerm]);
 
@@ -69,7 +68,7 @@ export default function PatientSearchDialog({
           setSearchTerm("");
         }
       }}
-      size="xl"
+      size="3xl"
     >
       <DialogContent>
         {/* Barra de búsqueda con efecto spotlight */}
@@ -101,7 +100,8 @@ export default function PatientSearchDialog({
                 Busca a alguien
               </p>
               <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
-                Escribe un nombre, cédula, edad o teléfono para ver resultados...
+                Escribe un nombre, cédula, edad o teléfono para ver
+                resultados...
               </p>
             </div>
           ) : limitedPatients.length === 0 ? (
@@ -143,7 +143,7 @@ export default function PatientSearchDialog({
                     "border border-[hsl(var(--border))] bg-[hsl(var(--card))]",
                     "hover:bg-[hsl(var(--muted))]/50 active:scale-[0.995]",
                     "transition-colors duration-150",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand))]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--surface))]"
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand))]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--surface))]",
                   )}
                 >
                   <div className="flex items-start justify-between gap-4 px-4 py-3">
@@ -165,12 +165,6 @@ export default function PatientSearchDialog({
                           <div className="inline-flex items-center gap-1.5 min-w-0">
                             <Hash size={14} className="opacity-70" />
                             <span className="truncate">{patient.doc_id}</span>
-                          </div>
-                        )}
-                        {typeof patient.age === "number" && (
-                          <div className="inline-flex items-center gap-1.5">
-                            <Calendar size={14} className="opacity-70" />
-                            <span>{patient.age} años</span>
                           </div>
                         )}
                         {patient.phone && (

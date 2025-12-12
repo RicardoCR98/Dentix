@@ -8,6 +8,7 @@ import {
   type FontName,
 } from "../theme/presets";
 import { useTheme } from "../theme/ThemeProvider";
+import { useAppStore } from "../stores";
 import { Button } from "./ui/Button";
 import { Label } from "./ui/Label";
 import { Divider } from "./ui/Divider";
@@ -24,7 +25,11 @@ import {
   Moon,
   Settings,
   RotateCcw,
+  Layout,
+  Columns,
 } from "lucide-react";
+
+type LayoutMode = "tabs" | "vertical";
 
 const themeIcons: Record<ThemeName, React.ReactNode> = {
   light: <Sun size={16} />,
@@ -42,8 +47,23 @@ type ThemePanelProps = {
 };
 
 export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
-  const { theme, setTheme, brandHsl, setBrand, font, setFont, size, setSize, saveSettings, resetToDefaults } =
-    useTheme();
+  const {
+    theme,
+    setTheme,
+    brandHsl,
+    setBrand,
+    font,
+    setFont,
+    size,
+    setSize,
+    saveSettings,
+    resetToDefaults,
+  } = useTheme();
+
+  // Layout mode from store (persisted to database)
+  const layoutMode = useAppStore((state) => state.layoutMode);
+  const setLayoutMode = useAppStore((state) => state.setLayoutMode);
+
   const [open, setOpen] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,6 +89,12 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
     setUnsavedChanges(true);
   };
 
+  const handleLayoutModeChange = async (newMode: LayoutMode) => {
+    // Store's setLayoutMode automatically persists to database
+    await setLayoutMode(newMode);
+    // No need to mark as unsaved since it saves immediately to DB
+  };
+
   // Guardar al cerrar el panel
   const handleOpenChange = async (isOpen: boolean) => {
     // Si se está cerrando el panel Y hay cambios sin guardar
@@ -89,12 +115,17 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
   };
 
   const handleReset = async () => {
-    if (confirm("¿Restaurar la configuración a los valores por defecto?\n\nTema: Oscuro\nColor: Verde Menta (#5CC5B5)\nTipografía: Inter\nTamaño: 16px")) {
+    if (
+      confirm(
+        "¿Restaurar la configuración a los valores por defecto?\n\nTema: Oscuro\nColor: Verde Menta (#5CC5B5)\nTipografía: Inter\nTamaño: 16px",
+      )
+    ) {
       try {
         await resetToDefaults();
         setUnsavedChanges(false);
       } catch (error) {
-        alert("Error al restaurar la configuración");
+        console.error("Error restaurando configuración:", error);
+        alert("Error al restaurar la configuración. Los cambios se perderán.");
       }
     }
   };
@@ -103,11 +134,12 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Trigger asChild>
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
           className={cn(!inlineTrigger && "fixed right-4 top-4 z-50 shadow-lg")}
         >
           <Settings size={18} />
+          Personalización
         </Button>
       </Dialog.Trigger>
 
@@ -416,6 +448,113 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
                 El texto se verá así en toda la aplicación
               </p>
             </div>
+          </div>
+
+          <Divider />
+
+          {/* Layout Mode */}
+          <div className="mb-6">
+            <Label className="flex items-center gap-2 mb-3">
+              <Layout size={16} className="text-[hsl(var(--brand))]" />
+              Diseño de la página de pacientes
+            </Label>
+            <div className="grid grid-cols-1 gap-2">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleLayoutModeChange("vertical")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleLayoutModeChange("vertical");
+                  }
+                }}
+                className={cn(
+                  "relative rounded-lg p-4 h-auto text-left cursor-pointer",
+                  "border-2 hover:shadow-md w-full transition-all",
+                  "bg-[hsl(var(--surface))] hover:bg-[hsl(var(--muted))]",
+                  layoutMode === "vertical"
+                    ? "border-[hsl(var(--brand))] bg-[color-mix(in_oklab,hsl(var(--brand))_8%,transparent)]"
+                    : "border-[hsl(var(--border))] hover:border-[hsl(var(--brand))]",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "w-10 h-10 rounded-md flex items-center justify-center",
+                        layoutMode === "vertical"
+                          ? "bg-[hsl(var(--brand))] text-white"
+                          : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
+                      )}
+                    >
+                      <Layout size={18} />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Diseño Vertical</div>
+                      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                        Scroll vertical tradicional con todas las secciones
+                      </div>
+                    </div>
+                  </div>
+                  {layoutMode === "vertical" && (
+                    <div className="w-6 h-6 rounded-full bg-[hsl(var(--brand))] flex items-center justify-center text-white">
+                      <Check size={14} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleLayoutModeChange("tabs")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleLayoutModeChange("tabs");
+                  }
+                }}
+                className={cn(
+                  "relative rounded-lg p-4 h-auto text-left cursor-pointer",
+                  "border-2 hover:shadow-md w-full transition-all",
+                  "bg-[hsl(var(--surface))] hover:bg-[hsl(var(--muted))]",
+                  layoutMode === "tabs"
+                    ? "border-[hsl(var(--brand))] bg-[color-mix(in_oklab,hsl(var(--brand))_8%,transparent)]"
+                    : "border-[hsl(var(--border))] hover:border-[hsl(var(--brand))]",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "w-10 h-10 rounded-md flex items-center justify-center",
+                        layoutMode === "tabs"
+                          ? "bg-[hsl(var(--brand))] text-white"
+                          : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
+                      )}
+                    >
+                      <Columns size={18} />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Diseño con Pestañas</div>
+                      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                        Navegación por tabs, ideal para pantallas pequeñas
+                      </div>
+                    </div>
+                  </div>
+                  {layoutMode === "tabs" && (
+                    <div className="w-6 h-6 rounded-full bg-[hsl(var(--brand))] flex items-center justify-center text-white">
+                      <Check size={14} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2 flex items-start gap-2">
+              <span className="inline-block w-1 h-1 rounded-full bg-[hsl(var(--brand))] mt-1.5" />
+              Cambia entre diseño vertical clásico o navegación por pestañas
+            </p>
           </div>
 
           {/* Footer con información */}

@@ -1,4 +1,4 @@
-// src/components/ui/Dialog.tsx
+// src/components/ui/Dialog.ts
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "../../lib/cn";
@@ -9,7 +9,7 @@ interface DialogProps {
   children: React.ReactNode;
   title?: string;
   description?: string;
-  size?: "sm" | "md" | "lg" | "xl" | "4xl" | "full";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "full";
   spotlight?: boolean;
 }
 
@@ -47,6 +47,8 @@ export function Dialog({
     md: "max-w-md",
     lg: "max-w-lg",
     xl: "max-w-xl",
+    "2xl": "max-w-2xl",
+    "3xl": "max-w-3xl",
     "4xl": "max-w-4xl",
     full: "max-w-7xl",
   };

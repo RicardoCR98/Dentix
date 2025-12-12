@@ -1,5 +1,5 @@
 // src/components/Section.tsx
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { cn } from '../lib/cn';
 
 interface SectionProps {
@@ -10,15 +10,15 @@ interface SectionProps {
   className?: string;
 }
 
-export default function Section({ 
-  title, 
+const Section = forwardRef<HTMLElement, SectionProps>(({
+  title,
   icon,
-  right, 
-  children, 
-  className 
-}: SectionProps) {
+  right,
+  children,
+  className
+}, ref) => {
   return (
-    <section className={cn('mb-8', className)}>
+    <section ref={ref} className={cn('mb-8', className)}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -44,4 +44,8 @@ export default function Section({
       </div>
     </section>
   );
-}
+});
+
+Section.displayName = 'Section';
+
+export default Section;

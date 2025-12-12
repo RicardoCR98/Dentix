@@ -12,43 +12,48 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "../lib/cn";
-import type { Patient } from "../lib/types";
-
-export type ProcItem = { name: string; unit: number; qty: number; sub: number };
-export type SessionRow = {
-  id?: string;
-  date: string;
-  items: ProcItem[];
-  auto: boolean;
-  budget: number;
-  payment: number;
-  balance: number;
-  signer?: string;
-};
-
-interface PatientWithDebt {
-  patient: Patient;
-  totalDebt: number;
-  lastSessionDate: string;
-  isOverdue: boolean;
-  daysOverdue: number;
-}
+import type { Patient, PatientDebtSummary } from "../lib/types";
+import { getRepository } from "../lib/storage/TauriSqliteRepository";
 
 interface PendingPaymentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  patients: Patient[];
-  patientSessions: Record<number, SessionRow[]>;
   onSelectPatient: (patient: Patient) => void;
 }
 
 export default function PendingPaymentsDialog({
   open,
   onOpenChange,
-  patients,
-  patientSessions,
   onSelectPatient,
 }: PendingPaymentsDialogProps) {
+  // ========================================
+  // FASE 2: Load data from optimized backend command
+  // ========================================
+  const [patientsWithDebt, setPatientsWithDebt] = useState<
+    PatientDebtSummary[]
+  >([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load data when dialog opens
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const repo = await getRepository();
+        const summary = await repo.getPendingPaymentsSummary();
+        setPatientsWithDebt(summary);
+      } catch (e) {
+        console.error("Error cargando cartera:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [open]);
+
   // inputValue: lo que escribe el usuario
   const [inputValue, setInputValue] = useState("");
   // searchTerm: valor con debounce (se usa para filtrar)
@@ -62,63 +67,15 @@ export default function PendingPaymentsDialog({
 
   const hasTyped = searchTerm.length > 0;
 
-  const patientsWithDebt = useMemo(() => {
-    const result: PatientWithDebt[] = [];
-
-    patients.forEach((patient) => {
-      if (!patient.id) return;
-
-      const sessions = patientSessions[patient.id] || [];
-      const totalDebt = sessions.reduce((sum, s) => sum + s.balance, 0);
-
-      if (totalDebt > 0) {
-        const sessionsWithBalance = sessions
-          .filter((s) => s.balance > 0)
-          .sort(
-            (a, b) =>
-              new Date(b.date).getTime() - new Date(a.date).getTime()
-          );
-
-        const lastSession = sessionsWithBalance[0];
-        const lastDate =
-          lastSession?.date || sessions[sessions.length - 1]?.date || "";
-
-        const daysDiff = lastDate
-          ? Math.floor(
-              (Date.now() - new Date(lastDate).getTime()) /
-                (1000 * 60 * 60 * 24)
-            )
-          : 0;
-
-        const isOverdue = daysDiff > 90;
-
-        result.push({
-          patient,
-          totalDebt,
-          lastSessionDate: lastDate,
-          isOverdue,
-          daysOverdue: daysDiff,
-        });
-      }
-    });
-
-    // Orden: primero en mora, luego mayor deuda
-    return result.sort((a, b) => {
-      if (a.isOverdue && !b.isOverdue) return -1;
-      if (!a.isOverdue && b.isOverdue) return 1;
-      return b.totalDebt - a.totalDebt;
-    });
-  }, [patients, patientSessions]);
-
   // Filtro con debounce (solo si se escribió)
   const filteredPatients = useMemo(() => {
     if (!hasTyped) return [];
     const term = searchTerm.toLowerCase();
     return patientsWithDebt.filter(
       (p) =>
-        p.patient.full_name?.toLowerCase().includes(term) ||
-        p.patient.phone?.toLowerCase().includes(term) ||
-        p.patient.doc_id?.toLowerCase().includes(term)
+        p.full_name?.toLowerCase().includes(term) ||
+        p.phone?.toLowerCase().includes(term) ||
+        p.doc_id?.toLowerCase().includes(term)
     );
   }, [patientsWithDebt, hasTyped, searchTerm]);
 
@@ -128,14 +85,26 @@ export default function PendingPaymentsDialog({
   const top5 = useMemo(() => patientsWithDebt.slice(0, 5), [patientsWithDebt]);
   const visible = hasTyped ? filteredPatients.slice(0, 5) : top5;
 
-  const totalDebt = patientsWithDebt.reduce((sum, p) => sum + p.totalDebt, 0);
-  const overdueCount = patientsWithDebt.filter((p) => p.isOverdue).length;
+  const totalDebt = patientsWithDebt.reduce(
+    (sum, p) => sum + p.total_debt,
+    0
+  );
+  const overdueCount = patientsWithDebt.filter((p) => p.is_overdue).length;
 
-  const handleSelect = (patient: Patient) => {
-    onSelectPatient(patient);
-    onOpenChange(false);
-    setInputValue("");
-    setSearchTerm("");
+  const handleSelect = async (summary: PatientDebtSummary) => {
+    // Load full patient data
+    try {
+      const repo = await getRepository();
+      const patient = await repo.findPatientById(summary.patient_id);
+      if (patient) {
+        onSelectPatient(patient);
+        onOpenChange(false);
+        setInputValue("");
+        setSearchTerm("");
+      }
+    } catch (e) {
+      console.error("Error loading patient:", e);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -250,11 +219,11 @@ export default function PendingPaymentsDialog({
 
               {visible.map((item) => (
                 <div
-                  key={item.patient.id}
+                  key={item.patient_id}
                   className={cn(
                     "grid grid-cols-[2fr_1fr_1.5fr_120px] gap-4 items-center px-4 py-3 rounded-lg transition-all",
                     "hover:bg-[hsl(var(--muted))] border",
-                    item.isOverdue
+                    item.is_overdue
                       ? "bg-red-500/5 border-red-500/30 hover:border-red-500/50"
                       : "bg-[hsl(var(--surface))] border-transparent hover:border-[hsl(var(--brand))]/30"
                   )}
@@ -264,24 +233,22 @@ export default function PendingPaymentsDialog({
                       <User
                         size={16}
                         className={
-                          item.isOverdue
+                          item.is_overdue
                             ? "text-red-500"
                             : "text-[hsl(var(--brand))]"
                         }
                       />
-                      <span className="font-semibold">
-                        {item.patient.full_name}
-                      </span>
-                      {item.isOverdue && (
+                      <span className="font-semibold">{item.full_name}</span>
+                      {item.is_overdue && (
                         <Badge variant="danger" className="text-xs animate-pulse">
                           MORA
                         </Badge>
                       )}
                     </div>
-                    {item.patient.phone && (
+                    {item.phone && (
                       <div className="flex items-center gap-1.5 text-sm text-[hsl(var(--muted-foreground))]">
                         <Phone size={12} />
-                        <span>{item.patient.phone}</span>
+                        <span>{item.phone}</span>
                       </div>
                     )}
                   </div>
@@ -290,10 +257,10 @@ export default function PendingPaymentsDialog({
                     <p
                       className={cn(
                         "font-bold text-lg",
-                        item.isOverdue ? "text-red-600" : "text-orange-600"
+                        item.is_overdue ? "text-red-600" : "text-orange-600"
                       )}
                     >
-                      {money(item.totalDebt)}
+                      {money(item.total_debt)}
                     </p>
                   </div>
 
@@ -303,21 +270,22 @@ export default function PendingPaymentsDialog({
                         size={14}
                         className="text-[hsl(var(--muted-foreground))]"
                       />
-                      <span>{formatDate(item.lastSessionDate)}</span>
+                      <span>{formatDate(item.last_session_date)}</span>
                     </div>
-                    {item.isOverdue && (
+                    {item.is_overdue && (
                       <p className="text-xs text-red-600 mt-0.5">
-                        Hace {item.daysOverdue} días
+                        Hace {item.days_since_last} días
                       </p>
                     )}
                   </div>
 
                   <div className="text-center">
                     <Button
-                      onClick={() => handleSelect(item.patient)}
-                      variant={item.isOverdue ? "primary" : "secondary"}
+                      onClick={() => handleSelect(item)}
+                      variant={item.is_overdue ? "primary" : "secondary"}
                       size="sm"
                       className="w-full"
+                      disabled={loading}
                     >
                       Ver detalles
                     </Button>

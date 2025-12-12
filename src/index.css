@@ -142,6 +142,54 @@
     }
 }
 
+@keyframes dialogPopIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes dialogPopOut {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+}
+
+/* Subtle pulse for Save FAB when has changes */
+@keyframes pulseSaveButton {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.95;
+    }
+}
+
+/* Scale bounce for success state */
+@keyframes scaleBounce {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
 @import "tailwindcss";
 
 /* Animación de alerta FUERA del @layer para mayor prioridad */
@@ -149,6 +197,14 @@
     animation: pulseAlert 0.7s ease-in-out infinite;
     /* Optimizaciones de rendimiento - solo propiedades GPU */
     will-change: transform, opacity;
+}
+
+.dialog-open {
+    animation: dialogPopIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dialog-close {
+    animation: dialogPopOut 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Registrar animaciones personalizadas como utilities */
@@ -178,6 +234,20 @@
 
     .animate-shimmer {
         animation: shimmer 2s ease-in-out infinite;
+    }
+
+    /* Save FAB animations */
+    .animate-pulse-subtle {
+        animation: pulseSaveButton 3s ease-in-out infinite;
+        will-change: transform, opacity;
+    }
+
+    .animate-scale-bounce {
+        animation: scaleBounce 0.4s ease-in-out;
+    }
+
+    .animate-shake {
+        animation: shake 0.4s ease-in-out;
     }
 
     /* Sobrescribir animaciones de Tailwind CSS para hacerlas más lentas */
@@ -238,6 +308,7 @@
         --warning: 38 92% 50%;
         --danger: 0 84% 60%;
         --info: 199 89% 48%;
+        --purple: 264 100% 60%;
 
         --radius: 7px;
 
@@ -455,7 +526,14 @@
         transition: box-shadow 0.2s ease;
     }
 
-    .card:hover {
+    .card2 {
+        background: var(--surface-bg);
+        color: var(--text);
+        border: 1px solid hsl(var(--border));
+        border-radius: var(--radius);
+    }
+
+    .cardh:hover {
         box-shadow: var(--shadow-lg);
     }
 
@@ -670,6 +748,11 @@
     .badge-info {
         background: hsl(var(--info) / 0.1);
         color: hsl(var(--info));
+    }
+
+    .badge-purple {
+        background: hsl(var(--purple) / 0.1);
+        color: hsl(var(--purple));
     }
 
     /* Alert */
