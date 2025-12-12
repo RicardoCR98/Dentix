@@ -2,23 +2,27 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Patient,
-  Visit,
-  SessionRow,
-  ProcItem,
   ProcedureTemplate,
   DiagnosisOption,
+  Payment,
+  PaymentMethod,
+  Session,
+  SessionWithItems,
 } from "../types";
 
-/** Fila reducida para listar visitas de un paciente (histórico) */
-export type VisitListRow = {
+/** Fila reducida para listar sesiones de un paciente (histórico) */
+export type SessionListRow = {
   id: number;
   date: string;
   reason_type: string | null;
   reason_detail: string | null;
-  diagnosis: string | null;
+  diagnosis_text: string | null;
   full_dx_text: string | null;
   tooth_dx_json: string | null;
 };
+
+/** @deprecated Use SessionListRow instead */
+export type VisitListRow = SessionListRow;
 
 /**
  * Repositorio que usa comandos Tauri (Rust backend) para todas las operaciones de base de datos.
@@ -31,12 +35,24 @@ export class TauriSqliteRepository {
    */
   async initialize() {
     // No se necesita inicialización - el backend de Rust maneja todo
-    console.log("TauriSqliteRepository: Using Rust backend commands");
   }
 
   // ============================================================================
   // PATIENT OPERATIONS
   // ============================================================================
+
+  async getAllPatientsList(): Promise<
+    import("../types").PatientListItem[]
+  > {
+    try {
+      return await invoke<import("../types").PatientListItem[]>(
+        "get_all_patients_list",
+      );
+    } catch (error) {
+      console.error("Error en getAllPatientsList:", error);
+      throw error;
+    }
+  }
 
   async searchPatients(q: string): Promise<Patient[]> {
     try {
@@ -69,142 +85,176 @@ export class TauriSqliteRepository {
   // VISIT OPERATIONS
   // ============================================================================
 
-  async getVisitsByPatient(patientId: number): Promise<VisitListRow[]> {
+  async getSessionsByPatientList(patientId: number): Promise<SessionListRow[]> {
     try {
-      const visits = await invoke<Visit[]>("get_visits_by_patient", { patientId });
-      // Mapear a VisitListRow (el formato esperado por el frontend)
-      return visits.map((v) => ({
-        id: v.id!,
-        date: v.date || "",
-        reason_type: v.reason_type || null,
-        reason_detail: v.reason_detail || null,
-        diagnosis: v.diagnosis || null,
-        full_dx_text: v.full_dx_text || null,
-        tooth_dx_json: v.tooth_dx_json || null,
+      const sessions = await invoke<Session[]>("get_visits_by_patient", {
+        patientId,
+      });
+      // Mapear a SessionListRow (el formato esperado por el frontend)
+      return sessions.map((s) => ({
+        id: s.id!,
+        date: s.date || "",
+        reason_type: s.reason_type || null,
+        reason_detail: s.reason_detail || null,
+        diagnosis_text: s.diagnosis_text || null,
+        full_dx_text: s.full_dx_text || null,
+        tooth_dx_json: s.tooth_dx_json || null,
       }));
     } catch (error) {
-      console.error("Error en getVisitsByPatient:", error);
+      console.error("Error en getSessionsByPatientList:", error);
       throw error;
     }
   }
 
-  async getVisitDetail(visitId: number): Promise<Visit | null> {
+  /** @deprecated Use getSessionsByPatientList instead */
+  async getVisitsByPatient(patientId: number): Promise<SessionListRow[]> {
+    return this.getSessionsByPatientList(patientId);
+  }
+
+  async getSessionDetail(sessionId: number): Promise<Session | null> {
     try {
-      // Usamos get_visits_by_patient y filtramos (no muy eficiente pero funciona)
-      // En una implementación real, podríamos añadir un comando get_visit_by_id en Rust
-      const visits = await invoke<Visit[]>("get_visits_by_patient", { patientId: 0 });
-      return visits.find((v) => v.id === visitId) || null;
+      // TODO: Añadir comando get_session_by_id en Rust para mayor eficiencia
+      const sessions = await invoke<Session[]>("get_visits_by_patient", {
+        patientId: 0,
+      });
+      return sessions.find((s) => s.id === sessionId) || null;
     } catch (error) {
-      console.error("Error en getVisitDetail:", error);
+      console.error("Error en getSessionDetail:", error);
       return null;
     }
   }
 
-  async deleteVisit(visitId: number): Promise<void> {
+  /** @deprecated Use getSessionDetail instead */
+  async getVisitDetail(visitId: number): Promise<Session | null> {
+    return this.getSessionDetail(visitId);
+  }
+
+  async deleteSession(sessionId: number): Promise<void> {
     try {
-      await invoke("delete_visit", { visitId });
+      await invoke("delete_visit", { visitId: sessionId });
     } catch (error) {
-      console.error("Error en deleteVisit:", error);
+      console.error("Error en deleteSession:", error);
       throw error;
     }
   }
 
+  /** @deprecated Use deleteSession instead */
+  async deleteVisit(visitId: number): Promise<void> {
+    return this.deleteSession(visitId);
+  }
+
   // ============================================================================
-  // SESSION OPERATIONS
+  // SESSION WITH ITEMS OPERATIONS
   // ============================================================================
 
-  async getSessionsByVisit(visitId: number): Promise<SessionRow[]> {
+  async getSessionsWithItems(sessionId: number): Promise<SessionWithItems[]> {
     try {
-      const rustSessions = await invoke<Array<{ visit: any; items: any[] }>>(
-        "get_sessions_by_visit",
-        { visitId }
-      );
+      // Rust devuelve { visit: Session, items: SessionItem[] }[]
+      // Frontend espera { session: Session, items: SessionItem[] }[]
+      type RustSessionRow = {
+        visit: Session;
+        items: import("../types").SessionItem[];
+      };
+      const rustData = await invoke<RustSessionRow[]>("get_sessions_by_visit", {
+        visitId: sessionId,
+      });
 
-      // Transformar de formato Rust a formato frontend
-      return rustSessions.map((rustSession) => ({
-        id: String(rustSession.visit.id),
-        visitId: rustSession.visit.id,
-        date: rustSession.visit.date,
-        auto: true,  // Asumir automático por defecto
-        items: rustSession.items.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          unit: item.unit_price,
-          qty: item.quantity,
-          sub: item.subtotal,
-          procedure_template_id: item.procedure_template_id,
-        })),
-        budget: rustSession.visit.budget,
-        discount: rustSession.visit.discount,
-        payment: rustSession.visit.payment,
-        balance: rustSession.visit.balance,
-        signer: rustSession.visit.signer || "",
-        observations: rustSession.visit.observations || "",
+      // Transformar: visit -> session
+      return rustData.map((row) => ({
+        session: row.visit,
+        items: row.items,
       }));
     } catch (error) {
-      console.error("Error en getSessionsByVisit:", error);
+      console.error("Error en getSessionsWithItems:", error);
       throw error;
     }
+  }
+
+  /** @deprecated Use getSessionsWithItems instead */
+  async getSessionsByVisit(visitId: number): Promise<SessionWithItems[]> {
+    return this.getSessionsWithItems(visitId);
   }
 
   // ============================================================================
   // COMPLEX OPERATION: Save Visit with Sessions
   // ============================================================================
 
-  async saveVisitWithSessions(payload: {
+  async savePatientWithSessions(payload: {
     patient: Patient;
-    visit: Visit;
-    sessions: SessionRow[];
-  }): Promise<{ patient_id: number; visit_id: number }> {
+    session: Session;
+    sessions: SessionWithItems[];
+  }): Promise<{ patient_id: number; session_id: number }> {
     try {
-      // Transformar SessionRow[] del frontend al formato que espera Rust
-      // Rust espera: { visit: Visit, items: VisitProcedure[] }[]
-      const rustSessions = payload.sessions.map((session) => ({
-        visit: {
-          id: session.visitId,  // ID de la visita en BD (si existe)
-          patient_id: payload.patient.id,
-          date: session.date,
-          reason_type: payload.visit.reason_type,
-          reason_detail: payload.visit.reason_detail,
-          diagnosis_text: payload.visit.diagnosis_text,
-          auto_dx_text: payload.visit.auto_dx_text,
-          full_dx_text: payload.visit.full_dx_text,
-          tooth_dx_json: payload.visit.tooth_dx_json,
-          budget: session.budget,
-          discount: session.discount,
-          payment: session.payment,
-          balance: session.balance,
-          cumulative_balance: 0,  // Se calcula en Rust
-          signer: session.signer || null,
-          observations: session.observations || null,
-          is_saved: true,
-        },
-        items: session.items.map((item) => ({
-          id: item.id,
-          visit_id: session.visitId,
-          name: item.name,
-          unit_price: item.unit,
-          quantity: item.qty,
-          subtotal: item.sub,
-          procedure_template_id: item.procedure_template_id,
-          sort_order: 0,  // Se asigna en Rust
-        })),
-      }));
+      // sessions is already SessionWithItems[] which is { session: Session, items: SessionItem[] }[]
 
-      const rustPayload = {
+      // Convert undefined to null for proper serialization
+      const serializeSession = (s: Session) => ({
+        id: s.id ?? null,
+        patient_id: s.patient_id ?? null,
+        date: s.date,
+        reason_type: s.reason_type ?? null,
+        reason_detail: s.reason_detail ?? null,
+        diagnosis_text: s.diagnosis_text ?? null,
+        auto_dx_text: s.auto_dx_text ?? null,
+        full_dx_text: s.full_dx_text ?? null,
+        tooth_dx_json: s.tooth_dx_json ?? null,
+        budget: s.budget ?? 0,
+        discount: s.discount ?? 0,
+        payment: s.payment ?? 0,
+        balance: s.balance ?? 0,
+        cumulative_balance: s.cumulative_balance ?? 0,
+        payment_method_id: s.payment_method_id ?? null,
+        payment_notes: s.payment_notes ?? null,
+        signer: s.signer ?? null,
+        clinical_notes: s.clinical_notes ?? null,
+        is_saved: s.is_saved ?? null,
+        created_at: s.created_at ?? null,
+        updated_at: s.updated_at ?? null,
+      });
+
+      const serializedPayload = {
         patient: payload.patient,
-        visit: payload.visit,
-        sessions: rustSessions,
+        visit: serializeSession(payload.session), // Nota: Rust aún espera "visit" (pendiente actualizar)
+        sessions: payload.sessions.map((s) => ({
+          visit: serializeSession(s.session), // Nota: Rust aún espera "visit" (pendiente actualizar)
+          items: s.items,
+        })),
       };
 
-      return await invoke<{ patient_id: number; visit_id: number }>(
-        "save_visit_with_sessions",
-        { payload: rustPayload }
+      const result = await invoke<{ patient_id: number; visit_id: number }>(
+        "save_visit_with_sessions", // Nota: Comando Rust aún se llama así (pendiente actualizar)
+        {
+          patient: serializedPayload.patient,
+          visit: serializedPayload.visit,
+          sessions: serializedPayload.sessions,
+        },
       );
+
+      // Mapear respuesta de Rust a nombres nuevos
+      return {
+        patient_id: result.patient_id,
+        session_id: result.visit_id, // Rust aún devuelve visit_id
+      };
     } catch (error) {
-      console.error("Error en saveVisitWithSessions:", error);
+      console.error("❌ Error en savePatientWithSessions:", error);
       throw error;
     }
+  }
+
+  /** @deprecated Use savePatientWithSessions instead */
+  async saveVisitWithSessions(payload: {
+    patient: Patient;
+    session: Session;
+    sessions: SessionWithItems[];
+  }): Promise<{ patient_id: number; session_id: number }> {
+    // Map old structure to new
+    const newPayload = {
+      patient: payload.patient,
+      session: payload.session as Session,
+      sessions: payload.sessions as SessionWithItems[],
+    };
+    const result = await this.savePatientWithSessions(newPayload);
+    return { patient_id: result.patient_id, session_id: result.session_id };
   }
 
   // ============================================================================
@@ -254,7 +304,7 @@ export class TauriSqliteRepository {
   // Métodos legacy que ahora usan saveDiagnosisOptions internamente
   async createDiagnosisOption(option: {
     label: string;
-    color: string;
+    color: "success" | "info" | "warning" | "danger" | "default";
   }): Promise<number> {
     try {
       const current = await this.getDiagnosisOptions();
@@ -275,12 +325,15 @@ export class TauriSqliteRepository {
 
   async updateDiagnosisOption(
     id: number,
-    updates: { label?: string; color?: string }
+    updates: {
+      label?: string;
+      color?: "success" | "info" | "warning" | "danger" | "default";
+    },
   ): Promise<void> {
     try {
       const current = await this.getDiagnosisOptions();
       const updated = current.map((opt) =>
-        opt.id === id ? { ...opt, ...updates } : opt
+        opt.id === id ? { ...opt, ...updates } : opt,
       );
       await this.saveDiagnosisOptions(updated);
     } catch (error) {
@@ -318,6 +371,37 @@ export class TauriSqliteRepository {
       return await invoke<number>("create_signer", { name });
     } catch (error) {
       console.error("Error en createSigner:", error);
+      throw error;
+    }
+  }
+
+  async deleteSigner(id: number): Promise<void> {
+    try {
+      await invoke<void>("delete_signer", { id });
+    } catch (error) {
+      console.error("Error en deleteSigner:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // PAYMENT METHOD OPERATIONS
+  // ============================================================================
+
+  async getPaymentMethods(): Promise<PaymentMethod[]> {
+    try {
+      return await invoke<PaymentMethod[]>("get_payment_methods");
+    } catch (error) {
+      console.error("Error en getPaymentMethods:", error);
+      throw error;
+    }
+  }
+
+  async createPaymentMethod(name: string): Promise<number> {
+    try {
+      return await invoke<number>("create_payment_method", { name });
+    } catch (error) {
+      console.error("Error en createPaymentMethod:", error);
       throw error;
     }
   }
@@ -367,6 +451,32 @@ export class TauriSqliteRepository {
   }
 
   // ============================================================================
+  // DOCTOR PROFILE OPERATIONS
+  // ============================================================================
+
+  async getDoctorProfile(): Promise<import("../types").DoctorProfile | null> {
+    try {
+      return await invoke<import("../types").DoctorProfile | null>(
+        "get_doctor_profile",
+      );
+    } catch (error) {
+      console.error("Error en getDoctorProfile:", error);
+      throw error;
+    }
+  }
+
+  async upsertDoctorProfile(
+    profile: import("../types").DoctorProfile,
+  ): Promise<number> {
+    try {
+      return await invoke<number>("upsert_doctor_profile", { profile });
+    } catch (error) {
+      console.error("Error en upsertDoctorProfile:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
   // SETTINGS OPERATIONS
   // ============================================================================
 
@@ -389,7 +499,9 @@ export class TauriSqliteRepository {
     }
   }
 
-  async getSettingsByCategory(category: string): Promise<Record<string, string>> {
+  async getSettingsByCategory(
+    category: string,
+  ): Promise<Record<string, string>> {
     try {
       // No hay filtrado por categoría en el backend, así que devolvemos todas
       // En una implementación real, se podría añadir soporte para categorías
@@ -403,7 +515,7 @@ export class TauriSqliteRepository {
   async setSetting(
     key: string,
     value: string,
-    category: string = "general"
+    category: string = "general",
   ): Promise<void> {
     try {
       await invoke("save_setting", { key, value, category });
@@ -414,7 +526,7 @@ export class TauriSqliteRepository {
   }
 
   async setSettings(
-    settings: Record<string, { value: string; category?: string }>
+    settings: Record<string, { value: string; category?: string }>,
   ): Promise<void> {
     try {
       // Guardar cada configuración individualmente
@@ -428,52 +540,241 @@ export class TauriSqliteRepository {
   }
 
   // ============================================================================
-  // ATTACHMENT OPERATIONS (No implementados en Rust aún - devuelven arrays vacíos)
+  // PAYMENT OPERATIONS
   // ============================================================================
 
-  async getAttachmentsByVisit(visitId: number) {
-    console.warn("getAttachmentsByVisit: Not implemented in Rust backend yet");
-    return [];
+  async getPaymentsByPatient(patientId: number): Promise<Payment[]> {
+    try {
+      return await invoke<Payment[]>("get_payments_by_patient", { patientId });
+    } catch (error) {
+      console.error("Error en getPaymentsByPatient:", error);
+      throw error;
+    }
   }
 
-  async getAttachmentsByPatient(patientId: number) {
-    console.warn("getAttachmentsByPatient: Not implemented in Rust backend yet");
-    return [];
+  async createPayment(payment: Payment): Promise<number> {
+    try {
+      return await invoke<number>("create_payment", { payment });
+    } catch (error) {
+      console.error("Error en createPayment:", error);
+      throw error;
+    }
+  }
+
+  async updatePayment(payment: Payment): Promise<void> {
+    try {
+      await invoke<void>("update_payment", { payment });
+    } catch (error) {
+      console.error("Error en updatePayment:", error);
+      throw error;
+    }
+  }
+
+  async deletePayment(paymentId: number): Promise<void> {
+    try {
+      await invoke<void>("delete_payment", { paymentId });
+    } catch (error) {
+      console.error("Error en deletePayment:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // ATTACHMENT OPERATIONS
+  // ============================================================================
+
+  async getAttachmentsBySession(sessionId: number): Promise<import("../types").Attachment[]> {
+    try {
+      // First, get the patient_id from the session
+      const sessionRows = await invoke<Array<{ patient_id: number }>>(
+        "get_sessions_by_visit",
+        { visitId: sessionId }
+      );
+
+      if (sessionRows.length === 0) {
+        return [];
+      }
+
+      const patientId = sessionRows[0].patient_id;
+
+      // Get all patient attachments and filter by this session
+      const all = await this.getAttachmentsByPatient(patientId);
+      return all.filter((a) => a.session_id === sessionId);
+    } catch (error) {
+      console.error("Error en getAttachmentsBySession:", error);
+      throw error;
+    }
+  }
+
+  /** @deprecated Use getAttachmentsBySession instead */
+  async getAttachmentsByVisit(visitId: number) {
+    return this.getAttachmentsBySession(visitId);
+  }
+
+  async getAttachmentsByPatient(patientId: number): Promise<import("../types").Attachment[]> {
+    try {
+      type RustAttachment = {
+        id: number;
+        patient_id: number;
+        session_id: number | null;
+        kind: string;
+        filename: string;
+        mime_type: string | null;
+        size_bytes: number | null;
+        storage_key: string;
+        note: string | null;
+        created_at: string | null;
+      };
+
+      const rustData = await invoke<RustAttachment[]>(
+        "get_attachments_by_patient",
+        { patientId },
+      );
+
+      // Transform Rust data to frontend format
+      return rustData.map((a) => ({
+        id: a.id,
+        patient_id: a.patient_id,
+        session_id: a.session_id,
+        kind: a.kind,
+        filename: a.filename,
+        mime_type: a.mime_type,
+        size_bytes: a.size_bytes,
+        storage_key: a.storage_key,
+        note: a.note,
+        created_at: a.created_at,
+      }));
+    } catch (error) {
+      console.error("Error en getAttachmentsByPatient:", error);
+      throw error;
+    }
   }
 
   async createAttachment(meta: {
-    visit_id: number | null;
-    patient_id: number | null;
+    session_id: number | null;
+    patient_id: number;
     filename: string;
     mime_type: string;
     bytes: number;
     storage_key: string;
-  }) {
-    console.warn("createAttachment: Not implemented in Rust backend yet");
-    throw new Error("Attachments not implemented yet");
+  }): Promise<number> {
+    try {
+      return await invoke<number>("create_attachment", {
+        patientId: meta.patient_id,
+        sessionId: meta.session_id,
+        filename: meta.filename,
+        mimeType: meta.mime_type,
+        bytes: meta.bytes,
+        storageKey: meta.storage_key,
+      });
+    } catch (error) {
+      console.error("Error en createAttachment:", error);
+      throw error;
+    }
   }
 
+  async moveAttachmentToSession(
+    attachmentId: number,
+    sessionId: number | null,
+  ) {
+    console.warn(
+      "moveAttachmentToSession: Not implemented in Rust backend yet",
+    );
+    throw new Error("moveAttachmentToSession not implemented yet");
+  }
+
+  /** @deprecated Use moveAttachmentToSession instead */
   async moveAttachmentToVisit(attachmentId: number, visitId: number | null) {
-    console.warn("moveAttachmentToVisit: Not implemented in Rust backend yet");
-    throw new Error("Attachments not implemented yet");
+    return this.moveAttachmentToSession(attachmentId, visitId);
   }
 
-  async deleteAttachment(attachmentId: number) {
-    console.warn("deleteAttachment: Not implemented in Rust backend yet");
-    throw new Error("Attachments not implemented yet");
+  async deleteAttachment(attachmentId: number): Promise<void> {
+    try {
+      await invoke("delete_attachment", { attachmentId });
+    } catch (error) {
+      console.error("Error en deleteAttachment:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // NEW: GRANULAR SAVE OPERATIONS
+  // ============================================================================
+
+  /**
+   * Updates ONLY patient demographic data (no sessions created)
+   * Use this when you only want to update patient info like phone, email, etc.
+   */
+  async updatePatientOnly(patient: Patient): Promise<void> {
+    try {
+      await invoke("update_patient_only", { patient });
+    } catch (error) {
+      console.error("Error en updatePatientOnly:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Saves attachments WITHOUT creating a session (session_id = NULL)
+   * Use this for standalone attachments not tied to a specific visit
+   */
+  async saveAttachmentsWithoutSession(
+    patientId: number,
+    attachments: Array<{
+      filename: string;
+      mime_type: string;
+      bytes: number;
+      storage_key: string;
+    }>
+  ): Promise<number[]> {
+    try {
+      return await invoke<number[]>("save_attachments_without_session", {
+        patientId,
+        attachments,
+      });
+    } catch (error) {
+      console.error("Error en saveAttachmentsWithoutSession:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a "Diagnostic Update" session for odontogram changes WITHOUT financial data
+   * This preserves snapshots by creating a new session instead of modifying existing ones
+   */
+  async createDiagnosticUpdateSession(
+    patientId: number,
+    toothDxJson: string | null,
+    autoDxText: string | null,
+    fullDxText: string | null
+  ): Promise<{ session_id: number }> {
+    try {
+      return await invoke<{ session_id: number }>(
+        "create_diagnostic_update_session",
+        {
+          patientId,
+          toothDxJson,
+          autoDxText,
+          fullDxText,
+        }
+      );
+    } catch (error) {
+      console.error("Error en createDiagnosticUpdateSession:", error);
+      throw error;
+    }
   }
 
   // ============================================================================
   // MÉTODOS LEGACY/NO UTILIZADOS
   // ============================================================================
 
-  async getVisitsByPatientPaged(
+  async getSessionsByPatientPaged(
     patientId: number,
     limit: number = 10,
-    offset: number = 0
+    offset: number = 0,
   ) {
-    // Implementación simple usando getVisitsByPatient
-    const all = await this.getVisitsByPatient(patientId);
+    // Implementación simple usando getSessionsByPatientList
+    const all = await this.getSessionsByPatientList(patientId);
     return {
       items: all.slice(offset, offset + limit),
       total: all.length,
@@ -481,33 +782,32 @@ export class TauriSqliteRepository {
     };
   }
 
-  async getSessionsByPatient(patientId: number): Promise<SessionRow[]> {
+  /** @deprecated Use getSessionsByPatientPaged instead */
+  async getVisitsByPatientPaged(
+    patientId: number,
+    limit: number = 10,
+    offset: number = 0,
+  ) {
+    return this.getSessionsByPatientPaged(patientId, limit, offset);
+  }
+
+  async getSessionsByPatient(patientId: number): Promise<SessionWithItems[]> {
     try {
-      const rustSessions = await invoke<Array<{ visit: any; items: any[] }>>(
+      // Rust devuelve { visit: Session, items: SessionItem[] }[]
+      // Frontend espera { session: Session, items: SessionItem[] }[]
+      type RustSessionRow = {
+        visit: Session;
+        items: import("../types").SessionItem[];
+      };
+      const rustData = await invoke<RustSessionRow[]>(
         "get_sessions_by_patient",
-        { patientId }
+        { patientId },
       );
 
-      // Transformar de formato Rust a formato frontend
-      return rustSessions.map((rustSession) => ({
-        id: String(rustSession.visit.id),
-        visitId: rustSession.visit.id,
-        date: rustSession.visit.date,
-        auto: true,  // Asumir automático por defecto
-        items: rustSession.items.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          unit: item.unit_price,
-          qty: item.quantity,
-          sub: item.subtotal,
-          procedure_template_id: item.procedure_template_id,
-        })),
-        budget: rustSession.visit.budget,
-        discount: rustSession.visit.discount,
-        payment: rustSession.visit.payment,
-        balance: rustSession.visit.balance,
-        signer: rustSession.visit.signer || "",
-        observations: rustSession.visit.observations || "",
+      // Transformar: visit -> session
+      return rustData.map((row) => ({
+        session: row.visit,
+        items: row.items,
       }));
     } catch (error) {
       console.error("Error en getSessionsByPatient:", error);
@@ -515,28 +815,57 @@ export class TauriSqliteRepository {
     }
   }
 
+  // Métodos legacy/futuros - no implementados aún
   async updateSigner(id: number, name: string): Promise<void> {
     console.warn("updateSigner: Not implemented in Rust backend yet");
-  }
-
-  async deleteSigner(id: number): Promise<void> {
-    console.warn("deleteSigner: Not implemented in Rust backend yet");
+    throw new Error("updateSigner not implemented yet");
   }
 
   async updateReasonType(id: number, name: string): Promise<void> {
     console.warn("updateReasonType: Not implemented in Rust backend yet");
+    throw new Error("updateReasonType not implemented yet");
   }
 
   async deleteReasonType(id: number): Promise<void> {
     console.warn("deleteReasonType: Not implemented in Rust backend yet");
+    throw new Error("deleteReasonType not implemented yet");
   }
 
   async deleteSetting(key: string): Promise<void> {
     console.warn("deleteSetting: Not implemented in Rust backend yet");
+    throw new Error("deleteSetting not implemented yet");
   }
 
   async resetAllSettings(): Promise<void> {
     console.warn("resetAllSettings: Not implemented in Rust backend yet");
+    throw new Error("resetAllSettings not implemented yet");
+  }
+
+  /**
+   * FASE 2: Get pending payments summary (optimized report)
+   * Single IPC call replaces N+1 query pattern in frontend
+   * All calculations done in backend for performance
+   */
+  async getPendingPaymentsSummary(): Promise<
+    import("../types").PatientDebtSummary[]
+  > {
+    try {
+      return await invoke<import("../types").PatientDebtSummary[]>(
+        "get_pending_payments_summary",
+      );
+    } catch (error) {
+      console.error("Error en getPendingPaymentsSummary:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Alias for getPendingPaymentsSummary for backward compatibility
+   */
+  async getPatientsWithDebt(): Promise<
+    import("../types").PatientDebtSummary[]
+  > {
+    return this.getPendingPaymentsSummary();
   }
 }
 
