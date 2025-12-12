@@ -89,22 +89,29 @@ patients (root entity)
 
 ### State Management Pattern
 
-**No Redux/Zustand** - this app uses React's built-in state management:
-- **Local state** (`useState`) in `App.tsx` for all application data
-- **Prop drilling** to pass data to child components
-- **Callbacks** passed down for child components to update parent state
+**Hybrid Architecture** (Updated 2025-12-11):
+- **Zustand store** for UI preferences (layout mode, active tab, dialog states)
+- **Custom hooks** for patient record management (business logic extraction)
+- **Local component state** for patient data (via hooks)
 
-**Key state in App.tsx**:
-- `patient`: Current patient record
-- `visit`: Current visit being edited
-- `toothDx`: Odontogram selections (tooth number → diagnosis array mapping)
-- `sessions`: Financial sessions array
-- `attachments`: File attachments array
-- `procedureTemplates`, `signers`, `reasonTypes`: Master data from database
+**Store Architecture** (`src/stores/`):
+- `uiStore.ts`: Layout mode (persisted to database), active tab, dialog states
+- Store persists layout preference to `user_settings` table in SQLite
+
+**Custom Hooks** (`src/hooks/`):
+- `usePatientRecord`: Patient data, sessions, odontogram, diagnosis, attachments
+- `usePatientFromURL`: URL parameter handling for patient loading
+- `useMasterData`: Reference data (templates, signers, reason types, payment methods)
+
+**Key benefits**:
+- State preservation when switching layouts (vertical ↔ tabs)
+- No code duplication (eliminated 1,595 lines)
+- Data loss prevention (browser warns before closing with unsaved work)
+- Layout preference persists across app restarts
 
 ### Data Flow for Save Operation
 
-1. User clicks "Guardar Historia" → `handleSave()` in App.tsx
+1. User clicks "Guardar Historia" → `handleSave()` in `usePatientRecord` hook
 2. Validate patient data (name + doc_id required)
 3. **Pre-save**: Save attachment files to disk BEFORE database transaction
 4. Call `repo.saveVisitWithSessions()` with patient, visit, and sessions
@@ -113,6 +120,8 @@ patients (root entity)
 7. Update local state with returned IDs (no database reload for performance)
 
 **Performance optimization**: The app avoids reloading from database after saves. Instead, it updates local state with returned IDs to prevent race conditions.
+
+**Data loss prevention**: `PatientsPageUnified` uses `beforeunload` listener to warn users before closing browser with unsaved draft sessions.
 
 ### File Storage Strategy
 
@@ -125,15 +134,28 @@ patients (root entity)
 
 ### Main Application Component
 
-**`App.tsx`** (720 lines): The main application component managing all state. This is intentionally a large component following the single-page application pattern.
+**`PatientsPageUnified.tsx`** (705 lines): The unified patient record component with conditional layout rendering.
+
+**Key features**:
+- Renders vertical or tabbed layout based on `layoutMode` prop
+- Uses custom hooks for all business logic
+- Implements data loss prevention
+- Preserves state when switching layouts
 
 **Key sections**:
-1. Patient data form
-2. Visit reason/motive
+1. Acciones Rápidas (quick actions)
+2. Patient data form (or patient card in tabs mode)
 3. Odontogram (interactive dental chart)
 4. Diagnosis (auto-generated from odontogram + manual notes)
 5. Sessions table (financial tracking)
-6. Attachments manager
+6. Financial history (saved sessions only)
+7. Attachments manager
+
+**Layout modes**:
+- **Vertical**: All sections in single scroll view
+- **Tabs**: Sections split into 4 tabs (odontogram, procedures, financial, attachments)
+
+**Wrapper**: `PatientsPageWrapper.tsx` loads layout preference from database and renders unified component
 
 ### UI Component Library
 
@@ -229,7 +251,7 @@ When adding new shortcuts, add to `ShortcutsHelp.tsx` component.
 
 ### Toast Notifications
 
-Use the `useToast()` hook from `ToastProvider`:
+Use the `useToast()` hook from `hooks/useToast`:
 ```typescript
 const toast = useToast();
 toast.success("Title", "Message");

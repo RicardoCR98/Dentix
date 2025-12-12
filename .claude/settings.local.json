@@ -23,7 +23,22 @@
       "Bash(cargo check:*)",
       "Bash(pnpm tauri:dev:*)",
       "Bash(del \"C:\\Users\\Ricky\\AppData\\Roaming\\com.tauri.dev\\clinic.db\")",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm build:check:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(if not exist \"C:\\Users\\Ricky\\Desktop\\odonto\\docs\\api\" mkdir \"C:\\Users\\Ricky\\Desktop\\odonto\\docs\\api\")",
+      "Bash(del \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\components\\DentalChart.tsx\")",
+      "Bash(del \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\components\\BrandBlock.tsx\")",
+      "Bash(del \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\components\\ui\\Skeleton.tsx\")",
+      "Bash(rm:*)",
+      "Bash(pnpm run build:check:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(cargo clean:*)",
+      "Bash(del /F \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\components\\payments\\PaymentDialog.tsx\")",
+      "Bash(del /F \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\components\\payments\\PaymentsSection.tsx\")",
+      "Bash(del \"C:\\Users\\Ricky\\Desktop\\odonto\\src-tauri\\migrations\\002_add_is_active_to_visit_procedures.sql\")",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": []
