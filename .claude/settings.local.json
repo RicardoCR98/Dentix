@@ -38,7 +38,17 @@
       "Bash(del /F \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\components\\payments\\PaymentDialog.tsx\")",
       "Bash(del /F \"C:\\Users\\Ricky\\Desktop\\odonto\\src\\components\\payments\\PaymentsSection.tsx\")",
       "Bash(del \"C:\\Users\\Ricky\\Desktop\\odonto\\src-tauri\\migrations\\002_add_is_active_to_visit_procedures.sql\")",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm eslint:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc:*)",
+      "Bash(dir:*)",
+      "Bash(pnpm run lint)",
+      "Bash(pnpm run lint:*)",
+      "Bash(del \"D:\\Github\\odonto\\src-tauri\\migrations\\001_dentix_schema_final.sql\")"
     ],
     "deny": [],
     "ask": []

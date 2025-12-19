@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦷 Dentix
+# 🦷 Oklus
 
 ### Sistema de Gestión Dental Profesional
 
@@ -39,9 +39,9 @@
 
 ## 🎯 Descripción
 
-**Dentix** es una aplicación de escritorio multiplataforma diseñada específicamente para la gestión integral de clínicas dentales. Desarrollada con tecnologías modernas como React, TypeScript y Tauri, ofrece una experiencia de usuario fluida y profesional.
+**Oklus** es una aplicación de escritorio multiplataforma diseñada específicamente para la gestión integral de clínicas dentales. Desarrollada con tecnologías modernas como React, TypeScript y Tauri, ofrece una experiencia de usuario fluida y profesional.
 
-### ¿Por qué Dentix?
+### ¿Por qué Oklus?
 
 - **🚀 Rendimiento Nativo**: Construido con Tauri, más ligero y rápido que Electron
 - **🔒 Seguridad**: Datos almacenados localmente en SQLite con WAL mode
@@ -304,7 +304,7 @@ dentix/
 
 ## 🗄️ Base de Datos
 
-Dentix utiliza **SQLite** con modo **WAL (Write-Ahead Logging)** para mejor concurrencia.
+Oklus utiliza **SQLite** con modo **WAL (Write-Ahead Logging)** para mejor concurrencia.
 
 ### Esquema Principal
 
@@ -334,7 +334,7 @@ Las migraciones se encuentran en `src-tauri/migrations/` y se ejecutan automáti
 
 ## 🎨 Temas Personalizados
 
-Dentix incluye un sistema de temas CSS variables que permite personalización completa:
+Oklus incluye un sistema de temas CSS variables que permite personalización completa:
 
 ### Temas Incluidos
 

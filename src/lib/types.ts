@@ -61,11 +61,11 @@ export type Session = {
   balance: number;
   cumulative_balance: number;
   payment_method_id?: number; // NEW: FK to payment_methods
-  payment_notes?: string;      // NEW: Notes specific to payment
+  payment_notes?: string; // NEW: Notes specific to payment
 
   // Administrative
   signer?: string;
-  clinical_notes?: string;  // RENAMED: from observations
+  clinical_notes?: string; // RENAMED: from observations
   is_saved?: boolean;
 
   // Metadata
@@ -84,9 +84,9 @@ export type SessionItem = {
   unit_price: number;
   quantity: number;
   subtotal: number;
-  is_active?: boolean;           // Checkbox activation (independent of quantity)
-  tooth_number?: string;          // NEW: Which tooth this procedure was applied to
-  procedure_notes?: string;       // NEW: Notes specific to this procedure
+  is_active?: boolean; // Checkbox activation (independent of quantity)
+  tooth_number?: string; // NEW: Which tooth this procedure was applied to
+  procedure_notes?: string; // NEW: Notes specific to this procedure
   procedure_template_id?: number; // Optional: for audit trail
   sort_order?: number;
   created_at?: string;
@@ -99,7 +99,7 @@ export type VisitProcedure = SessionItem;
 export type Attachment = {
   id?: number;
   patient_id: number;
-  session_id?: number;  // RENAMED: from visit_id
+  session_id?: number; // RENAMED: from visit_id
   kind: "radiograph" | "photo" | "document" | "other";
   filename: string;
   mime_type?: string;
@@ -258,11 +258,12 @@ export type AttachmentFile = {
   uploadDate: string; // Display date
   storage_key?: string; // File path on disk (for saved files)
   db_id?: number; // Attachment.id in database (for saved files)
+  session_id?: number | null; // Link attachment to specific session (NEW)
 };
 
 /**
- * PatientDebtSummary: Aggregated patient debt report
- * Used by PendingPaymentsDialog for optimized reporting
+ * PatientDebtSummary: Aggregated patient debt report with TRIADA fields
+ * Used by FinancesPage for optimized reporting with contact tracking
  * Calculated entirely in backend (Rust) for performance
  */
 export type PatientDebtSummary = {
@@ -270,12 +271,19 @@ export type PatientDebtSummary = {
   full_name: string;
   phone: string | null;
   doc_id: string;
-  total_budget: number;
-  total_paid: number;
-  total_debt: number;
-  last_session_date: string;
-  days_since_last: number;
-  is_overdue: boolean;
+
+  // Financial
+  current_balance: number;        // Latest cumulative_balance
+
+  // TRIADA (from patients table)
+  debt_opened_at: string | null;  // Date when debt was opened
+  debt_archived: number;          // 0=active, 1=archived
+  last_contact_at: string | null; // Last contact timestamp
+  last_contact_type: string | null; // 'whatsapp' | 'call' | 'email' | 'in_person'
+
+  // Calculated
+  days_overdue: number;           // Days since debt_opened_at
+  contact_status: string;         // 'not_contacted' | 'recently_contacted' | 'long_ago'
 };
 
 /**
@@ -288,6 +296,8 @@ export type PatientListItem = {
   full_name: string;
   doc_id: string;
   phone: string;
+  allergy_detail?: string | null;
+  status?: "active" | "inactive";
   last_visit_date: string | null;
   pending_balance: number;
 };

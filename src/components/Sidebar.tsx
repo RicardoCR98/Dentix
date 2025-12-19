@@ -1,6 +1,13 @@
 // src/components/Sidebar.tsx
 import { NavLink } from "react-router-dom";
-import { User, Wallet, BarChart3, Settings, FileText } from "lucide-react";
+import {
+  User,
+  Wallet,
+  BarChart3,
+  Settings,
+  FileText,
+  Calendar,
+} from "lucide-react";
 import { cn } from "../lib/cn";
 
 interface NavItem {
@@ -10,12 +17,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: "/pacientes", icon: <User size={20} />, label: "Pacientes" },
   {
     to: "/registro-clinico",
     icon: <FileText size={20} />,
     label: "Registro clínico",
   },
+  { to: "/pacientes", icon: <User size={20} />, label: "Pacientes" },
+  { to: "/Agenda", icon: <Calendar size={20} />, label: "Agenda" },
   { to: "/finanzas", icon: <Wallet size={20} />, label: "Finanzas" },
   { to: "/reportes", icon: <BarChart3 size={20} />, label: "Reportes" },
   {
@@ -43,11 +51,11 @@ export function Sidebar({ clinicName, slogan, isCollapsed }: SidebarProps) {
       <div className="p-4">
         {!isCollapsed ? (
           <div>
-            <h2 className="text-[hsl(var(--brand))] font-bold text-lg tracking-wide truncate">
+            <h2 className="text-[hsl(var(--brand))] font-bold text-lg tracking-wide truncate text-center">
               {clinicName}
             </h2>
             {slogan && (
-              <p className="text-xs text-[hsl(var(--muted-foreground))] truncate">
+              <p className="text-xs text-[hsl(var(--muted-foreground))] truncate text-center">
                 {slogan}
               </p>
             )}

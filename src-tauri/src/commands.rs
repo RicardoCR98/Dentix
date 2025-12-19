@@ -182,12 +182,19 @@ pub struct PatientDebtSummary {
     pub full_name: String,
     pub phone: Option<String>,
     pub doc_id: String,
-    pub total_budget: f64,
-    pub total_paid: f64,
-    pub total_debt: f64,
-    pub last_session_date: String,
-    pub days_since_last: i64,
-    pub is_overdue: bool,
+
+    // Financial
+    pub current_balance: f64,
+
+    // TRIADA (from patients)
+    pub debt_opened_at: Option<String>,
+    pub debt_archived: i64,
+    pub last_contact_at: Option<String>,
+    pub last_contact_type: Option<String>,
+
+    // Calculated
+    pub days_overdue: i64,
+    pub contact_status: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -196,6 +203,8 @@ pub struct PatientListItem {
     pub full_name: String,
     pub doc_id: String,
     pub phone: String,
+    pub allergy_detail: Option<String>,
+    pub status: Option<String>,
     pub last_visit_date: Option<String>,
     pub pending_balance: f64,
 }
@@ -270,12 +279,14 @@ pub async fn get_all_patients_list(
             p.full_name,
             p.doc_id,
             p.phone,
+            p.allergy_detail,
+            p.status,
             MAX(s.date) as last_visit_date,
             COALESCE(SUM(CASE WHEN s.is_saved = 1 THEN s.balance ELSE 0 END), 0) as pending_balance
          FROM patients p
          LEFT JOIN sessions s ON s.patient_id = p.id
          WHERE p.status = 'active'
-         GROUP BY p.id, p.full_name, p.doc_id, p.phone
+         GROUP BY p.id, p.full_name, p.doc_id, p.phone, p.allergy_detail, p.status
          ORDER BY p.full_name ASC"
     )
     .fetch_all(&*pool)
@@ -289,6 +300,8 @@ pub async fn get_all_patients_list(
             full_name: row.get("full_name"),
             doc_id: row.get("doc_id"),
             phone: row.get("phone"),
+            allergy_detail: row.get("allergy_detail"),
+            status: row.get("status"),
             last_visit_date: row.get("last_visit_date"),
             pending_balance: row.get("pending_balance"),
         })
@@ -934,6 +947,109 @@ pub async fn save_visit_with_sessions(
         }
     }
 
+    // ============================================================================
+    // TRIADA: Apply debt opening/closing logic
+    // ============================================================================
+
+    // Get previous cumulative balance (before this save)
+    let previous_cumulative: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(cumulative_balance, 0.0)
+         FROM sessions
+         WHERE patient_id = ?1 AND is_saved = 1 AND id < ?2
+         ORDER BY date DESC, id DESC
+         LIMIT 1"
+    )
+    .bind(patient_id)
+    .bind(last_session_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?
+    .unwrap_or(0.0);
+
+    // Get new cumulative balance (from the last saved session)
+    let new_cumulative: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(cumulative_balance, 0.0)
+         FROM sessions
+         WHERE patient_id = ?1 AND is_saved = 1
+         ORDER BY date DESC, id DESC
+         LIMIT 1"
+    )
+    .bind(patient_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?
+    .unwrap_or(0.0);
+
+    println!("🔄 TRIADA check: previous_balance={}, new_balance={}", previous_cumulative, new_cumulative);
+
+    // Get current debt state
+    let (debt_opened_at, debt_archived): (Option<String>, i64) = sqlx::query_as(
+        "SELECT debt_opened_at, debt_archived FROM patients WHERE id = ?1"
+    )
+    .bind(patient_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Apply TRIADA logic
+    if previous_cumulative <= 0.0 && new_cumulative > 0.0 {
+        // OPEN DEBT: Balance went from <=0 to >0
+        println!("📈 Opening debt for patient {}", patient_id);
+        sqlx::query(
+            "UPDATE patients
+             SET debt_opened_at = (SELECT date FROM sessions WHERE id = ?1),
+                 debt_archived = 0,
+                 debt_archived_at = NULL
+             WHERE id = ?2"
+        )
+        .bind(last_session_id)
+        .bind(patient_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    } else if previous_cumulative > 0.0 && new_cumulative <= 0.0 {
+        // CLOSE DEBT: Balance went from >0 to <=0
+        println!("📉 Closing debt for patient {}", patient_id);
+        sqlx::query(
+            "UPDATE patients
+             SET debt_opened_at = NULL,
+                 debt_archived = 0,
+                 debt_archived_at = NULL
+             WHERE id = ?1"
+        )
+        .bind(patient_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    } else if new_cumulative > 0.0 && debt_archived == 1 {
+        // UNARCHIVE: If debt is archived but balance is positive, unarchive it
+        println!("📂 Unarchiving debt for patient {}", patient_id);
+        sqlx::query(
+            "UPDATE patients
+             SET debt_archived = 0,
+                 debt_archived_at = NULL
+             WHERE id = ?1"
+        )
+        .bind(patient_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    } else if new_cumulative > 0.0 && debt_opened_at.is_none() {
+        // EDGE CASE: Debt exists but debt_opened_at is NULL (data inconsistency fix)
+        println!("🔧 Fixing debt_opened_at for patient {}", patient_id);
+        sqlx::query(
+            "UPDATE patients
+             SET debt_opened_at = (SELECT date FROM sessions WHERE id = ?1),
+                 debt_archived = 0
+             WHERE id = ?2"
+        )
+        .bind(last_session_id)
+        .bind(patient_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+
     tx.commit().await.map_err(|e| e.to_string())?;
 
     let mut result = HashMap::new();
@@ -1474,22 +1590,39 @@ pub async fn get_pending_payments_summary(
     let pool = db_pool.0.lock().await;
 
     let rows = sqlx::query(
-        "SELECT
+        "WITH latest_balance AS (
+            SELECT
+                patient_id,
+                cumulative_balance,
+                ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date DESC, id DESC) as rn
+            FROM sessions
+            WHERE is_saved = 1
+        )
+        SELECT
             p.id as patient_id,
             p.full_name,
             p.phone,
             p.doc_id,
-            SUM(s.budget) as total_budget,
-            SUM(s.payment) as total_paid,
-            SUM(s.balance) as total_debt,
-            MAX(s.date) as last_session_date,
-            CAST((JULIANDAY('now') - JULIANDAY(MAX(s.date))) AS INTEGER) as days_since_last
-         FROM patients p
-         INNER JOIN sessions s ON s.patient_id = p.id
-         WHERE s.is_saved = 1 AND s.balance > 0
-         GROUP BY p.id, p.full_name, p.phone, p.doc_id
-         HAVING total_debt > 0
-         ORDER BY total_debt DESC"
+            COALESCE(lb.cumulative_balance, 0) as current_balance,
+            p.debt_opened_at,
+            p.debt_archived,
+            p.last_contact_at,
+            p.last_contact_type,
+            CASE
+                WHEN p.debt_opened_at IS NULL THEN 0
+                ELSE CAST((JULIANDAY('now') - JULIANDAY(p.debt_opened_at)) AS INTEGER)
+            END as days_overdue,
+            CASE
+                WHEN p.last_contact_at IS NULL THEN 0
+                ELSE CAST((JULIANDAY('now') - JULIANDAY(p.last_contact_at)) AS INTEGER)
+            END as days_since_contact
+        FROM patients p
+        LEFT JOIN latest_balance lb ON p.id = lb.patient_id AND lb.rn = 1
+        WHERE p.status = 'active'
+          AND p.debt_archived = 0
+          AND p.debt_opened_at IS NOT NULL
+          AND COALESCE(lb.cumulative_balance, 0) > 0
+        ORDER BY days_overdue DESC, current_balance DESC"
     )
     .fetch_all(&*pool)
     .await
@@ -1498,23 +1631,164 @@ pub async fn get_pending_payments_summary(
     let summaries = rows
         .into_iter()
         .map(|row| {
-            let days: i64 = row.get("days_since_last");
+            let last_contact_at: Option<String> = row.get("last_contact_at");
+            let days_since_contact: i64 = row.get("days_since_contact");
+
+            // Calculate contact_status based on days_since_contact
+            let contact_status = if last_contact_at.is_none() {
+                "not_contacted".to_string()
+            } else if days_since_contact <= 7 {
+                "recently_contacted".to_string()
+            } else {
+                "long_ago".to_string()
+            };
+
             PatientDebtSummary {
                 patient_id: row.get("patient_id"),
                 full_name: row.get("full_name"),
                 phone: row.get("phone"),
                 doc_id: row.get("doc_id"),
-                total_budget: row.get("total_budget"),
-                total_paid: row.get("total_paid"),
-                total_debt: row.get("total_debt"),
-                last_session_date: row.get("last_session_date"),
-                days_since_last: days,
-                is_overdue: days > 90,
+                current_balance: row.get("current_balance"),
+                debt_opened_at: row.get("debt_opened_at"),
+                debt_archived: row.get("debt_archived"),
+                last_contact_at: row.get("last_contact_at"),
+                last_contact_type: row.get("last_contact_type"),
+                days_overdue: row.get("days_overdue"),
+                contact_status,
             }
         })
         .collect();
 
     Ok(summaries)
+}
+
+// =========================
+// ARCHIVE DEBT
+// =========================
+
+#[tauri::command]
+pub async fn archive_debt(
+    db_pool: State<'_, DbPool>,
+    patient_id: i64,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    // Archive debt at patient level (TRIADA)
+    sqlx::query("UPDATE patients SET debt_archived = 1, debt_archived_at = datetime('now') WHERE id = ?")
+        .bind(patient_id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn unarchive_debt(
+    db_pool: State<'_, DbPool>,
+    patient_id: i64,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    // Unarchive debt at patient level (TRIADA)
+    sqlx::query("UPDATE patients SET debt_archived = 0, debt_archived_at = NULL WHERE id = ?")
+        .bind(patient_id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+// =========================
+// REPAIR DEBT DATA (One-time fix)
+// =========================
+
+#[tauri::command]
+pub async fn repair_debt_opened_dates(
+    db_pool: State<'_, DbPool>,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+
+    println!("🔧 Starting debt repair...");
+
+    // Find patients with positive balance but no debt_opened_at
+    let patients_to_fix = sqlx::query(
+        "WITH latest_balance AS (
+            SELECT
+                patient_id,
+                cumulative_balance,
+                date,
+                ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date DESC, id DESC) as rn
+            FROM sessions
+            WHERE is_saved = 1
+        )
+        SELECT
+            p.id as patient_id,
+            lb.cumulative_balance,
+            lb.date as first_debt_date
+        FROM patients p
+        INNER JOIN latest_balance lb ON p.id = lb.patient_id AND lb.rn = 1
+        WHERE p.status = 'active'
+          AND lb.cumulative_balance > 0
+          AND p.debt_opened_at IS NULL"
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let count = patients_to_fix.len() as i64;
+    println!("📋 Found {} patients to fix", count);
+
+    for row in patients_to_fix {
+        let patient_id: i64 = row.get("patient_id");
+        let first_debt_date: String = row.get("first_debt_date");
+
+        println!("  → Fixing patient {} with debt date {}", patient_id, first_debt_date);
+
+        sqlx::query(
+            "UPDATE patients
+             SET debt_opened_at = ?,
+                 debt_archived = 0,
+                 debt_archived_at = NULL
+             WHERE id = ?"
+        )
+        .bind(&first_debt_date)
+        .bind(patient_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+
+    println!("✅ Debt repair completed: {} patients fixed", count);
+
+    Ok(count)
+}
+
+#[tauri::command]
+pub async fn mark_patient_contacted(
+    db_pool: State<'_, DbPool>,
+    patient_id: i64,
+    contact_type: String,  // 'whatsapp' | 'call' | 'email' | 'in_person'
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    sqlx::query(
+        "UPDATE patients
+         SET last_contact_at = datetime('now'),
+             last_contact_type = ?
+         WHERE id = ?"
+    )
+    .bind(contact_type)
+    .bind(patient_id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 // =========================

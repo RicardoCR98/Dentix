@@ -1,4 +1,4 @@
-# Codebase Organization - Dentix Desktop
+# Codebase Organization - Oklus Desktop
 
 ## Project Structure Overview
 
@@ -348,7 +348,7 @@ SaveVisitPayload
 
 **Key Settings**:
 - App identifier: `com.tauri.dev`
-- Window title: "Dentix"
+- Window title: "Oklus"
 - Window size: 1400x900
 - Security capabilities: SQL, FS, Opener plugins
 - Build targets: Windows (MSI), macOS (DMG), Linux (DEB/AppImage)
@@ -537,8 +537,8 @@ pnpm tauri:build
 ```
 
 **Output Locations**:
-- **Windows**: `src-tauri/target/release/bundle/msi/Dentix_0.1.0_x64_en-US.msi`
-- **macOS**: `src-tauri/target/release/bundle/dmg/Dentix_0.1.0_x64.dmg`
+- **Windows**: `src-tauri/target/release/bundle/msi/Oklus_0.1.0_x64_en-US.msi`
+- **macOS**: `src-tauri/target/release/bundle/dmg/Oklus_0.1.0_x64.dmg`
 - **Linux**: `src-tauri/target/release/bundle/deb/dentix_0.1.0_amd64.deb`
 
 **Bundle Contents**:

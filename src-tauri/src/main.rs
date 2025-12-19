@@ -44,7 +44,7 @@ fn main() {
                     .expect("Failed to create database pool");
 
                 // Ejecutar migración unificada
-                let migration_001 = include_str!("../migrations/001_dentix_schema_final.sql");
+                let migration_001 = include_str!("../migrations/001_schema.sql");
                 sqlx::raw_sql(migration_001)
                     .execute(&pool)
                     .await
@@ -109,6 +109,12 @@ fn main() {
             save_visit_with_sessions,
             // Reports
             get_pending_payments_summary,
+            // Archive debt commands
+            archive_debt,
+            unarchive_debt,
+            mark_patient_contacted,
+            // Repair command
+            repair_debt_opened_dates,
             // Payments commands
             get_payments_by_patient,
             create_payment,

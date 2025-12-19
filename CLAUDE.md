@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Dentix** is a desktop dental clinic management system built with React, TypeScript, and Tauri. It's a 100% offline application that stores data locally in SQLite, providing patient management, odontogram (dental chart), visit tracking, and financial management for dental practices.
+**Oklus** is a desktop dental clinic management system built with React, TypeScript, and Tauri. It's a 100% offline application that stores data locally in SQLite, providing patient management, odontogram (dental chart), visit tracking, and financial management for dental practices.
 
 ## Development Commands
 

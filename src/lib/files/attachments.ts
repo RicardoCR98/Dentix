@@ -1,17 +1,32 @@
 // src/lib/files/attachments.ts
-import { mkdir, writeFile, BaseDirectory } from "@tauri-apps/plugin-fs";
+import { mkdir, writeFile, exists, BaseDirectory } from "@tauri-apps/plugin-fs";
 import { documentDir, join } from "@tauri-apps/api/path";
 
-function safeName(name: string) { return name.replace(/[^\w.-]/g, "_"); }
-function pad(n: number) { return String(n).padStart(2, "0"); }
-function ts(d = new Date()) {
-  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+function safeName(name: string) {
+  return name.replace(/[^\w.-]/g, "_");
 }
-function rand8(){ return Math.random().toString(16).slice(2,10); }
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+function ts(d = new Date()) {
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+function rand8() {
+  return Math.random().toString(16).slice(2, 10);
+}
+
+// Stable, clinic-name-independent root to make syncing/migration easier
+const ATTACHMENTS_ROOT = "odonto_data/attachments"; // relative to Documents
+const LEGACY_ROOTS = ["GreenAppleDental/attachments"];
 
 export function getAttachmentsRoot(): string {
-  return "GreenAppleDental/attachments"; // relativo a $DOCUMENTS
+  return ATTACHMENTS_ROOT;
 }
+
+const getAllRoots = () => [ATTACHMENTS_ROOT, ...LEGACY_ROOTS];
+const isTauri = () =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  typeof (window as any).__TAURI__ !== "undefined";
 
 export async function saveAttachmentFile(
   file: File,
@@ -36,19 +51,29 @@ export async function saveAttachmentFile(
 
 /** Devuelve la ruta absoluta de un storage_key tal como lo guardamos */
 export async function resolveAttachmentPath(storage_key: string) {
-  // guardamos: attachments/p_{id}/YYYY/MM/filename
-  // base: Documents/GreenAppleDental
-  const base = await documentDir(); // p.ej. C:\Users\...\Documents\
-  const abs = await join(base, "GreenAppleDental", storage_key);
-  return abs;
+  const base = await documentDir(); // e.g. C:\Users\...\Documents\
+
+  for (const root of getAllRoots()) {
+    const candidateRelative = `${root}/${storage_key}`;
+    try {
+      const existsHere = await exists(candidateRelative, {
+        baseDir: BaseDirectory.Document,
+      });
+      if (existsHere) {
+        return await join(base, root, storage_key);
+      }
+    } catch {
+      // ignore and try next root
+    }
+  }
+
+  // Fallback: assume current root even if exists() failed (e.g., permission issue)
+  return await join(base, getAttachmentsRoot(), storage_key);
 }
 
-/** Abre archivo o URL con la app por defecto del SO (Tauri) y, si falla / Web, copia la ruta */
+/** Abre archivo o URL con la app por defecto del SO (Tauri); en web solo informa */
 export async function openWithOS(path: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isTauri = typeof (window as any).__TAURI__ !== "undefined";
-
-  if (isTauri) {
+  if (isTauri()) {
     try {
       // Tipamos explícitamente el módulo para que TS “vea” .open
       type Opener = typeof import("@tauri-apps/plugin-opener");
@@ -61,20 +86,13 @@ export async function openWithOS(path: string) {
     }
   }
 
-  // Fallback: copiamos al portapapeles
-  try {
-    await navigator.clipboard.writeText(path);
-    alert("No se pudo abrir directamente. La ruta se copió al portapapeles:\n" + path);
-  } catch {
-    alert("No se pudo abrir ni copiar la ruta:\n" + path);
-  }
+  // Web: no intentar abrir rutas locales; mostrar mensaje
+  alert("Abrir en el explorador está disponible solo en la app de escritorio. Usa la vista previa.");
 }
 
 /** Opcional: mostrar el archivo dentro de su carpeta (Explorer/Finder) */
 export async function revealInOS(path: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isTauri = typeof (window as any).__TAURI__ !== "undefined";
-  if (isTauri) {
+  if (isTauri()) {
     try {
       type Opener = typeof import("@tauri-apps/plugin-opener");
       const mod = (await import("@tauri-apps/plugin-opener")) as Opener;
@@ -86,6 +104,7 @@ export async function revealInOS(path: string) {
       console.error("opener reveal failed:", err);
     }
   }
-  // si no existe reveal, intentamos abrir
-  await openWithOS(path);
+
+  // Web: mismo mensaje que openWithOS
+  alert("Abrir la carpeta está disponible solo en la app de escritorio. Usa la vista previa.");
 }

@@ -867,6 +867,73 @@ export class TauriSqliteRepository {
   > {
     return this.getPendingPaymentsSummary();
   }
+
+  /**
+   * Repair debt_opened_at for patients with positive balance (one-time fix)
+   * Finds patients with debt but no debt_opened_at and sets it
+   * @returns Number of patients fixed
+   */
+  async repairDebtOpenedDates(): Promise<number> {
+    try {
+      return await invoke<number>("repair_debt_opened_dates");
+    } catch (error) {
+      console.error("Error repairing debt dates:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Archive debt for a patient (marks patient.debt_archived = 1)
+   * Archived debts are excluded from financial reports (TRIADA)
+   * @param patientId - Patient ID
+   */
+  async archiveDebt(patientId: number): Promise<void> {
+    try {
+      await invoke("archive_debt", {
+        patientId,
+      });
+    } catch (error) {
+      console.error("Error archiving debt:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unarchive debt for a patient (marks patient.debt_archived = 0)
+   * Reactivates patient debt in financial reports (TRIADA)
+   * @param patientId - Patient ID
+   */
+  async unarchiveDebt(patientId: number): Promise<void> {
+    try {
+      await invoke("unarchive_debt", {
+        patientId,
+      });
+    } catch (error) {
+      console.error("Error unarchiving debt:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark patient as contacted (updates TRIADA fields)
+   * Sets last_contact_at to NOW and last_contact_type
+   * @param patientId - Patient ID
+   * @param contactType - Type of contact: 'whatsapp' | 'call' | 'email' | 'in_person'
+   */
+  async markPatientContacted(
+    patientId: number,
+    contactType: 'whatsapp' | 'call' | 'email' | 'in_person'
+  ): Promise<void> {
+    try {
+      await invoke("mark_patient_contacted", {
+        patientId,
+        contactType,
+      });
+    } catch (error) {
+      console.error("Error marking patient contacted:", error);
+      throw error;
+    }
+  }
 }
 
 // Singleton instance

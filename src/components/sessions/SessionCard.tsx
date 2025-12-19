@@ -37,6 +37,7 @@ interface SessionCardProps {
   isExpanded: boolean;
   isEditable: boolean;
   inEditMode: boolean;
+  isActive?: boolean; // NEW: Visual indicator for active session
   manualBudgetEnabled: boolean;
   signers: Array<{ id: number; name: string }>;
   reasonTypes: ReasonType[];
@@ -81,6 +82,7 @@ export const SessionCard = memo(
     isExpanded,
     isEditable,
     inEditMode,
+    isActive = false, // NEW: Destructure isActive with default
     previousBalance,
     signers,
     reasonTypes,
@@ -137,6 +139,7 @@ export const SessionCard = memo(
           "card cardh overflow-hidden transition-all duration-200",
           isExpanded && "ring-2 ring-[hsl(var(--brand)/0.3)]",
           !isExpanded && "hover:border-[hsl(var(--brand))]",
+          isActive && "border-l-4 border-l-[hsl(var(--brand))]", // NEW: Active session indicator
         )}
       >
         {/* ============================================
@@ -154,10 +157,10 @@ export const SessionCard = memo(
 
                 <div className="flex flex-col gap-1">
                   <Badge
-                    variant="danger"
+                    variant="info"
                     className="rounded-md px-2.5 py-0.5 text-xs font-semibold w-fit"
                   >
-                    {session.session.reason_type || "Consulta"}
+                    {session.session.reason_type || "Desconocido"}
                   </Badge>
 
                   {/* Fecha en formato legible */}
@@ -199,12 +202,12 @@ export const SessionCard = memo(
 
               {/* Metadata badges */}
               <div className="flex flex-wrap items-center gap-2 mt-3">
-                {session.session.tooth && (
+                {session.session.clinical_notes && (
                   <Badge
                     variant="info"
                     className="rounded-full px-2.5 py-0.5 text-[10px] font-medium"
                   >
-                    Pieza {session.session.tooth}
+                    Pieza {session.session.clinical_notes}
                   </Badge>
                 )}
 

@@ -31,9 +31,7 @@ export default function SplashScreen() {
         </div>
 
         {/* Título de la app */}
-        <h1 className="text-3xl font-bold mb-2 text-[hsl(0,0%,98%)]">
-          Dentix
-        </h1>
+        <h1 className="text-3xl font-bold mb-2 text-[hsl(0,0%,98%)]">Oklus</h1>
 
         {/* Mensaje de carga */}
         <p className="text-sm text-[hsl(0,0%,60%)] animate-pulse">

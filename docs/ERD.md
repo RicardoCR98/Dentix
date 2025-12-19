@@ -1,8 +1,8 @@
-# Entity Relationship Diagram - Dentix Desktop
+# Entity Relationship Diagram - Oklus Desktop
 
 ## Overview
 
-Dentix uses a **denormalized SQLite schema** designed for offline-first operation with intentional snapshot semantics. Historical data is immutable - visit records preserve the exact state of master data at the time of visit.
+Oklus uses a **denormalized SQLite schema** designed for offline-first operation with intentional snapshot semantics. Historical data is immutable - visit records preserve the exact state of master data at the time of visit.
 
 ## Database Configuration
 

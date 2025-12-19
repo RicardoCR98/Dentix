@@ -7,6 +7,7 @@ import {
   X,
   Paperclip,
   ExternalLink,
+  Eye,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
@@ -14,7 +15,15 @@ import { Alert } from "./ui/Alert";
 import { cn } from "../lib/cn";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/Tabs";
 import type { AttachmentFile } from "../lib/types";
-import { resolveAttachmentPath, openWithOS } from "../lib/files/attachments";
+import {
+  resolveAttachmentPath,
+  openWithOS,
+  revealInOS,
+} from "../lib/files/attachments";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { BaseDirectory } from "@tauri-apps/plugin-fs";
+import { Dialog } from "./ui/Dialog";
+import { FilePreviewModal } from "./FilePreviewModal";
 
 interface Props {
   files: AttachmentFile[];
@@ -22,6 +31,11 @@ interface Props {
   onFileDelete?: (file: AttachmentFile) => Promise<void>;
   patientName?: string;
   readOnly?: boolean;
+
+  // NEW PROPS: Session filtering
+  activeSessionId?: number | null;
+  filterMode?: "all" | "session";
+  onFilterModeChange?: (mode: "all" | "session") => void;
 }
 
 const getFileIcon = (type: string) => {
@@ -74,14 +88,49 @@ const formatFilePath = (storage_key: string, patientName?: string): string => {
   return `${year} › ${monthName}`;
 };
 
+const getDisplayName = (file: AttachmentFile): string => {
+  if (file.file?.name) return file.file.name;
+  const raw = file.name || file.storage_key || "Archivo";
+  const basename = raw.split("/").pop() || raw;
+  const match = basename.match(/^\d{8}_\d{6}_[a-f0-9]{8}_(.+)$/i);
+  if (match?.[1]) return match[1];
+  return basename;
+};
+
 const Attachments = memo(function Attachments({
   files,
   onFilesChange,
   onFileDelete,
   patientName,
   readOnly,
+  activeSessionId,
+  filterMode = "all",
+  onFilterModeChange,
 }: Props) {
   const [dragActive, setDragActive] = useState(false);
+  const [preview, setPreview] = useState<{
+    file: AttachmentFile;
+    url: string | null;
+  } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<AttachmentFile | null>(
+    null,
+  );
+
+  // NEW: Filter files by session
+  const filteredFiles = useMemo(() => {
+    if (filterMode === "all") {
+      return files;
+    }
+
+    if (filterMode === "session") {
+      if (!activeSessionId) {
+        return []; // No active session, show nothing
+      }
+      return files.filter((f) => f.session_id === activeSessionId);
+    }
+
+    return files;
+  }, [files, filterMode, activeSessionId]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -115,20 +164,17 @@ const Attachments = memo(function Attachments({
       file,
       url: URL.createObjectURL(file),
       uploadDate: new Date().toISOString(),
+      session_id: filterMode === "session" ? activeSessionId : undefined, // AUTO-ASSIGN
     }));
     onFilesChange([...files, ...newFiles]);
   };
 
-  const removeFile = async (id: string) => {
+  const removeFile = async (file: AttachmentFile) => {
     if (readOnly) return;
 
-    const fileToRemove = files.find((f) => f.id === id);
-    if (!fileToRemove) return;
-
-    // Si tiene callback de eliminación y db_id, eliminar de la DB primero
-    if (onFileDelete && fileToRemove.db_id) {
+    if (onFileDelete && file.db_id) {
       try {
-        await onFileDelete(fileToRemove);
+        await onFileDelete(file);
       } catch (e) {
         console.error("Error al eliminar archivo de la DB:", e);
         alert("Error al eliminar el archivo");
@@ -136,8 +182,7 @@ const Attachments = memo(function Attachments({
       }
     }
 
-    // Eliminar del estado local
-    onFilesChange(files.filter((f) => f.id !== id));
+    onFilesChange(files.filter((f) => f.id !== file.id));
   };
 
   const clearAll = () => {
@@ -145,22 +190,24 @@ const Attachments = memo(function Attachments({
     onFilesChange([]);
   };
 
-  const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+  // Use filteredFiles for all calculations
+  const totalSize = filteredFiles.reduce((acc, f) => acc + f.size, 0);
   const images = useMemo(
-    () => files.filter((f) => f.type?.startsWith("image/")),
-    [files],
+    () => filteredFiles.filter((f) => f.type?.startsWith("image/")),
+    [filteredFiles],
   );
   const docs = useMemo(
-    () => files.filter((f) => !f.type?.startsWith("image/")),
-    [files],
+    () => filteredFiles.filter((f) => !f.type?.startsWith("image/")),
+    [filteredFiles],
   );
 
   const FileCard = memo(({ file }: { file: AttachmentFile }) => {
     const isNew = !!file.file;
     const isSaved = !!file.storage_key;
     const isImage = file.type?.startsWith("image/");
-    const fileName = file.name || "Archivo";
+    const fileName = getDisplayName(file);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const thumbSrc = isNew ? file.url : imageUrl;
     const filePath = useMemo(
       () =>
         isSaved && file.storage_key
@@ -192,15 +239,55 @@ const Attachments = memo(function Attachments({
       }
     }, [isSaved, isImage, file.storage_key]);
 
+    const buildFileUrl = async (): Promise<string | null> => {
+      if (file.file && file.url) return file.url;
+      if (isSaved && file.storage_key) {
+        try {
+          const fullPath = await resolveAttachmentPath(file.storage_key);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+          if (isTauri) {
+            const { convertFileSrc } = await import("@tauri-apps/api/core");
+            return convertFileSrc(fullPath);
+          }
+          // Web fallback (dev): try reading via plugin-fs and build blob URL
+          try {
+            const bytes = await readFile(fullPath, {
+              baseDir: BaseDirectory.Document,
+            });
+            const blob = new Blob([bytes], {
+              type: file.type || "application/octet-stream",
+            });
+            return URL.createObjectURL(blob);
+          } catch {
+            return fullPath;
+          }
+        } catch (e) {
+          console.warn("No se pudo resolver ruta de archivo:", e);
+          return null;
+        }
+      }
+      return null;
+    };
+
     const handleOpenFile = async () => {
       if (!isSaved || !file.storage_key) return;
       try {
         const fullPath = await resolveAttachmentPath(file.storage_key);
-        await openWithOS(fullPath);
+        await revealInOS(fullPath);
       } catch (e) {
-        console.error("Error al abrir archivo:", e);
-        alert("No se pudo abrir el archivo");
+        console.error("Error al abrir ubicación:", e);
+        alert("No se pudo abrir la ubicación del archivo");
       }
+    };
+
+    const handlePreview = async () => {
+      const url = await buildFileUrl();
+      if (!url) {
+        alert("No se pudo generar la vista previa del archivo");
+        return;
+      }
+      setPreview({ file, url });
     };
 
     return (
@@ -216,13 +303,12 @@ const Attachments = memo(function Attachments({
         <div className="p-4 flex items-center gap-3">
           {/* Thumbnail / Icon */}
           <div className="w-16 h-16 rounded-lg bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {isImage ? (
+            {isImage && thumbSrc ? (
               <img
-                src={isNew ? file.url : imageUrl || ""}
+                src={thumbSrc}
                 alt={fileName}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  // Fallback si la imagen no se puede cargar
                   e.currentTarget.style.display = "none";
                 }}
               />
@@ -238,7 +324,7 @@ const Attachments = memo(function Attachments({
             <div className="flex items-center gap-2 mb-2">
               <h4
                 className="font-medium text-sm truncate flex-1"
-                title={fileName}
+                title={file.name || fileName}
               >
                 {fileName}
               </h4>
@@ -266,6 +352,21 @@ const Attachments = memo(function Attachments({
 
           {/* Actions */}
           <div className="flex items-center gap-1">
+            {/* Preview (imágenes y PDFs) */}
+            {(isImage || file.type?.includes("pdf")) && (
+              <button
+                onClick={handlePreview}
+                className={cn(
+                  "p-2 rounded-md transition-all",
+                  "hover:bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))]",
+                )}
+                aria-label="Vista previa"
+                title="Vista previa"
+              >
+                <Eye size={18} />
+              </button>
+            )}
             {/* Botón Abrir (solo para archivos guardados) */}
             {isSaved && (
               <button
@@ -285,7 +386,7 @@ const Attachments = memo(function Attachments({
             {/* Delete Button */}
             {!readOnly && (
               <button
-                onClick={() => removeFile(file.id)}
+                onClick={() => setConfirmDelete(file)}
                 className={cn(
                   "p-2 rounded-md transition-all opacity-0 group-hover:opacity-100",
                   "hover:bg-red-500/10 text-red-600 hover:text-red-700",
@@ -335,8 +436,40 @@ const Attachments = memo(function Attachments({
         </div>
       )}
 
+      {/* Session Filter Toggle */}
+      {activeSessionId !== undefined && onFilterModeChange && (
+        <div className="flex items-center justify-center gap-2 p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
+          <button
+            onClick={() => onFilterModeChange("all")}
+            className={cn(
+              "px-4 py-2 rounded-md text-sm font-medium transition-all",
+              filterMode === "all"
+                ? "bg-[hsl(var(--primary))] text-white"
+                : "bg-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]",
+            )}
+          >
+            Todo el paciente
+          </button>
+          <button
+            onClick={() => onFilterModeChange("session")}
+            className={cn(
+              "px-4 py-2 rounded-md text-sm font-medium transition-all",
+              filterMode === "session"
+                ? "bg-[hsl(var(--primary))] text-white"
+                : "bg-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]",
+            )}
+            disabled={!activeSessionId}
+          >
+            Sesión activa
+            {activeSessionId && filterMode === "session" && (
+              <span className="ml-1 opacity-75">({activeSessionId})</span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Summary Card */}
-      {files.length > 0 && (
+      {filteredFiles.length > 0 && (
         <div className="flex items-center justify-between p-4 rounded-lg bg-[hsl(var(--muted))] border border-[hsl(var(--border))]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center">
@@ -344,7 +477,12 @@ const Attachments = memo(function Attachments({
             </div>
             <div>
               <div className="font-medium text-sm">
-                {files.length} archivo{files.length !== 1 ? "s" : ""}
+                {filteredFiles.length} archivo{filteredFiles.length !== 1 ? "s" : ""}
+                {filterMode === "session" && (
+                  <span className="ml-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    (sesión)
+                  </span>
+                )}
               </div>
               <div className="text-xs text-[hsl(var(--muted-foreground))]">
                 {formatFileSize(totalSize)} total
@@ -352,7 +490,7 @@ const Attachments = memo(function Attachments({
             </div>
           </div>
 
-          {!readOnly && files.length > 0 && (
+          {!readOnly && filteredFiles.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
@@ -410,6 +548,12 @@ const Attachments = memo(function Attachments({
               o haz clic para seleccionar • Formatos: Imágenes, PDF, Word
             </p>
 
+            {filterMode === "session" && activeSessionId && (
+              <p className="text-xs text-[hsl(var(--brand))] mb-4 font-medium">
+                Los archivos se vincularán a la sesión activa
+              </p>
+            )}
+
             <label htmlFor="file-upload" className="cursor-pointer">
               <Button variant="secondary" size="sm" className="cursor-pointer">
                 <span className="flex items-center gap-2">
@@ -423,7 +567,7 @@ const Attachments = memo(function Attachments({
       )}
 
       {/* Tabs */}
-      {files.length > 0 && (
+      {filteredFiles.length > 0 && (
         <Tabs defaultValue="images" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="images" className="relative">
@@ -484,6 +628,48 @@ const Attachments = memo(function Attachments({
           relevantes al tratamiento.
         </Alert>
       )}
+
+      {/* Confirm delete */}
+      <Dialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(null);
+        }}
+        title="¿Eliminar adjunto?"
+        description="Esta acción no se puede deshacer."
+        size="sm"
+      >
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirmDelete(null)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            className="bg-red-600 hover:bg-red-700"
+            onClick={() => {
+              if (confirmDelete) {
+                removeFile(confirmDelete);
+              }
+              setConfirmDelete(null);
+            }}
+          >
+            Eliminar
+          </Button>
+        </div>
+      </Dialog>
+
+      {/* Preview Dialog (Radix) */}
+      <FilePreviewModal
+        open={!!preview && !!preview.url}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+        fileUrl={preview?.url || ""}
+        type={
+          preview?.file.type?.includes("pdf") ? "pdf" : "image"
+        }
+        title={preview?.file.name || "Vista previa"}
+      />
     </div>
   );
 });

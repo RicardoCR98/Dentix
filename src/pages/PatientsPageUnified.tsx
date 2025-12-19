@@ -1,5 +1,5 @@
 // src/pages/PatientsPageUnified.tsx
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import Section from "../components/Section";
 import PatientForm from "../components/PatientForm";
 import PatientCard from "../components/PatientCard";
@@ -8,8 +8,7 @@ import Attachments from "../components/Attachments";
 import PatientSearchDialog from "../components/PatientSearchDialog";
 import PendingPaymentsDialog from "../components/PendingPaymentsDialog";
 import ShortcutsHelp from "../components/ShortcutsHelp";
-import { FloatingActionButton } from "../components/FloatingActionButton";
-import { SaveFloatingButton } from "../components/SaveFloatingButton";
+import { MacOSDock } from "../components/MacOSDock";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -47,6 +46,7 @@ import { usePatientRecord } from "../hooks/usePatientRecord";
 import { usePatientFromURL } from "../hooks/usePatientFromURL";
 import { useMasterData } from "../hooks/useMasterData";
 import { useScrollVisibility } from "../hooks/useScrollVisibility";
+import { useAppStore } from "../stores";
 import type { Patient } from "../lib/types";
 import OdontogramDiagnosisSection from "../components/OdontogramDiagnosisSection";
 
@@ -108,6 +108,11 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("odontogram");
   const [isEditingPatient, setIsEditingPatient] = useState(true);
+  const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(null);
+  const [hasManuallyExited, setHasManuallyExited] = useState(false);
+
+  // Quick actions visibility from store
+  const showQuickActions = useAppStore((state) => state.showQuickActions);
 
   // FAB scroll visibility
   const quickActionsRef = useRef<HTMLElement>(null);
@@ -126,6 +131,36 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     hasNewAttachments ||
     hasDraftSessions;
 
+  // Snapshot helpers
+  const isSnapshotMode = snapshotSessionId !== null;
+
+  const latestSavedSessionId = useMemo(() => {
+    const saved = sessions.filter((s) => s.session.is_saved);
+    if (saved.length === 0) return null;
+    return saved
+      .sort((a, b) => (b.session.date || "").localeCompare(a.session.date || ""))
+      .map((s) => s.session.id!)
+      .find(Boolean) as number | null;
+  }, [sessions]);
+
+  const sessionsToRender = useMemo(() => {
+    if (!snapshotSessionId) return sessions;
+    const target = sessions.find((s) => s.session.id === snapshotSessionId);
+    if (!target?.session.date) return sessions;
+    const targetDate = target.session.date;
+    const targetId = target.session.id || 0;
+
+    return sessions
+      .filter((s) => {
+        const d = s.session.date || "";
+        const id = s.session.id || 0;
+        if (d < targetDate) return true;
+        if (d > targetDate) return false;
+        return id <= targetId;
+      })
+      .sort((a, b) => (a.session.date || "").localeCompare(b.session.date || ""));
+  }, [sessions, snapshotSessionId]);
+
   // Handlers
   const handlePreview = useCallback(() => window.print(), []);
 
@@ -133,22 +168,29 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     const result = handleNew();
     if (result) {
       clearPatientURL();
+      // Always show edit form when creating a new patient
       setIsEditingPatient(true);
     }
   }, [handleNew, clearPatientURL]);
 
   const handleSaveWrapper = useCallback(async () => {
+    if (isSnapshotMode) return;
     const result = await handleSave();
     if (result && layoutMode === "tabs") {
       setIsEditingPatient(false);
     }
-  }, [handleSave, layoutMode]);
+  }, [handleSave, layoutMode, isSnapshotMode]);
 
   const handleSelectPatientWrapper = useCallback(
     async (selectedPatient: Patient) => {
       const result = await handleSelectPatient(selectedPatient);
-      if (result && layoutMode === "tabs") {
-        setIsEditingPatient(false);
+      if (result) {
+        setHasManuallyExited(false); // Reset manual exit flag when selecting new patient
+        // In tabs mode, show PatientCard (not edit form) after loading a patient
+        if (layoutMode === "tabs") {
+          setIsEditingPatient(false);
+          // Don't set snapshot here - let useEffect handle auto-snapshot
+        }
       }
     },
     [handleSelectPatient, layoutMode],
@@ -168,6 +210,39 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     },
     [handleQuickPayment],
   );
+
+  const handleToothDxChange = useCallback(
+    (next: typeof toothDx) => {
+      if (isSnapshotMode) return;
+      onToothDxChange(next);
+    },
+    [isSnapshotMode, onToothDxChange],
+  );
+
+  const handleManualDiagnosisChange = useCallback(
+    (next: string) => {
+      if (isSnapshotMode) return;
+      setManualDiagnosis(next);
+    },
+    [isSnapshotMode, setManualDiagnosis],
+  );
+
+  const handleOpenSnapshot = useCallback((sessionId: number) => {
+    setSnapshotSessionId(sessionId);
+  }, []);
+
+  const handleCloseSnapshot = useCallback(() => {
+    setSnapshotSessionId(null);
+    setHasManuallyExited(true); // Mark that user manually exited
+  }, []);
+
+  // Auto snapshot to última sesión guardada cuando se carga un paciente
+  // But only if user hasn't manually exited snapshot mode
+  useEffect(() => {
+    if (!hasManuallyExited && snapshotSessionId === null && latestSavedSessionId) {
+      setSnapshotSessionId(latestSavedSessionId);
+    }
+  }, [latestSavedSessionId, snapshotSessionId, hasManuallyExited]);
 
   // Load patients for dialogs (with debounce)
   useEffect(() => {
@@ -244,6 +319,248 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         />
 
         {/* Quick actions */}
+        {showQuickActions && (
+          <Section
+            ref={quickActionsRef}
+            title="Acciones Rápidas"
+            icon={
+              <PopoverRoot>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Ver atajos de teclado"
+                    className="cursor-pointer inline-flex items-center justify-center rounded-full p-1.5 hover:bg-[hsl(var(--muted))]/60 transition"
+                  >
+                    <Info size={20} />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="bottom"
+                  align="start"
+                  className="w-[320px] p-3"
+                >
+                  <ShortcutsHelp />
+                </PopoverContent>
+              </PopoverRoot>
+            }
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+              <button
+                onClick={handleNewWrapper}
+                disabled={isSnapshotMode}
+                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-success font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(30,157,96,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+              >
+                <Plus size={28} />
+                Nueva historia
+              </button>
+
+              <button
+                onClick={handlePreview}
+                disabled={isSnapshotMode}
+                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-info font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(27,99,209,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+              >
+                <Printer size={28} />
+                Imprimir
+              </button>
+
+              <button
+                onClick={() => setSearchDialogOpen(true)}
+                disabled={isSnapshotMode}
+                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-purple font-semibold text-[15px] shadow-[0_2px_6px_rgba(214,69,69,0.16)] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(122,59,227,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+              >
+                <Search size={28} />
+                Búsqueda de pacientes
+              </button>
+
+              <button
+                onClick={() => setPaymentsDialogOpen(true)}
+                disabled={isSnapshotMode}
+                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-danger font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(214,69,69,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+              >
+                <Wallet size={28} />
+                Cartera de pendientes
+              </button>
+            </div>
+          </Section>
+        )}
+
+        {/* Snapshot banner */}
+        {isSnapshotMode && (
+          <Alert variant="info" className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="font-semibold">
+                Modo histórico: sesión #{snapshotSessionId ?? ""}
+              </div>
+              <div className="text-sm text-[hsl(var(--muted-foreground))]">
+                Vista solo lectura. Los campos están deshabilitados hasta salir.
+              </div>
+            </div>
+            <Button variant="primary" size="sm" onClick={handleCloseSnapshot}>
+              Volver a edición
+            </Button>
+          </Alert>
+        )}
+
+        {/* Patient data */}
+        <Section
+          title="Datos del Paciente"
+          icon={<User size={20} />}
+          right={
+            hasAllergy && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg sticky top-4 z-40">
+                <AlertTriangle size={20} className="animate-pulse" />
+                ALERGIA
+              </div>
+            )
+          }
+        >
+        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+          <PatientForm value={patient} onChange={setPatient} />
+          {!hasPatientData && (
+            <Alert variant="warning" className="mt-4">
+              Por favor completa al menos el nombre y cédula del paciente para
+              poder guardar.
+            </Alert>
+          )}
+        </div>
+      </Section>
+
+      {/* Odontogram */}
+      <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+        <OdontogramDiagnosisSection
+          toothDx={toothDx}
+          onToothDxChange={handleToothDxChange}
+          diagnosisFromTeeth={diagnosisFromTeeth}
+          manualDiagnosis={manualDiagnosis}
+          onManualDiagnosisChange={handleManualDiagnosisChange}
+          readOnly={isSnapshotMode}
+        />
+      </div>
+      {/* Sessions */}
+      <Section
+        title="Evolución y Procedimientos"
+        icon={<Activity size={20} />}
+      >
+        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+          <SessionsTable
+            sessions={sessionsToRender}
+            onSessionsChange={isSnapshotMode ? () => {} : setSessions}
+            procedureTemplates={procedureTemplates}
+            onUpdateTemplates={updateProcedureTemplates}
+            signers={signers}
+            onSignersChange={reloadSigners}
+            reasonTypes={reasonTypes}
+            paymentMethods={paymentMethods}
+            onReasonTypesChange={handleReasonTypesChange}
+            onViewReadOnly={handleOpenSnapshot}
+          />
+        </div>
+      </Section>
+
+      {/* Financial history */}
+      {(() => {
+        const savedSessions = sessionsToRender.filter(
+          (s) => s.session.is_saved === true,
+        );
+
+        return patient.id && savedSessions.length > 0 ? (
+          <Section icon={<Wallet size={20} />} title="Historial Financiero">
+            <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+              <FinancialHistoryBlock
+                sessions={savedSessions}
+                onQuickPayment={() => {
+                  if (isSnapshotMode) return;
+                  setQuickPaymentOpen(true);
+                }}
+              />
+            </div>
+          </Section>
+        ) : null;
+      })()}
+
+        {/* Quick Payment Modal */}
+        {patient.id && (
+          <QuickPaymentModal
+            open={quickPaymentOpen}
+            onOpenChange={setQuickPaymentOpen}
+            patientId={patient.id}
+            paymentMethods={paymentMethods}
+            onSave={handleQuickPaymentWrapper}
+          />
+        )}
+
+      {/* Attachments */}
+      <Section
+        title="Adjuntos (Radiografías, Fotos, Documentos)"
+        icon={<Paperclip size={20} />}
+      >
+        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+          <Attachments
+            files={attachments}
+            onFilesChange={isSnapshotMode ? () => {} : setAttachments}
+            onFileDelete={isSnapshotMode ? () => Promise.resolve() : handleDeleteAttachment}
+            patientName={patient.full_name}
+          />
+        </div>
+      </Section>
+
+        {/* Action buttons */}
+        <div className="flex justify-end gap-3 mt-8 p-6 bg-[hsl(var(--muted))] rounded-lg">
+          <Button onClick={handleNewWrapper} variant="ghost" size="lg" disabled={isSnapshotMode}>
+            <Plus size={18} />
+            Nueva Historia
+          </Button>
+          <Button onClick={handlePreview} variant="secondary" size="lg" disabled={isSnapshotMode}>
+            <FileDown size={18} />
+            Vista previa/Imprimir
+          </Button>
+          <Button
+            onClick={handleSaveWrapper}
+            variant="primary"
+            size="lg"
+            disabled={!canSave || isSnapshotMode}
+            title="Guardar"
+          >
+            <Save size={18} />
+            Guardar Historia
+          </Button>
+        </div>
+
+        {/* macOS Dock */}
+        <MacOSDock
+          visible={true}
+          onNewRecord={handleNewWrapper}
+          onSearch={() => setSearchDialogOpen(true)}
+          onPrint={handlePreview}
+          onSave={handleSaveWrapper}
+          onPendingPayments={() => setPaymentsDialogOpen(true)}
+          hasChanges={hasAnyChanges}
+          changesCount={changesCount}
+          saveDisabled={!canSave}
+          isSnapshotMode={isSnapshotMode}
+        />
+      </>
+    );
+  }
+
+  // Render tabbed layout
+  return (
+    <>
+      {/* Dialogs */}
+      <PatientSearchDialog
+        open={searchDialogOpen}
+        onOpenChange={setSearchDialogOpen}
+        patients={patientsForDialogs}
+        onSelectPatient={handleSelectPatientWrapper}
+      />
+      <PendingPaymentsDialog
+        open={paymentsDialogOpen}
+        onOpenChange={setPaymentsDialogOpen}
+        onSelectPatient={handleSelectPatientWrapper}
+      />
+
+      {/* Quick actions */}
+      {showQuickActions && (
         <Section
           ref={quickActionsRef}
           title="Acciones Rápidas"
@@ -271,7 +588,8 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
             <button
               onClick={handleNewWrapper}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-success font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(30,157,96,0.24)] active:scale-[0.97]"
+              disabled={isSnapshotMode}
+              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-success font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(30,157,96,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               <Plus size={28} />
               Nueva historia
@@ -279,7 +597,8 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
             <button
               onClick={handlePreview}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-info font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(27,99,209,0.24)] active:scale-[0.97]"
+              disabled={isSnapshotMode}
+              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-info font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(27,99,209,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               <Printer size={28} />
               Imprimir
@@ -287,7 +606,8 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
             <button
               onClick={() => setSearchDialogOpen(true)}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-purple font-semibold text-[15px] shadow-[0_2px_6px_rgba(214,69,69,0.16)] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(122,59,227,0.24)] active:scale-[0.97]"
+              disabled={isSnapshotMode}
+              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-purple font-semibold text-[15px] shadow-[0_2px_6px_rgba(214,69,69,0.16)] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(122,59,227,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               <Search size={28} />
               Búsqueda de pacientes
@@ -295,217 +615,32 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
             <button
               onClick={() => setPaymentsDialogOpen(true)}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-danger font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(214,69,69,0.24)] active:scale-[0.97]"
+              disabled={isSnapshotMode}
+              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-danger font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(214,69,69,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               <Wallet size={28} />
               Cartera de pendientes
             </button>
           </div>
         </Section>
+      )}
 
-        {/* Patient data */}
-        <Section
-          title="Datos del Paciente"
-          icon={<User size={20} />}
-          right={
-            hasAllergy && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg sticky top-4 z-40">
-                <AlertTriangle size={20} className="animate-pulse" />
-                ALERGIA
-              </div>
-            )
-          }
-        >
-          <PatientForm value={patient} onChange={setPatient} />
-          {!hasPatientData && (
-            <Alert variant="warning" className="mt-4">
-              Por favor completa al menos el nombre y cédula del paciente para
-              poder guardar.
-            </Alert>
-          )}
-        </Section>
-
-        {/* Odontogram */}
-        <OdontogramDiagnosisSection
-          toothDx={toothDx}
-          onToothDxChange={onToothDxChange}
-          diagnosisFromTeeth={diagnosisFromTeeth}
-          manualDiagnosis={manualDiagnosis}
-          onManualDiagnosisChange={setManualDiagnosis}
-        />
-        {/* Sessions */}
-        <Section
-          title="Evolución y Procedimientos"
-          icon={<Activity size={20} />}
-        >
-          <SessionsTable
-            sessions={sessions}
-            onSessionsChange={setSessions}
-            procedureTemplates={procedureTemplates}
-            onUpdateTemplates={updateProcedureTemplates}
-            signers={signers}
-            onSignersChange={reloadSigners}
-            reasonTypes={reasonTypes}
-            paymentMethods={paymentMethods}
-            onReasonTypesChange={handleReasonTypesChange}
-          />
-        </Section>
-
-        {/* Financial history */}
-        {(() => {
-          const savedSessions = sessions.filter(
-            (s) => s.session.is_saved === true,
-          );
-
-          return patient.id && savedSessions.length > 0 ? (
-            <Section icon={<Wallet size={20} />} title="Historial Financiero">
-              <FinancialHistoryBlock
-                sessions={savedSessions}
-                onQuickPayment={() => setQuickPaymentOpen(true)}
-              />
-            </Section>
-          ) : null;
-        })()}
-
-        {/* Quick Payment Modal */}
-        {patient.id && (
-          <QuickPaymentModal
-            open={quickPaymentOpen}
-            onOpenChange={setQuickPaymentOpen}
-            patientId={patient.id}
-            paymentMethods={paymentMethods}
-            onSave={handleQuickPaymentWrapper}
-          />
-        )}
-
-        {/* Attachments */}
-        <Section
-          title="Adjuntos (Radiografías, Fotos, Documentos)"
-          icon={<Paperclip size={20} />}
-        >
-          <Attachments
-            files={attachments}
-            onFilesChange={setAttachments}
-            onFileDelete={handleDeleteAttachment}
-            patientName={patient.full_name}
-          />
-        </Section>
-
-        {/* Action buttons */}
-        <div className="flex justify-end gap-3 mt-8 p-6 bg-[hsl(var(--muted))] rounded-lg">
-          <Button onClick={handleNewWrapper} variant="ghost" size="lg">
-            <Plus size={18} />
-            Nueva Historia
+      {/* Snapshot banner */}
+      {isSnapshotMode && (
+        <Alert variant="info" className="mb-4 flex items-center justify-between">
+          <div>
+            <div className="font-semibold">
+              Modo histórico: sesión #{snapshotSessionId ?? ""}
+            </div>
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+              Vista solo lectura. Los campos están deshabilitados hasta salir.
+            </div>
+          </div>
+          <Button variant="primary" size="sm" onClick={handleCloseSnapshot}>
+            Volver a edición
           </Button>
-          <Button onClick={handlePreview} variant="secondary" size="lg">
-            <FileDown size={18} />
-            Vista previa/Imprimir
-          </Button>
-          <Button
-            onClick={handleSaveWrapper}
-            variant="primary"
-            size="lg"
-            disabled={!canSave}
-            title="Guardar"
-          >
-            <Save size={18} />
-            Guardar Historia
-          </Button>
-        </div>
-
-        {/* Floating Action Buttons */}
-        <SaveFloatingButton
-          visible={showFAB}
-          hasChanges={hasAnyChanges}
-          changesCount={changesCount}
-          onSave={handleSaveWrapper}
-        />
-        <FloatingActionButton
-          visible={showFAB}
-          onNewRecord={handleNewWrapper}
-          onPrint={handlePreview}
-          onSearch={() => setSearchDialogOpen(true)}
-          onPendingPayments={() => setPaymentsDialogOpen(true)}
-        />
-      </>
-    );
-  }
-
-  // Render tabbed layout
-  return (
-    <>
-      {/* Dialogs */}
-      <PatientSearchDialog
-        open={searchDialogOpen}
-        onOpenChange={setSearchDialogOpen}
-        patients={patientsForDialogs}
-        onSelectPatient={handleSelectPatientWrapper}
-      />
-      <PendingPaymentsDialog
-        open={paymentsDialogOpen}
-        onOpenChange={setPaymentsDialogOpen}
-        onSelectPatient={handleSelectPatientWrapper}
-      />
-
-      {/* Quick actions */}
-      <Section
-        ref={quickActionsRef}
-        title="Acciones Rápidas"
-        icon={
-          <PopoverRoot>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Ver atajos de teclado"
-                className="cursor-pointer inline-flex items-center justify-center rounded-full p-1.5 hover:bg-[hsl(var(--muted))]/60 transition"
-              >
-                <Info size={20} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="bottom"
-              align="start"
-              className="w-[320px] p-3"
-            >
-              <ShortcutsHelp />
-            </PopoverContent>
-          </PopoverRoot>
-        }
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-          <button
-            onClick={handleNewWrapper}
-            className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-success font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(30,157,96,0.24)] active:scale-[0.97]"
-          >
-            <Plus size={28} />
-            Nueva historia
-          </button>
-
-          <button
-            onClick={handlePreview}
-            className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-info font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(27,99,209,0.24)] active:scale-[0.97]"
-          >
-            <Printer size={28} />
-            Imprimir
-          </button>
-
-          <button
-            onClick={() => setSearchDialogOpen(true)}
-            className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-purple font-semibold text-[15px] shadow-[0_2px_6px_rgba(214,69,69,0.16)] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(122,59,227,0.24)] active:scale-[0.97]"
-          >
-            <Search size={28} />
-            Búsqueda de pacientes
-          </button>
-
-          <button
-            onClick={() => setPaymentsDialogOpen(true)}
-            className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-danger font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(214,69,69,0.24)] active:scale-[0.97]"
-          >
-            <Wallet size={28} />
-            Cartera de pendientes
-          </button>
-        </div>
-      </Section>
+        </Alert>
+      )}
 
       {/* Patient data or card */}
       <Section
@@ -521,22 +656,26 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           )
         }
       >
-        {isEditingPatient ? (
-          <>
-            <PatientForm value={patient} onChange={setPatient} />
-            {!hasPatientData && (
-              <Alert variant="warning" className="mt-4">
-                Por favor completa al menos el nombre y cédula del paciente para
-                poder guardar.
-              </Alert>
-            )}
-          </>
-        ) : (
-          <PatientCard
-            patient={patient}
-            onEdit={() => setIsEditingPatient(true)}
-          />
-        )}
+        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+          {/* In tabs mode: show PatientCard when patient is loaded (isEditingPatient=false) */}
+          {/* Show PatientForm when creating new patient or when user clicks "Editar datos" */}
+          {isEditingPatient ? (
+            <>
+              <PatientForm value={patient} onChange={setPatient} />
+              {!hasPatientData && (
+                <Alert variant="warning" className="mt-4">
+                  Por favor completa al menos el nombre y cédula del paciente para
+                  poder guardar.
+                </Alert>
+              )}
+            </>
+          ) : (
+            <PatientCard
+              patient={patient}
+              onEdit={() => setIsEditingPatient(true)}
+            />
+          )}
+        </div>
       </Section>
 
       {/* Tabs system */}
@@ -562,13 +701,16 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
         {/* Tab 1: Odontogram + Diagnosis */}
         <TabsContent value="odontogram">
-          <OdontogramDiagnosisSection
-            toothDx={toothDx}
-            onToothDxChange={onToothDxChange}
-            diagnosisFromTeeth={diagnosisFromTeeth}
-            manualDiagnosis={manualDiagnosis}
-            onManualDiagnosisChange={setManualDiagnosis}
-          />
+          <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+            <OdontogramDiagnosisSection
+              toothDx={toothDx}
+              onToothDxChange={handleToothDxChange}
+              diagnosisFromTeeth={diagnosisFromTeeth}
+              manualDiagnosis={manualDiagnosis}
+              onManualDiagnosisChange={handleManualDiagnosisChange}
+              readOnly={isSnapshotMode}
+            />
+          </div>
         </TabsContent>
 
         {/* Tab 2: Sessions */}
@@ -577,33 +719,41 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             title="Evolución y Procedimientos"
             icon={<Activity size={20} />}
           >
-            <SessionsTable
-              sessions={sessions}
-              onSessionsChange={setSessions}
-              procedureTemplates={procedureTemplates}
-              onUpdateTemplates={updateProcedureTemplates}
-              signers={signers}
-              onSignersChange={reloadSigners}
-              reasonTypes={reasonTypes}
-              paymentMethods={paymentMethods}
-              onReasonTypesChange={handleReasonTypesChange}
-            />
+            <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+              <SessionsTable
+                sessions={sessionsToRender}
+                onSessionsChange={isSnapshotMode ? () => {} : setSessions}
+                procedureTemplates={procedureTemplates}
+                onUpdateTemplates={updateProcedureTemplates}
+                signers={signers}
+                onSignersChange={reloadSigners}
+                reasonTypes={reasonTypes}
+                paymentMethods={paymentMethods}
+                onReasonTypesChange={handleReasonTypesChange}
+                onViewReadOnly={handleOpenSnapshot}
+              />
+            </div>
           </Section>
         </TabsContent>
 
         {/* Tab 3: Financial history */}
         <TabsContent value="financial">
           {(() => {
-            const savedSessions = sessions.filter(
+            const savedSessions = sessionsToRender.filter(
               (s) => s.session.is_saved === true,
             );
 
             return patient.id && savedSessions.length > 0 ? (
               <Section icon={<Wallet size={20} />} title="Historial Financiero">
-                <FinancialHistoryBlock
-                  sessions={savedSessions}
-                  onQuickPayment={() => setQuickPaymentOpen(true)}
-                />
+                <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+                  <FinancialHistoryBlock
+                    sessions={savedSessions}
+                    onQuickPayment={() => {
+                      if (isSnapshotMode) return;
+                      setQuickPaymentOpen(true);
+                    }}
+                  />
+                </div>
               </Section>
             ) : (
               <Section icon={<Wallet size={20} />} title="Historial Financiero">
@@ -633,29 +783,52 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             title="Adjuntos (Radiografías, Fotos, Documentos)"
             icon={<Paperclip size={20} />}
           >
-            <Attachments
-              files={attachments}
-              onFilesChange={setAttachments}
-              onFileDelete={handleDeleteAttachment}
-              patientName={patient.full_name}
-            />
+            <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+              <Attachments
+                files={attachments}
+                onFilesChange={isSnapshotMode ? () => {} : setAttachments}
+                onFileDelete={isSnapshotMode ? () => Promise.resolve() : handleDeleteAttachment}
+                patientName={patient.full_name}
+              />
+            </div>
           </Section>
         </TabsContent>
       </Tabs>
 
-      {/* Floating Action Buttons */}
-      <SaveFloatingButton
-        visible={showFAB}
+      {/* Action buttons (same as vertical layout) */}
+      <div className="flex justify-end gap-3 mt-8 p-6 bg-[hsl(var(--muted))] rounded-lg">
+        <Button onClick={handleNewWrapper} variant="ghost" size="lg" disabled={isSnapshotMode}>
+          <Plus size={18} />
+          Nueva Historia
+        </Button>
+        <Button onClick={handlePreview} variant="secondary" size="lg" disabled={isSnapshotMode}>
+          <FileDown size={18} />
+          Vista previa/Imprimir
+        </Button>
+        <Button
+          onClick={handleSaveWrapper}
+          variant="primary"
+          size="lg"
+          disabled={!canSave || isSnapshotMode}
+          title="Guardar"
+        >
+          <Save size={18} />
+          Guardar Historia
+        </Button>
+      </div>
+
+      {/* macOS Dock */}
+      <MacOSDock
+        visible={true}
+        onNewRecord={handleNewWrapper}
+        onSearch={() => setSearchDialogOpen(true)}
+        onPrint={handlePreview}
+        onSave={handleSaveWrapper}
+        onPendingPayments={() => setPaymentsDialogOpen(true)}
         hasChanges={hasAnyChanges}
         changesCount={changesCount}
-        onSave={handleSaveWrapper}
-      />
-      <FloatingActionButton
-        visible={showFAB}
-        onNewRecord={handleNewWrapper}
-        onPrint={handlePreview}
-        onSearch={() => setSearchDialogOpen(true)}
-        onPendingPayments={() => setPaymentsDialogOpen(true)}
+        saveDisabled={!canSave}
+        isSnapshotMode={isSnapshotMode}
       />
     </>
   );

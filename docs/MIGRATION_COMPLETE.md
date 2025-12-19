@@ -1,6 +1,6 @@
 # Zustand Migration Complete
 
-**Project:** Dentix - Dental Clinic Management System
+**Project:** Oklus - Dental Clinic Management System
 **Date:** 2025-12-11
 **Status:** ✅ PRODUCTION READY
 
@@ -542,7 +542,7 @@ The application is **ready for deployment** with low risk and high user value.
 
 ## Contact & Support
 
-**Project:** Dentix - Dental Clinic Management System
+**Project:** Oklus - Dental Clinic Management System
 **Completed by:** Claude Code (Sonnet 4.5)
 **Date:** 2025-12-11
 

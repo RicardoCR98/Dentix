@@ -19,12 +19,16 @@ type Props = {
   value: Patient;
   onChange: (p: Patient) => void;
   errors?: Partial<Record<keyof Patient, string>>;
+  showSummaryOnly?: boolean;
+  onEditSummary?: () => void;
 };
 
 const PatientForm = memo(function PatientForm({
   value,
   onChange,
   errors,
+  showSummaryOnly,
+  onEditSummary,
 }: Props) {
   const set = <K extends keyof Patient>(k: K, v: Patient[K]) =>
     onChange({ ...value, [k]: v });
@@ -100,92 +104,106 @@ const PatientForm = memo(function PatientForm({
 
   const hasAllergy = Boolean(value.allergy_detail?.trim());
 
-  return (
-    <>
-      {/* Información adicional */}
-      {(value.full_name || value.doc_id) && (
-        <div
-          className={[
-            "mt-4 p-4 rounded-lg border-2 relative mb-10",
-            hasAllergy
-              ? "badge-danger animate-pulseAlert shadow-lg"
-              : "border-[hsl(var(--border))] bg-[hsl(var(--muted))]",
-          ].join(" ")}
-        >
-          {/* Banner de advertencia visible */}
-          {hasAllergy && (
-            <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2  cursor-auto">
-              <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
-              ¡ALERTA! Novedad Encontrada
-            </div>
-          )}
-          <div className="flex items-start gap-6 py-4">
-            <div className="w-20 h-20 rounded-full bg-[hsl(var(--brand)/0.3)] flex items-center justify-center text-white font-bold text-3xl shrink-0 ms-4 mt-4 border-2 border-[hsl(var(--brand))]">
-              {value.full_name?.charAt(0)?.toUpperCase() || "?"}
-            </div>
-            <div className="flex-1 min-w-0 ">
-              <h4 className="mb-2 font-semibold text-[hsl(var(--foreground))] truncate">
-                {value.full_name.toUpperCase() || "Sin nombre"}
-              </h4>
-              <div className="flex flex-wrap gap-4 mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                {value.doc_id && (
-                  <span className="flex items-center gap-1">
-                    <CreditCard size={12} />
-                    {value.doc_id}
-                  </span>
-                )}
-                {age !== null && (
-                  <span className="flex items-center gap-1">
-                    <Calendar size={12} />
-                    {age} años
-                  </span>
-                )}
-                {value.email && (
-                  <span className="flex items-center gap-1">
-                    <Mail size={12} />
-                    {value.email}
-                  </span>
-                )}
-                {value.phone && (
-                  <span className="flex items-center gap-1">
-                    <Phone size={12} />
-                    {value.phone}
-                  </span>
-                )}
-                {value.emergency_phone && (
-                  <span className="flex items-center gap-1 text-red-700 font-semibold">
-                    <PhoneCall size={12} />
-                    {value.emergency_phone}
-                  </span>
-                )}
-              </div>
 
-              <div className="grid gap-2 md:grid-flow-col md:auto-cols-fr">
-                {value.anamnesis && (
-                  <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/6 ">
-                    <div className="text-sm font-semibold mb-1">Anamnesis:</div>
-                    <div className="text-md leading-relaxed text-[hsl(var(--foreground))]">
-                      {value.anamnesis}
-                    </div>
-                  </div>
-                )}
-
-                {hasAllergy && (
-                  <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/6 border border-red-200 dark:border-red-500/30">
-                    <div className="text-sm font-semibold text-red-700 mb-1">
-                      Detalle:
-                    </div>
-                    <div className="text-md leading-relaxed text-[hsl(var(--foreground))]">
-                      {highlightAllergy(value.allergy_detail!)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+  const summaryCard = (value.full_name || value.doc_id) && (
+    <div
+      className={[
+        "mt-4 p-4 rounded-lg border-2 relative mb-10",
+        hasAllergy
+          ? "badge-danger animate-pulseAlert shadow-lg"
+          : "border-[hsl(var(--border))] bg-[hsl(var(--muted))]",
+      ].join(" ")}
+    >
+      {hasAllergy && (
+        <div className="absolute -top-3 left-4 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2  cursor-auto">
+          <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
+          ¡ALERTA! Novedad Encontrada
         </div>
       )}
+      <div className="flex items-start gap-6 py-4">
+        <div className="w-20 h-20 rounded-full bg-[hsl(var(--brand)/0.3)] flex items-center justify-center text-white font-bold text-3xl shrink-0 ms-4 mt-4 border-2 border-[hsl(var(--brand))]">
+          {value.full_name?.charAt(0)?.toUpperCase() || "?"}
+        </div>
+        <div className="flex-1 min-w-0 ">
+          <div className="flex items-start justify-between gap-3">
+            <h4 className="mb-2 font-semibold text-[hsl(var(--foreground))] truncate">
+              {value.full_name.toUpperCase() || "Sin nombre"}
+            </h4>
+            {value.id && onEditSummary && (
+              <button
+                type="button"
+                onClick={onEditSummary}
+                className="inline-flex items-center gap-2 rounded-md border border-[hsl(var(--border))] px-3 py-2 text-sm font-semibold hover:bg-[hsl(var(--muted))] transition"
+              >
+                Editar datos
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-4 mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+            {value.doc_id && (
+              <span className="flex items-center gap-1">
+                <CreditCard size={12} />
+                {value.doc_id}
+              </span>
+            )}
+            {age !== null && (
+              <span className="flex items-center gap-1">
+                <Calendar size={12} />
+                {age} años
+              </span>
+            )}
+            {value.email && (
+              <span className="flex items-center gap-1">
+                <Mail size={12} />
+                {value.email}
+              </span>
+            )}
+            {value.phone && (
+              <span className="flex items-center gap-1">
+                <Phone size={12} />
+                {value.phone}
+              </span>
+            )}
+            {value.emergency_phone && (
+              <span className="flex items-center gap-1 text-red-700 font-semibold">
+                <PhoneCall size={12} />
+                {value.emergency_phone}
+              </span>
+            )}
+          </div>
 
+          <div className="grid gap-2 md:grid-flow-col md:auto-cols-fr">
+            {value.anamnesis && (
+              <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/6 ">
+                <div className="text-sm font-semibold mb-1">Anamnesis:</div>
+                <div className="text-md leading-relaxed text-[hsl(var(--foreground))]">
+                  {value.anamnesis}
+                </div>
+              </div>
+            )}
+
+            {hasAllergy && (
+              <div className="mt-3 p-3 rounded-md bg-white/60 dark:bg-white/6 border border-red-200 dark:border-red-500/30">
+                <div className="text-sm font-semibold text-red-700 mb-1">
+                  Detalle:
+                </div>
+                <div className="text-md leading-relaxed text-[hsl(var(--foreground))]">
+                  {highlightAllergy(value.allergy_detail!)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (showSummaryOnly) {
+    return <>{summaryCard}</>;
+  }
+  return (
+    <>
+      {summaryCard}
       <div className="space-y-4">
         {/* 1. Nombre completo - Cédula */}
         <div className="grid md:grid-cols-2 gap-4">

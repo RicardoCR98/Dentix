@@ -89,40 +89,54 @@ const PatientCard = memo(function PatientCard({
             <h3 className="text-2xl font-bold text-[hsl(var(--foreground))] truncate">
               {patient.full_name?.toUpperCase() || "Sin nombre"}
             </h3>
-            <Button
-              onClick={onEdit}
-              variant="secondary"
-              size="sm"
-              className="ml-4"
-            >
-              <Edit3 size={16} />
-              Editar datos
-            </Button>
+            {patient.id && (
+              <Button
+                onClick={onEdit}
+                variant="primary"
+                size="sm"
+                className="ml-4"
+              >
+                <Edit3 size={16} />
+                Editar datos
+              </Button>
+            )}
           </div>
 
           {/* Demographics Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
             {patient.doc_id && (
               <div className="flex items-center gap-2 text-sm">
-                <CreditCard size={14} className="text-[hsl(var(--muted-foreground))]" />
+                <CreditCard
+                  size={14}
+                  className="text-[hsl(var(--muted-foreground))]"
+                />
                 <span className="font-medium">{patient.doc_id}</span>
               </div>
             )}
             {age !== null && (
               <div className="flex items-center gap-2 text-sm">
-                <Calendar size={14} className="text-[hsl(var(--muted-foreground))]" />
+                <Calendar
+                  size={14}
+                  className="text-[hsl(var(--muted-foreground))]"
+                />
                 <span className="font-medium">{age} años</span>
               </div>
             )}
             {patient.phone && (
               <div className="flex items-center gap-2 text-sm">
-                <Phone size={14} className="text-[hsl(var(--muted-foreground))]" />
+                <Phone
+                  size={14}
+                  className="text-[hsl(var(--muted-foreground))]"
+                />
                 <span className="font-medium">{patient.phone}</span>
               </div>
             )}
             {patient.email && (
               <div className="flex items-center gap-2 text-sm">
-                <Mail size={14} className="text-[hsl(var(--muted-foreground))]" />
+                <Mail
+                  size={14}
+                  className="text-[hsl(var(--muted-foreground))]"
+                />
                 <span className="font-medium truncate">{patient.email}</span>
               </div>
             )}
@@ -132,7 +146,10 @@ const PatientCard = memo(function PatientCard({
           {hasAllergy && (
             <div className="mt-4 p-3 rounded-lg bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-700">
               <div className="flex items-start gap-2">
-                <AlertTriangle size={16} className="text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <AlertTriangle
+                  size={16}
+                  className="text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-red-900 dark:text-red-100 mb-1">
                     Novedad médica importante

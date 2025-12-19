@@ -1,5 +1,13 @@
 // src/components/sessions/ProceduresSection.tsx
-import { useMemo, memo, useCallback } from "react";
+import {
+  useMemo,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -27,9 +35,22 @@ interface ProceduresSectionProps {
 }
 
 // Tipo extendido para poder pasar el índice a los handlers
-type ProcedureRow = VisitProcedure & { _index: number };
+type ProcedureRow = VisitProcedure & { _index: number; _key: string };
 
 const columnHelper = createColumnHelper<ProcedureRow>();
+
+const buildRowKey = (
+  item: VisitProcedure,
+  idx: number,
+  counter: MutableRefObject<number>,
+  fallback?: string,
+) => {
+  if (item.id != null) return `id-${item.id}`;
+  if (item.procedure_template_id != null) {
+    return `tpl-${item.procedure_template_id}-${idx}`;
+  }
+  return fallback ?? `tmp-${++counter.current}`;
+};
 
 export const ProceduresSection = memo(
   ({
@@ -42,38 +63,85 @@ export const ProceduresSection = memo(
     onActiveChange,
     onRemove,
   }: ProceduresSectionProps) => {
-    // Añadimos _index para saber qué elemento del array tocar
-    const data = useMemo<ProcedureRow[]>(
-      () => items.map((item, idx) => ({ ...item, _index: idx })),
-      [items],
+    const keyCounter = useRef(0);
+
+    // Local draft to keep focus stable while typing
+    const [draftItems, setDraftItems] = useState<ProcedureRow[]>(() =>
+      items.map((item, idx) => ({
+        ...item,
+        _index: idx,
+        _key: buildRowKey(item, idx, keyCounter),
+      })),
     );
 
-    // Handlers memoizados
-    const handleActiveChange = useCallback(
-      (idx: number, value: boolean) => onActiveChange(idx, value),
-      [onActiveChange],
-    );
+    useEffect(() => {
+      setDraftItems((prev) => {
+        const prevById = new Map<string | number, ProcedureRow>();
+        prev.forEach((row, idx) => {
+          if (row.id != null) prevById.set(`id-${row.id}`, row);
+          else if (row.procedure_template_id != null) {
+            prevById.set(`tpl-${row.procedure_template_id}`, row);
+          } else {
+            prevById.set(`idx-${idx}`, row);
+          }
+        });
 
-    const handleNameChange = useCallback(
-      (idx: number, value: string) => onNameChange(idx, value),
+        return items.map((item, idx) => {
+          const match =
+            (item.id != null && prevById.get(`id-${item.id}`)) ||
+            (item.procedure_template_id != null &&
+              prevById.get(`tpl-${item.procedure_template_id}`)) ||
+            prevById.get(`idx-${idx}`);
+
+          const preservedKey = match?._key;
+          return {
+            ...item,
+            _index: idx,
+            _key: preservedKey ?? buildRowKey(item, idx, keyCounter),
+          };
+        });
+      });
+    }, [items]);
+
+    const data = useMemo<ProcedureRow[]>(() => draftItems, [draftItems]);
+
+    const commitName = useCallback(
+      (idx: number, value: string) => {
+        onNameChange(idx, value);
+      },
       [onNameChange],
     );
 
-    const handleUnitChange = useCallback(
-      (idx: number, value: string) => onUnitChange(idx, value),
+    const commitUnit = useCallback(
+      (idx: number, value: number) => {
+        onUnitChange(idx, value.toString());
+      },
       [onUnitChange],
     );
 
-    const handleQtyChange = useCallback(
-      (idx: number, value: string, isActive: boolean) => {
-        const newQty = parseInt(value) || 0;
-        onQtyChange(idx, value);
-        // Auto-activar checkbox si cantidad > 0
-        if (newQty > 0 && !isActive) {
+    const commitQty = useCallback(
+      (idx: number, value: number, isActive: boolean) => {
+        onQtyChange(idx, value.toString());
+        if (value > 0 && !isActive) {
           onActiveChange(idx, true);
+        }
+        if (value === 0 && isActive) {
+          onActiveChange(idx, false);
         }
       },
       [onQtyChange, onActiveChange],
+    );
+
+    const handleActiveChange = useCallback(
+      (idx: number, value: boolean) => {
+        setDraftItems((prev) =>
+          prev.map((item) =>
+            item._index === idx ? { ...item, is_active: value } : item,
+          ),
+        );
+        onActiveChange(idx, value);
+      },
+      [onActiveChange],
     );
 
     const handleRemove = useCallback(
@@ -128,7 +196,16 @@ export const ProceduresSection = memo(
                     type="text"
                     value={getValue() as string}
                     onChange={(e) =>
-                      handleNameChange(row.original._index, e.target.value)
+                      setDraftItems((prev) =>
+                        prev.map((item) =>
+                          item._index === row.original._index
+                            ? { ...item, name: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    onBlur={(e) =>
+                      commitName(row.original._index, e.target.value)
                     }
                     placeholder="Nombre del procedimiento"
                     className="h-9"
@@ -157,7 +234,16 @@ export const ProceduresSection = memo(
                   step={1}
                   value={(getValue() as number) || ""}
                   onChange={(e) =>
-                    handleUnitChange(row.original._index, e.target.value)
+                    setDraftItems((prev) =>
+                      prev.map((item) =>
+                        item._index === row.original._index
+                          ? { ...item, unit_price: Number(e.target.value) }
+                          : item,
+                      ),
+                    )
+                  }
+                  onBlur={(e) =>
+                    commitUnit(row.original._index, Number(e.target.value) || 0)
                   }
                   icon={<DollarSign size={14} />}
                   className="h-9 text-center text-sm"
@@ -187,9 +273,18 @@ export const ProceduresSection = memo(
                     step={1}
                     value={(getValue() as number) || ""}
                     onChange={(e) =>
-                      handleQtyChange(
+                      setDraftItems((prev) =>
+                        prev.map((item) =>
+                          item._index === row.original._index
+                            ? { ...item, quantity: Number(e.target.value) || 0 }
+                            : item,
+                        ),
+                      )
+                    }
+                    onBlur={(e) =>
+                      commitQty(
                         row.original._index,
-                        e.target.value,
+                        Number(e.target.value) || 0,
                         isActive,
                       )
                     }
@@ -246,9 +341,9 @@ export const ProceduresSection = memo(
         inEditMode,
         isEditable,
         handleActiveChange,
-        handleNameChange,
-        handleUnitChange,
-        handleQtyChange,
+        commitName,
+        commitUnit,
+        commitQty,
         handleRemove,
       ],
     );
@@ -257,7 +352,7 @@ export const ProceduresSection = memo(
       data,
       columns,
       getCoreRowModel: getCoreRowModel(),
-      getRowId: (row) => row.id?.toString() || `item-${row._index}`,
+      getRowId: (row) => row._key,
     });
 
     // Estado vacío (sin items y no estás editando plantilla)
@@ -318,9 +413,33 @@ export const ProceduresSection = memo(
                     isActive && "bg-[hsl(var(--muted))]",
                     isEditable && "hover:bg-[hsl(var(--muted))]/50",
                   )}
-                  onClick={() => {
+                  onClick={(event) => {
+                    const target = event.target as HTMLElement | null;
+                    if (
+                      target?.closest(
+                        "input,button,textarea,select,[contenteditable]",
+                      )
+                    ) {
+                      return;
+                    }
                     if (isEditable) {
-                      handleActiveChange(row.original._index, !isActive);
+                      const nextActive = !isActive;
+                      setDraftItems((prev) =>
+                        prev.map((item) =>
+                          item._index === row.original._index
+                            ? {
+                                ...item,
+                                is_active: nextActive,
+                                quantity: nextActive ? 1 : 0,
+                              }
+                            : item,
+                        ),
+                      );
+                      commitQty(
+                        row.original._index,
+                        nextActive ? 1 : 0,
+                        isActive,
+                      );
                     }
                   }}
                 >

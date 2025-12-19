@@ -7,7 +7,12 @@ import { Input } from "./ui/Input";
 import { Textarea } from "./ui/Textarea";
 import { DatePicker } from "./ui/DatePicker";
 import { Label } from "./ui/Label";
-import { SelectRoot, SelectTrigger, SelectContent, SelectItem } from "./ui/Select";
+import {
+  SelectRoot,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+} from "./ui/Select";
 import type { PaymentMethod } from "../lib/types";
 
 interface QuickPaymentModalProps {
@@ -110,14 +115,18 @@ export function QuickPaymentModal({
       const payment = {
         date,
         amount: parseFloat(amount),
-        payment_method_id: paymentMethodId ? parseInt(paymentMethodId) : undefined,
+        payment_method_id: paymentMethodId
+          ? parseInt(paymentMethodId)
+          : undefined,
         payment_notes: notes || undefined,
       };
 
       await onSave(payment);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar el abono");
+      setError(
+        err instanceof Error ? err.message : "Error al guardar el abono",
+      );
     } finally {
       setLoading(false);
     }
@@ -178,7 +187,9 @@ export function QuickPaymentModal({
               <span className="flex items-center gap-2">
                 <CreditCard size={16} className="opacity-50" />
                 {paymentMethodId
-                  ? paymentMethods.find((m) => m.id === parseInt(paymentMethodId))?.name
+                  ? paymentMethods.find(
+                      (m) => m.id === parseInt(paymentMethodId),
+                    )?.name
                   : "Seleccionar método"}
               </span>
             </SelectTrigger>

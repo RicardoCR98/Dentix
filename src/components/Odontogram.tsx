@@ -12,17 +12,23 @@ import { cn } from "../lib/cn";
 import { getRepository } from "../lib/storage/TauriSqliteRepository";
 
 type Props = {
-  value: ToothDx;
+  value?: ToothDx;
   onChange: (next: ToothDx) => void;
+  readOnly?: boolean;
 };
 
-const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
+const Odontogram = memo(function Odontogram({
+  value = {},
+  onChange,
+  readOnly = false,
+}: Props) {
   const [openTooth, setOpenTooth] = useState<string | null>(null);
   const [diagOptions, setDiagOptions] = useState<DiagnosisOption[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingOptions, setEditingOptions] = useState<DiagnosisOption[]>([]);
   const [activeTab, setActiveTab] = useState<"adult" | "child">("adult");
   const [isSaving, setIsSaving] = useState(false);
+  const isReadOnly = readOnly;
 
   // Cargar opciones de diagnóstico desde la base de datos
   useEffect(() => {
@@ -58,11 +64,13 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
   };
 
   const handleEditMode = () => {
+    if (isReadOnly) return;
     setIsEditMode(true);
     setEditingOptions(JSON.parse(JSON.stringify(diagOptions)));
   };
 
   const handleCancelEdit = () => {
+    if (isReadOnly) return;
     setIsEditMode(false);
     setEditingOptions([]);
   };
@@ -96,6 +104,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
   };
 
   const handleAddOption = () => {
+    if (isReadOnly) return;
     const newOption: DiagnosisOption = {
       label: " ",
       color: "info",
@@ -105,6 +114,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
   };
 
   const handleDeleteOption = (index: number) => {
+    if (isReadOnly) return;
     setEditingOptions(editingOptions.filter((_, i) => i !== index));
   };
 
@@ -113,6 +123,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
     field: keyof DiagnosisOption,
     value: string,
   ) => {
+    if (isReadOnly) return;
     const updated = [...editingOptions];
     updated[index] = { ...updated[index], [field]: value };
     setEditingOptions(updated);
@@ -175,6 +186,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
   const arches = activeTab === "adult" ? adultArches : childArches;
 
   const toggleDx = (tooth: string, label: string) => {
+    if (isReadOnly) return;
     const prev = value[tooth] || [];
     const exists = prev.includes(label);
     const nextList = exists
@@ -184,12 +196,13 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
   };
 
   const clearTooth = (tooth: string) => {
+    if (isReadOnly) return;
     onChange({ ...value, [tooth]: [] });
     setOpenTooth(null);
   };
 
   const getDiagnosisCount = () => {
-    return Object.values(value).flat().length;
+    return Object.values(value || {}).flat().length;
   };
 
   const renderOdontogramGrid = () => (
@@ -313,6 +326,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
                                 onClick={handleEditMode}
                                 size="sm"
                                 className="flex-1 cursor-pointer"
+                                disabled={isReadOnly}
                               >
                                 <Edit3 size={14} />
                                 Editar
@@ -341,6 +355,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
                                 size="sm"
                                 onClick={handleAddOption}
                                 className="flex-1 cursor-pointer"
+                                disabled={isReadOnly}
                               >
                                 <Plus size={14} />
                                 Añadir
@@ -351,6 +366,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
                                 size="sm"
                                 onClick={handleCancelEdit}
                                 className="flex-1"
+                                disabled={isReadOnly}
                               >
                                 <X size={14} />
                                 Cancelar
@@ -360,7 +376,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
                                 variant="primary"
                                 size="sm"
                                 onClick={handleSaveOptions}
-                                disabled={isSaving}
+                                disabled={isSaving || isReadOnly}
                                 className="flex-1 cursor-pointer"
                               >
                                 <Save size={14} />
@@ -420,6 +436,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
                                     onCheckedChange={() =>
                                       toggleDx(toothNum, diag.label)
                                     }
+                                    disabled={isReadOnly}
                                   />
                                   <span className="flex-1 text-sm">
                                     {diag.label}
@@ -454,6 +471,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
                                 size="sm"
                                 onClick={() => clearTooth(toothNum)}
                                 className="flex-1"
+                                disabled={isReadOnly}
                               >
                                 <X size={14} />
                                 Limpiar
@@ -464,6 +482,7 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
                                 variant="primary"
                                 size="sm"
                                 className="flex-1"
+                                disabled={isReadOnly}
                               >
                                 <Check size={14} />
                                 Confirmar
@@ -544,3 +563,6 @@ const Odontogram = memo(function Odontogram({ value, onChange }: Props) {
 Odontogram.displayName = "Odontogram";
 
 export default Odontogram;
+
+
+

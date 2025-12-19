@@ -190,6 +190,40 @@
     }
 }
 
+/* macOS Dock animations */
+@keyframes dockSlideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes dockSlideDown {
+    from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+}
+
+/* Subtle pulse for Save button when has changes */
+@keyframes savePulse {
+    0%,
+    100% {
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    50% {
+        box-shadow: 0 8px 24px rgba(214, 69, 69, 0.4), 0 2px 12px rgba(214, 69, 69, 0.3);
+    }
+}
+
 @import "tailwindcss";
 
 /* Animación de alerta FUERA del @layer para mayor prioridad */
@@ -248,6 +282,19 @@
 
     .animate-shake {
         animation: shake 0.4s ease-in-out;
+    }
+
+    /* macOS Dock animations */
+    .animate-dock-slide-up {
+        animation: dockSlideUp 400ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .animate-dock-slide-down {
+        animation: dockSlideDown 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .animate-save-pulse {
+        animation: savePulse 2s ease-in-out infinite;
     }
 
     /* Sobrescribir animaciones de Tailwind CSS para hacerlas más lentas */

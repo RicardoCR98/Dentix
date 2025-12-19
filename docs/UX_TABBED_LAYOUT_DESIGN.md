@@ -1,7 +1,7 @@
 # Diseño UX: Layout con Pestañas para PatientsPage
 
 **Fecha:** 2025-12-10
-**Aplicación:** Dentix - Sistema de gestión dental
+**Aplicación:** Oklus - Sistema de gestión dental
 **Componente:** `src/pages/PatientsPage.tsx`
 **Objetivo:** Reducir scroll vertical, mejorar organización visual y facilitar navegación
 
@@ -1042,7 +1042,7 @@ useEffect(() => {
 
 ```
 ┌─────────────────────────────┐
-│ [≡] Dentix         [🔍] [☰] │
+│ [≡] Oklus         [🔍] [☰] │
 ├─────────────────────────────┤
 │ 📋 Juan Pérez               │
 │    CI: 1234567890           │

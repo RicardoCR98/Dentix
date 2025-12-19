@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the design, implementation, and usage of the Floating Action Button (FAB) system for the Dentix dental clinic management application.
+This document describes the design, implementation, and usage of the Floating Action Button (FAB) system for the Oklus dental clinic management application.
 
 ## Design Philosophy
 

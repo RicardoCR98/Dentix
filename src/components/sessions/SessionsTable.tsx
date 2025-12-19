@@ -36,6 +36,7 @@ interface SessionsTableProps {
   reasonTypes: ReasonType[];
   paymentMethods: PaymentMethod[];
   onReasonTypesChange: () => Promise<void>;
+  autoCreateDraftKey?: number | string;
   activeId?: number | null;
   onOpenSession?: (sessionId: number) => void;
   onViewReadOnly?: (sessionId: number, visitId?: number) => void;
@@ -53,6 +54,7 @@ const SessionsTable = memo(function SessionsTable({
   reasonTypes,
   paymentMethods,
   onReasonTypesChange,
+  autoCreateDraftKey,
   activeId,
   onOpenSession,
   onViewReadOnly,
@@ -103,6 +105,18 @@ const SessionsTable = memo(function SessionsTable({
       }
     }
   }, [sessions.length, activeId]);
+
+  // NEW: Sync expansion with activeId (when session context changes)
+  useEffect(() => {
+    if (activeId !== undefined && activeId !== null) {
+      const idStr = String(activeId);
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.add(idStr);
+        return next;
+      });
+    }
+  }, [activeId]);
 
   // Determinar cuál es la sesión más reciente EN BORRADOR (la única editable)
   const mostRecentDraftId = useMemo(() => {
@@ -221,6 +235,11 @@ const SessionsTable = memo(function SessionsTable({
     setPage(0);
   }, [sessions, onSessionsChange, onOpenSession, newRow]);
 
+  useEffect(() => {
+    if (autoCreateDraftKey === undefined || autoCreateDraftKey === null) return;
+    addRow();
+  }, [autoCreateDraftKey, addRow]);
+
   // Eliminar sesión (solo borradores)
   const deleteSession = useCallback(
     (sessionId: string) => {
@@ -288,22 +307,24 @@ const SessionsTable = memo(function SessionsTable({
 
   const handleToggleRow = useCallback(
     (id: number) => {
-      if (activeId !== undefined) {
-        if (onOpenSession) onOpenSession(id);
-        return;
-      }
       const idStr = id.toString();
       setExpandedIds((prev) => {
         const next = new Set(prev);
-        if (next.has(idStr)) {
+        const wasExpanded = next.has(idStr);
+
+        if (wasExpanded) {
           next.delete(idStr);
         } else {
           next.add(idStr);
+          // NEW: Notify parent when expanding a session (makes it active)
+          if (onOpenSession) {
+            onOpenSession(id);
+          }
         }
         return next;
       });
     },
-    [activeId, onOpenSession],
+    [onOpenSession],
   );
 
   // Agregar un procedimiento vacío a una sesión
@@ -487,6 +508,7 @@ const SessionsTable = memo(function SessionsTable({
                   isExpanded={isExpanded}
                   isEditable={isEditable}
                   inEditMode={inEditMode}
+                  isActive={row.session.id === activeId}
                   manualBudgetEnabled={
                     manualBudgetEnabled.get(sessionId) || false
                   }

@@ -588,7 +588,7 @@ import { devtools } from 'zustand/middleware';
 export const useAppStore = create(
   devtools(
     persist(...),
-    { name: 'DentixStore' }
+    { name: 'OklusStore' }
   )
 );
 ```

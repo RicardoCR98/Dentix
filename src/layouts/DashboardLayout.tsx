@@ -18,7 +18,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ clinicName, slogan }: DashboardLayoutProps) {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))] ">

@@ -2,7 +2,7 @@
 
 ## System Overview
 
-This document provides a high-level overview of the Zustand-based state management architecture for the Dentix dental clinic application.
+This document provides a high-level overview of the Zustand-based state management architecture for the Oklus dental clinic application.
 
 ## Visual Architecture
 

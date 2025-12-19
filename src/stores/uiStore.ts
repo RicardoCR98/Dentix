@@ -17,6 +17,7 @@ export interface UIState {
   // Layout preferences
   layoutMode: 'tabs' | 'vertical';
   activeTab: string;
+  showQuickActions: boolean; // NEW: Toggle for quick actions visibility
 
   // Dialog states
   searchDialogOpen: boolean;
@@ -36,6 +37,8 @@ export interface UIActions {
   setLayoutMode: (mode: 'tabs' | 'vertical') => Promise<void>;
   loadLayoutModeFromDB: () => Promise<void>;
   setActiveTab: (tab: string) => void;
+  setShowQuickActions: (show: boolean) => Promise<void>; // NEW
+  loadShowQuickActionsFromDB: () => Promise<void>; // NEW
 
   // Dialog actions
   setSearchDialogOpen: (open: boolean) => void;
@@ -60,6 +63,7 @@ export const createUISlice = (set: any, get: any) => ({
   // Initial state
   layoutMode: 'vertical' as const,
   activeTab: 'odontogram',
+  showQuickActions: true, // NEW: Default to showing quick actions
   searchDialogOpen: false,
   paymentsDialogOpen: false,
   loadedFromUrl: false,
@@ -96,6 +100,34 @@ export const createUISlice = (set: any, get: any) => ({
 
   setActiveTab: (tab: string) => {
     set({ activeTab: tab });
+  },
+
+  setShowQuickActions: async (show: boolean) => {
+    set({ showQuickActions: show });
+
+    // Persist to database (user_settings table)
+    try {
+      const repo = await getRepository();
+      await repo.setSetting('showQuickActions', String(show), 'appearance');
+    } catch (error) {
+      console.error('Error saving showQuickActions to database:', error);
+      // Don't throw - allow UI to update even if DB save fails
+    }
+  },
+
+  loadShowQuickActionsFromDB: async () => {
+    try {
+      const repo = await getRepository();
+      const saved = await repo.getSetting('showQuickActions');
+
+      if (saved === 'true' || saved === 'false') {
+        set({ showQuickActions: saved === 'true' });
+      }
+      // If no setting exists, keep default (true)
+    } catch (error) {
+      console.error('Error loading showQuickActions from database:', error);
+      // Default to true on error (already set in initial state)
+    }
   },
 
   setSearchDialogOpen: (open: boolean) => {

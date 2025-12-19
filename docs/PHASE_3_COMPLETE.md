@@ -482,4 +482,4 @@ The unified component architecture is **production-ready** and can be deployed i
 
 **Generated:** 2025-12-11
 **Author:** Claude Code (Sonnet 4.5)
-**Project:** Dentix - Dental Clinic Management System
+**Project:** Oklus - Dental Clinic Management System

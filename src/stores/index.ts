@@ -2,9 +2,21 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { createPatientSlice, type PatientState, type PatientActions } from "./patientStore";
-import { createSessionSlice, type SessionState, type SessionActions } from "./sessionStore";
-import { createMasterDataSlice, type MasterDataState, type MasterDataActions } from "./masterDataStore";
+import {
+  createPatientSlice,
+  type PatientState,
+  type PatientActions,
+} from "./patientStore";
+import {
+  createSessionSlice,
+  type SessionState,
+  type SessionActions,
+} from "./sessionStore";
+import {
+  createMasterDataSlice,
+  type MasterDataState,
+  type MasterDataActions,
+} from "./masterDataStore";
 import { createUISlice, type UIState, type UIActions } from "./uiStore";
 import { STORAGE_KEY, STORAGE_VERSION } from "./persistenceConfig";
 
@@ -56,7 +68,7 @@ export const useAppStore = create<AppStore>()(
       hasUnsavedChanges: () => {
         const state = get();
         // Check if patient has unsaved changes
-        if (state.hasUnsavedChanges) return true;
+        if (state.hasUnsavedChanges()) return true;
 
         // Check if there are draft sessions
         const draftSessions = state.sessions.filter((s) => !s.session.is_saved);
@@ -113,8 +125,8 @@ export const useAppStore = create<AppStore>()(
         }
         return persistedState;
       },
-    }
-  )
+    },
+  ),
 );
 
 /**
@@ -130,7 +142,8 @@ export const selectPatient = (state: AppStore) => state.patient;
 export const selectToothDx = (state: AppStore) => state.toothDx;
 export const selectManualDiagnosis = (state: AppStore) => state.manualDiagnosis;
 export const selectAttachments = (state: AppStore) => state.attachments;
-export const selectIsEditingPatient = (state: AppStore) => state.isEditingPatient;
+export const selectIsEditingPatient = (state: AppStore) =>
+  state.isEditingPatient;
 
 // Session selectors
 export const selectSession = (state: AppStore) => state.session;
@@ -141,7 +154,8 @@ export const selectSavedSessions = (state: AppStore) =>
   state.sessions.filter((s) => s.session.is_saved === true);
 
 // Master data selectors
-export const selectProcedureTemplates = (state: AppStore) => state.procedureTemplates;
+export const selectProcedureTemplates = (state: AppStore) =>
+  state.procedureTemplates;
 export const selectSigners = (state: AppStore) => state.signers;
 export const selectReasonTypes = (state: AppStore) => state.reasonTypes;
 export const selectPaymentMethods = (state: AppStore) => state.paymentMethods;
@@ -149,11 +163,14 @@ export const selectPaymentMethods = (state: AppStore) => state.paymentMethods;
 // UI selectors
 export const selectLayoutMode = (state: AppStore) => state.layoutMode;
 export const selectActiveTab = (state: AppStore) => state.activeTab;
-export const selectSearchDialogOpen = (state: AppStore) => state.searchDialogOpen;
-export const selectPaymentsDialogOpen = (state: AppStore) => state.paymentsDialogOpen;
+export const selectSearchDialogOpen = (state: AppStore) =>
+  state.searchDialogOpen;
+export const selectPaymentsDialogOpen = (state: AppStore) =>
+  state.paymentsDialogOpen;
 
 // Computed selectors
-export const selectHasUnsavedChanges = (state: AppStore) => state.hasUnsavedChanges();
+export const selectHasUnsavedChanges = (state: AppStore) =>
+  state.hasUnsavedChanges();
 export const selectHasPatientData = (state: AppStore) =>
   Boolean(state.patient.full_name && state.patient.doc_id);
 export const selectCanSave = (state: AppStore) =>
@@ -164,7 +181,9 @@ export const selectDiagnosisFromTeeth = (state: AppStore) => {
   const lines = Object.keys(state.toothDx)
     .sort((a, b) => +a - +b)
     .map((n) =>
-      state.toothDx[n]?.length ? `Diente ${n}: ${state.toothDx[n].join(", ")}` : ""
+      state.toothDx[n]?.length
+        ? `Diente ${n}: ${state.toothDx[n].join(", ")}`
+        : "",
     )
     .filter(Boolean);
   return lines.join("\n");

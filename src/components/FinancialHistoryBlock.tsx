@@ -17,6 +17,11 @@ interface FinancialHistoryBlockProps {
   sessions: SessionWithItems[]; // Solo sesiones guardadas (is_saved = true)
   allSessions?: SessionWithItems[]; // Todas las sesiones (para calcular totales)
   onQuickPayment: () => void; // Callback para abrir modal de abono rápido
+
+  // NEW PROPS: Session filtering
+  activeSessionId?: number | null;
+  filterMode?: "all" | "session";
+  onFilterModeChange?: (mode: "all" | "session") => void;
 }
 
 /**
@@ -37,12 +42,21 @@ export function FinancialHistoryBlock({
   sessions,
   allSessions,
   onQuickPayment,
+  activeSessionId,
+  filterMode = "all",
+  onFilterModeChange,
 }: FinancialHistoryBlockProps) {
   // NOTA: sessions ya viene filtrado desde el padre (App.tsx) para incluir solo is_saved === true
   // Por lo tanto, NO necesitamos filtrar nuevamente aquí
 
+  // NEW: Filter by session if needed
+  const filteredSessions =
+    filterMode === "session" && activeSessionId
+      ? sessions.filter((s) => s.session.id === activeSessionId)
+      : sessions;
+
   // Sort by date DESC (most recent first)
-  const sortedSessions = [...sessions].sort((a, b) => {
+  const sortedSessions = [...filteredSessions].sort((a, b) => {
     const dateA = new Date(a.session.date).getTime();
     const dateB = new Date(b.session.date).getTime();
     return dateB - dateA;
@@ -85,10 +99,49 @@ export function FinancialHistoryBlock({
 
   return (
     <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] overflow-hidden">
+      {/* Session Filter Toggle */}
+      {activeSessionId !== undefined && onFilterModeChange && (
+        <div className="px-6 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.5)]">
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => onFilterModeChange("all")}
+              className={cn(
+                "px-4 py-2 rounded-md text-sm font-medium transition-all",
+                filterMode === "all"
+                  ? "bg-[hsl(var(--primary))] text-white"
+                  : "bg-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]",
+              )}
+            >
+              Todo el paciente
+            </button>
+            <button
+              onClick={() => onFilterModeChange("session")}
+              className={cn(
+                "px-4 py-2 rounded-md text-sm font-medium transition-all",
+                filterMode === "session"
+                  ? "bg-[hsl(var(--primary))] text-white"
+                  : "bg-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]",
+              )}
+              disabled={!activeSessionId}
+            >
+              Sesión activa
+              {activeSessionId && filterMode === "session" && (
+                <span className="ml-1 opacity-75">({activeSessionId})</span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Patient Summary Section */}
       <div className="px-6 py-4 border-b border-[hsl(var(--border))]">
-        <h4 className="font-semibold mb-3 text-[hsl(var(--foreground))]">
-          Resumen general del paciente
+        <h4 className="font-semibold mb-3 text-[hsl(var(--foreground))] flex items-center gap-2">
+          <span>Resumen general del paciente</span>
+          {filterMode === "session" && (
+            <Badge variant="info" className="text-xs">
+              Mostrando transacciones de sesión activa
+            </Badge>
+          )}
         </h4>
         <div className="grid md:grid-cols-3 gap-4">
           <div className="text-center p-3 rounded-md badge-info">

@@ -1,8 +1,8 @@
-# Architecture Documentation - Dentix Desktop
+# Architecture Documentation - Oklus Desktop
 
 ## Overview
 
-Dentix is a **desktop-first, offline-first dental clinic management system** built with modern web technologies wrapped in a native desktop application. The application follows a **monolithic desktop architecture** where frontend and backend run in a single bundled executable.
+Oklus is a **desktop-first, offline-first dental clinic management system** built with modern web technologies wrapped in a native desktop application. The application follows a **monolithic desktop architecture** where frontend and backend run in a single bundled executable.
 
 ## C4 Model Diagrams
 

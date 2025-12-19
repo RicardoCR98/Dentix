@@ -1,4 +1,4 @@
-@startuml Dentix Database Schema
+@startuml Oklus Database Schema (Triada + Text Templates)
 
 !define TABLE(x) class x << (T,#FFAAAA) >>
 !define PK(x) <u>x</u>
@@ -11,9 +11,6 @@ skinparam class {
   ArrowColor Black
 }
 
-' =========================
-' CORE
-' =========================
 package "Core" {
 
   TABLE(doctor_profile) {
@@ -28,7 +25,7 @@ package "Core" {
     phone: TEXT
     location: TEXT
     app_version: TEXT
-    agreed_to_terms: INTEGER
+    agreed_to_terms: INTEGER DEFAULT 0
     last_sync: TEXT
     created_at: TEXT
     updated_at: TEXT
@@ -48,6 +45,13 @@ package "Core" {
     status: TEXT DEFAULT 'active'
     created_at: TEXT
     updated_at: TEXT
+
+    .. Triada (cobros) ..
+    debt_opened_at: TEXT
+    debt_archived: INTEGER DEFAULT 0
+    debt_archived_at: TEXT
+    last_contact_at: TEXT
+    last_contact_type: TEXT
   }
 
   TABLE(sessions) {
@@ -55,17 +59,20 @@ package "Core" {
     --
     FK(patient_id): INTEGER
     date: TEXT NOT NULL
-    .. Motivo ..
+
+    .. Motivo (snapshot) ..
     reason_type: TEXT
     reason_detail: TEXT
-    .. Clínico ..
+
+    .. Clínico (snapshots) ..
     diagnosis_text: TEXT
     auto_dx_text: TEXT
     full_dx_text: TEXT
     tooth_dx_json: TEXT
     clinical_notes: TEXT
     signer: TEXT
-    .. Financiero ..
+
+    .. Financiero (snapshot) ..
     budget: REAL DEFAULT 0
     discount: REAL DEFAULT 0
     payment: REAL DEFAULT 0
@@ -73,6 +80,7 @@ package "Core" {
     cumulative_balance: REAL DEFAULT 0
     FK(payment_method_id): INTEGER
     payment_notes: TEXT
+
     .. Metadata ..
     is_saved: INTEGER DEFAULT 0
     created_at: TEXT
@@ -83,16 +91,13 @@ package "Core" {
     PK(id): INTEGER
     --
     FK(session_id): INTEGER
-    .. Facturación ..
     name: TEXT NOT NULL
     unit_price: REAL NOT NULL
-    quantity: INTEGER NOT NULL
+    quantity: INTEGER DEFAULT 1
     subtotal: REAL NOT NULL
     is_active: INTEGER DEFAULT 1
-    .. Clínico opcional ..
     tooth_number: TEXT
     procedure_notes: TEXT
-    .. Auditoría ..
     FK(procedure_template_id): INTEGER
     sort_order: INTEGER DEFAULT 0
     created_at: TEXT
@@ -111,12 +116,24 @@ package "Core" {
     note: TEXT
     created_at: TEXT
   }
+
+  TABLE(text_templates) {
+    PK(id): INTEGER
+    --
+    kind: TEXT NOT NULL
+    title: TEXT NOT NULL
+    body: TEXT NOT NULL
+    tags: TEXT
+    source: TEXT DEFAULT 'system'
+    is_favorite: INTEGER DEFAULT 0
+    active: INTEGER DEFAULT 1
+    sort_order: INTEGER DEFAULT 0
+    created_at: TEXT
+    updated_at: TEXT
+  }
 }
 
-' =========================
-' CATÁLOGOS (MASTER DATA)
-' =========================
-package "catalogs" {
+package "Catalogs" {
 
   TABLE(procedure_templates) {
     PK(id): INTEGER
@@ -178,10 +195,7 @@ package "catalogs" {
   }
 }
 
-' =========================
-' TELEMETRÍA Y SYNC
-' =========================
-package "telemetry" {
+package "Telemetry" {
 
   TABLE(telemetry_events) {
     PK(id): INTEGER
@@ -219,79 +233,33 @@ package "telemetry" {
   }
 }
 
-' =========================
-' RELACIONES
-' =========================
-
-' Paciente → Sesiones (1:N)
 patients "1" --> "0..*" sessions : tiene
-
-' Paciente → Adjuntos (1:N)
 patients "1" --> "0..*" attachments : tiene
-
-' Sesión → Items (1:N)
 sessions "1" --> "0..*" session_items : contiene
-
-' Sesión → Adjuntos (1:N, opcional)
 sessions "1" --> "0..*" attachments : puede tener
-
-' Sesión → Método de pago (N:1, opcional)
 sessions "0..*" --> "0..1" payment_methods : usa
-
-' Item → Plantilla (N:1, opcional - para auditoría)
 session_items "0..*" --> "0..1" procedure_templates : basado en
-
-' Telemetría → Doctor (N:1)
 telemetry_events "0..*" --> "1" doctor_profile : pertenece a
 
-' =========================
-' NOTAS
-' =========================
-
 note right of sessions
-  **Corazón de la app**
-  Combina info clínica + financiera
-
-  **Snapshots inmutables**:
-  - tooth_dx_json: Estado del odontograma
-  - signer: Nombre del doctor
-  - reason_type: Motivo de consulta
-
-  **Auto-calculados**:
-  - budget = sum(items.subtotal WHERE is_active=1)
-  - balance = budget - discount - payment
+  SNAPSHOTS INMUTABLES:
+  - reason_type, signer son TEXT
+  - diagnosis_text/notes son texto final guardado
+  - items: name/unit_price snapshots
 end note
 
-note right of session_items
-  **Items de facturación**
-
-  Snapshots de precio:
-  - name, unit_price: Copiados de template
-  - No cambian si template cambia después
-
-  Metadata clínica opcional:
-  - tooth_number: ¿En qué diente?
-  - procedure_notes: Notas específicas
+note right of patients
+  TRIADA (operacional):
+  - debt_opened_at para mora (usa session.date)
+  - last_contact_at para estado de cuenta (sin WhatsApp API)
+  - debt_archived para limpiar cartera sin borrar historial
 end note
 
-note bottom of procedure_templates
-  **Catálogos maestros**
-
-  Plantillas reutilizables para:
-  - Procedimientos
-  - Doctores (signers)
-  - Diagnósticos (diagnosis_options)
-  - Motivos de consulta (reason_types)
-  - Métodos de pago (payment_methods)
+note right of text_templates
+  Plantillas:
+  - source=system | user
+  - kind define dónde se inserta
+  - NO FK con sessions (solo copia texto)
 end note
 
-note bottom of telemetry_events
-  **Sistema de telemetría offline-first**
-
-  Buffer local de eventos que se envían
-  cuando hay conexión:
-  - Eventos de uso
-  - Logs de errores
-  - Cola de sincronización (CDC)
-end note
 @enduml

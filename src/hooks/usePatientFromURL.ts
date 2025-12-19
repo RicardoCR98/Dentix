@@ -1,5 +1,5 @@
 // src/hooks/usePatientFromURL.ts
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Patient } from "../lib/types";
 import { getRepository } from "../lib/storage/TauriSqliteRepository";
@@ -17,10 +17,11 @@ export function usePatientFromURL({ onPatientLoaded }: UsePatientFromURLOptions)
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [urlPatientLoaded, setUrlPatientLoaded] = useState(false);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     // Only load once
-    if (urlPatientLoaded) return;
+    if (urlPatientLoaded || loadingRef.current) return;
 
     const patientIdParam = searchParams.get("patientId");
     if (!patientIdParam) {
@@ -33,6 +34,8 @@ export function usePatientFromURL({ onPatientLoaded }: UsePatientFromURLOptions)
       setUrlPatientLoaded(true);
       return;
     }
+
+    loadingRef.current = true;
 
     (async () => {
       try {
@@ -66,6 +69,8 @@ export function usePatientFromURL({ onPatientLoaded }: UsePatientFromURLOptions)
           "No se pudo cargar el paciente desde la URL",
         );
         setUrlPatientLoaded(true);
+      } finally {
+        loadingRef.current = false;
       }
     })();
   }, [urlPatientLoaded, searchParams, toast, setSearchParams, onPatientLoaded]);

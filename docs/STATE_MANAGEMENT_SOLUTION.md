@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The Dentix dental clinic application has **duplicate patient management pages** that cause significant issues:
+The Oklus dental clinic application has **duplicate patient management pages** that cause significant issues:
 
 ```
 PatientsPage.tsx          (874 lines)   - Single-page vertical layout

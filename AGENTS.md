@@ -1,40 +1,32 @@
 # Repository Guidelines
 
-## Project Structure & Modules
-- `src/` — React + TypeScript app (routing, views, Zustand stores, UI components).
-- `src-tauri/` — Tauri (Rust) desktop shell and plugins config.
-- `public/` — static assets served by Vite.
-- `dist/` — production build output.
-- `docs/` and root `*.md` — design/implementation notes.
-- `schema.sql` and `schema.puml` — app data model (used with Tauri SQL plugin).
+## Project Structure & Module Organization
+- `src/` — React + TypeScript app: `components/` (Radix/Tailwind UI), `pages/` (routes), `hooks/`, `stores/` (Zustand), `theme/` tokens, `assets/` static.
+- `src-tauri/` — Tauri shell/config/plugins; update when desktop behavior or permissions change.
+- `public/` — static assets for Vite; `docs/` + root `*.md` hold runbooks and context; `agents/` stores AI agent prompts/configs.
+- `dist/` — output of `pnpm build`; avoid manual edits.
 
-## Build, Test, and Development
-- Install: `pnpm install` (pnpm is expected; see `pnpm-lock.yaml`).
-- Web dev server: `pnpm dev` (Vite at localhost with HMR).
-- Desktop dev (Tauri): `pnpm tauri:dev` (spawns Vite + Tauri shell).
-- Build web: `pnpm build` (outputs to `dist/`).
-- Build desktop: `pnpm tauri:build` (platform binaries under `src-tauri/target`).
-- Lint: `pnpm lint` (ESLint 9, React hooks, TypeScript rules).
+## Build, Test, and Development Commands
+- Install deps: `pnpm install` (pnpm lock is authoritative).
+- Web dev: `pnpm dev` (Vite + HMR). Production preview: `pnpm preview`.
+- Desktop dev: `pnpm tauri:dev`; desktop build: `pnpm tauri:build`.
+- Web build: `pnpm build` → `dist/`; lint: `pnpm lint` (ESLint 9 + React hooks + TS rules).
 
-## Coding Style & Naming
-- TypeScript strictness per `tsconfig*.json`; prefer explicit types on public APIs.
-- React 19 with hooks; co-locate state with features; global state via `zustand/*`.
-- Tailwind v4 utility-first; use small, composable class lists and `clsx`.
-- Components: `PascalCase.tsx`; hooks: `useThing.ts`; utilities: `camelCase.ts`.
-- Avoid default exports for shared modules; prefer named exports.
-- Run `pnpm lint` before pushing; fix warnings unless intentionally justified.
+## Coding Style & Naming Conventions
+- TypeScript + React 19 hooks; keep components small and pure. Prefer named exports.
+- Files: components `PascalCase.tsx`; hooks `useThing.ts`; utilities `camelCase.ts`.
+- Styling: Tailwind v4 utilities with `clsx`; use Radix primitives for inputs, dialogs, menus. Keep class lists concise; avoid inline styles.
+- Indent with 2 spaces; favor ASCII identifiers/strings; run `pnpm lint` before pushing.
 
 ## Testing Guidelines
-- No formal test runner is configured yet. For contributions that add risky logic, include lightweight tests (suggested: Vitest + React Testing Library) or add story-style examples in `docs/` demonstrating behavior and edge cases.
-- Follow file co-location: `src/feature/File.test.ts` when adding tests.
+- No automated tests are configured yet. For new logic, prefer Vitest + React Testing Library with co-located specs `*.test.ts(x)`.
+- For UI changes, include brief manual steps in PRs (e.g., create patient → edit procedures table → save) plus screenshots/GIFs of key states.
 
-## Commit & Pull Requests
-- Commits: concise, imperative subject; scope where helpful. Examples: `feat: add patient search`, `fix(sql): escape identifiers`, `chore: bump tauri cli`.
-- PRs must include: purpose, summary of changes, screenshots/GIFs for UI, and any migration notes (DB/schema changes in `schema.sql`). Link issues when applicable.
-- Keep PRs focused and under ~400 lines of diff when possible.
+## Commit & Pull Request Guidelines
+- Git history favors short imperative prefixes: `add: …`, `fix: …`, `update: …`. Follow that format; scope tags optional.
+- PRs: include purpose, summary of changes, manual test notes, linked issues, and UI evidence for visual tweaks. Call out DB/Tauri config changes explicitly.
+- Keep PRs focused; avoid mixing feature work with formatting-only churn.
 
-## Security & Configuration
-- Desktop data persists via Tauri SQL plugin; validate inputs and avoid raw SQL string concatenation.
-- Do not commit secrets. Prefer OS keychains or `.env` ignored by Git if needed.
-- When introducing native permissions, document rationale in `src-tauri/tauri.conf.json`.
-
+## Security & Configuration Notes
+- Desktop data persists through the Tauri SQL plugin; sanitize inputs and avoid raw SQL string concatenation.
+- Do not commit secrets; use env vars or OS keychains. Document any new permissions in `src-tauri/tauri.conf.json`.

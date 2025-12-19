@@ -1,8 +1,8 @@
-# Coding Standards - Dentix Desktop
+# Coding Standards - Oklus Desktop
 
 ## Overview
 
-This document defines the coding standards, conventions, and best practices for the Dentix Desktop project. All contributors must follow these guidelines to maintain code quality and consistency.
+This document defines the coding standards, conventions, and best practices for the Oklus Desktop project. All contributors must follow these guidelines to maintain code quality and consistency.
 
 ## TypeScript / React Standards
 

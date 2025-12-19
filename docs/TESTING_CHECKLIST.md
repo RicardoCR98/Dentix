@@ -584,4 +584,4 @@ Document any issues found during testing:
 
 **Document Version:** 1.0
 **Last Updated:** 2025-12-11
-**Project:** Dentix - Dental Clinic Management System
+**Project:** Oklus - Dental Clinic Management System

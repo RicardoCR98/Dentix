@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains comprehensive documentation for the Zustand-based state management migration in the Dentix dental clinic application.
+This directory contains comprehensive documentation for the Zustand-based state management migration in the Oklus dental clinic application.
 
 ## Problem Solved
 

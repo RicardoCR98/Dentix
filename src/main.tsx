@@ -13,6 +13,7 @@ import { PatientsListPage } from "./pages/PatientsListPage";
 import { FinancesPage } from "./pages/FinancesPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SchedulePage } from "./pages/SchedulePage";
 
 /**
  * Estado de la aplicación durante la inicialización
@@ -127,7 +128,7 @@ function AppRoot() {
                   path="/"
                   element={
                     <DashboardLayout
-                      clinicName="GREENAPPLEDENTAL"
+                      clinicName="Oklus"
                       slogan="Magic in your smile"
                     />
                   }
@@ -135,15 +136,16 @@ function AppRoot() {
                   {/* Redirect root to /pacientes */}
                   <Route
                     index
-                    element={<Navigate to="/pacientes" replace />}
+                    element={<Navigate to="/registro-clinico" replace />}
                   />
 
                   {/* Main routes */}
-                  <Route path="pacientes" element={<PatientsListPage />} />
                   <Route
                     path="registro-clinico"
                     element={<PatientsPageWrapper />}
                   />
+                  <Route path="pacientes" element={<PatientsListPage />} />
+                  <Route path="Agenda" element={<SchedulePage />} />
                   <Route path="finanzas" element={<FinancesPage />} />
                   <Route path="reportes" element={<ReportsPage />} />
                   <Route path="configuracion" element={<SettingsPage />} />
@@ -151,7 +153,7 @@ function AppRoot() {
                   {/* Catch-all redirect */}
                   <Route
                     path="*"
-                    element={<Navigate to="/pacientes" replace />}
+                    element={<Navigate to="/registro-clinico" replace />}
                   />
                 </Route>
               </Routes>
