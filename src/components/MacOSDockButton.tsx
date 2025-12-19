@@ -2,7 +2,13 @@
 import { type LucideIcon } from "lucide-react";
 import { useState } from "react";
 
-export type DockButtonVariant = "neutral" | "brand" | "danger";
+export type DockButtonVariant =
+  | "neutral"
+  | "brand"
+  | "danger"
+  | "info"
+  | "success"
+  | "warning";
 
 export interface MacOSDockButtonProps {
   icon: LucideIcon;
@@ -22,6 +28,9 @@ const variantColors: Record<DockButtonVariant, string> = {
   neutral: "hsl(var(--muted-foreground) / 0.8)", // Subtle gray
   brand: "hsl(var(--brand))", // Brand blue for emphasis
   danger: "hsl(var(--danger))", // Red for destructive
+  info: "hsl(var(--info))",
+  success: "hsl(var(--success))",
+  warning: "hsl(var(--warning))",
 };
 
 export function MacOSDockButton({

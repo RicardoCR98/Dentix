@@ -113,12 +113,10 @@ export function MacOSDock({
 
   return (
     <div
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 transition-all duration-[400ms] ease-out will-change-transform"
+      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center transition-all duration-[400ms] ease-out will-change-transform"
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible
-          ? "translateX(-50%) translateY(0)"
-          : "translateX(-50%) translateY(20px)",
+        transform: visible ? "translateY(0)" : "translateY(20px)",
         pointerEvents: visible ? "auto" : "none",
       }}
     >
@@ -137,7 +135,7 @@ export function MacOSDock({
           icon={Plus}
           label="Nueva Historia"
           shortcut="Ctrl+N"
-          variant="neutral"
+          variant="success"
           onClick={onNewRecord}
           disabled={buttonsDisabled}
           magnification={getMagnification(0)}
@@ -150,7 +148,7 @@ export function MacOSDock({
           icon={Search}
           label="Búsqueda de Pacientes"
           shortcut="Ctrl+K"
-          variant="neutral"
+          variant="info"
           onClick={onSearch}
           disabled={buttonsDisabled}
           magnification={getMagnification(1)}
@@ -163,7 +161,7 @@ export function MacOSDock({
           icon={Printer}
           label="Imprimir"
           shortcut="Ctrl+P"
-          variant="neutral"
+          variant="warning"
           onClick={onPrint}
           disabled={false} // Always enabled
           magnification={getMagnification(2)}
@@ -191,7 +189,7 @@ export function MacOSDock({
           icon={Wallet}
           label="Cartera de Pendientes"
           shortcut=""
-          variant="neutral"
+          variant="brand"
           onClick={onPendingPayments}
           disabled={buttonsDisabled}
           magnification={getMagnification(4)}

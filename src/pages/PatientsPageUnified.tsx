@@ -53,6 +53,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     setPatient,
     sessions,
     setSessions,
+    activeSessionId,
     toothDx,
     manualDiagnosis,
     setManualDiagnosis,
@@ -68,6 +69,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     hasNewAttachments,
     hasDraftSessions,
     onToothDxChange,
+    handleSessionChange,
     handleNew,
     handleSave,
     handleDeleteAttachment,
@@ -147,6 +149,11 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       .sort((a, b) => (a.session.date || "").localeCompare(b.session.date || ""));
   }, [sessions, snapshotSessionId]);
 
+  const odontogramSessions = isSnapshotMode ? sessionsToRender : sessions;
+  const odontogramActiveSessionId = isSnapshotMode
+    ? snapshotSessionId
+    : activeSessionId;
+
   // Handlers
   const handlePreview = useCallback(() => window.print(), []);
 
@@ -201,6 +208,14 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       setManualDiagnosis(next);
     },
     [isSnapshotMode, setManualDiagnosis],
+  );
+
+  const handleOdontogramSessionChange = useCallback(
+    (sessionId: number | null) => {
+      if (isSnapshotMode) return;
+      handleSessionChange(sessionId);
+    },
+    [handleSessionChange, isSnapshotMode],
   );
 
   const handleOpenSnapshot = useCallback((sessionId: number) => {
@@ -346,6 +361,9 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           manualDiagnosis={manualDiagnosis}
           onManualDiagnosisChange={handleManualDiagnosisChange}
           readOnly={isSnapshotMode}
+          activeSessionId={odontogramActiveSessionId}
+          sessions={odontogramSessions}
+          onSessionChange={handleOdontogramSessionChange}
         />
       </div>
       {/* Sessions */}
@@ -364,6 +382,8 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             reasonTypes={reasonTypes}
             paymentMethods={paymentMethods}
             onReasonTypesChange={handleReasonTypesChange}
+            activeId={activeSessionId}
+            onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
             onViewReadOnly={handleOpenSnapshot}
           />
         </div>
@@ -526,6 +546,9 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               manualDiagnosis={manualDiagnosis}
               onManualDiagnosisChange={handleManualDiagnosisChange}
               readOnly={isSnapshotMode}
+              activeSessionId={odontogramActiveSessionId}
+              sessions={odontogramSessions}
+              onSessionChange={handleOdontogramSessionChange}
             />
           </div>
         </TabsContent>
@@ -547,6 +570,8 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
                 reasonTypes={reasonTypes}
                 paymentMethods={paymentMethods}
                 onReasonTypesChange={handleReasonTypesChange}
+                activeId={activeSessionId}
+                onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
                 onViewReadOnly={handleOpenSnapshot}
               />
             </div>

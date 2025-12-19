@@ -121,7 +121,51 @@ export function usePatientRecord() {
   // Handler: Update tooth diagnosis (per-session)
   const onToothDxChange = useCallback((next: ToothDx) => {
     if (!activeSessionId) {
-      console.warn('onToothDxChange called without active session');
+      const newSessionId = -Date.now();
+      const today = new Date().toISOString().slice(0, 10);
+
+      const newSession: VisitWithProcedures = {
+        session: {
+          id: newSessionId,
+          date: today,
+          reason_type: "Control",
+          reason_detail: "Actualizacion de diagnostico",
+          budget: 0,
+          discount: 0,
+          payment: 0,
+          balance: 0,
+          cumulative_balance: 0,
+          is_saved: false,
+        },
+        items: [],
+      };
+
+      setSessions((prev) => [newSession, ...prev]);
+      setActiveSessionId(newSessionId);
+      setSession((prev) => ({
+        ...prev,
+        id: newSessionId,
+        date: today,
+        reason_type: "Control",
+        reason_detail: "Actualizacion de diagnostico",
+        budget: 0,
+        discount: 0,
+        payment: 0,
+        balance: 0,
+        cumulative_balance: 0,
+        is_saved: false,
+      }));
+
+      setSessionOdontograms((prev) => {
+        const updated = new Map(prev);
+        updated.set(newSessionId, next);
+        return updated;
+      });
+      setCurrentToothDx(next);
+      toast.info(
+        "Nueva sesion creada",
+        "Se creo una sesion automaticamente para este diagnostico",
+      );
       return;
     }
 
@@ -131,7 +175,7 @@ export function usePatientRecord() {
       return updated;
     });
     setCurrentToothDx(next);
-  }, [activeSessionId]);
+  }, [activeSessionId, toast]);
 
   // Handler: Create new patient record
   const handleNew = useCallback(() => {

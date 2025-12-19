@@ -48,7 +48,15 @@
       "Bash(dir:*)",
       "Bash(pnpm run lint)",
       "Bash(pnpm run lint:*)",
-      "Bash(del \"D:\\Github\\odonto\\src-tauri\\migrations\\001_dentix_schema_final.sql\")"
+      "Bash(del \"D:\\Github\\odonto\\src-tauri\\migrations\\001_dentix_schema_final.sql\")",
+      "Bash(del \"D:\\\\Github\\\\odonto\\\\src\\\\hooks\\\\useScrollVisibility.ts\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(purple)",
+      "Bash(danger)",
+      "Bash(default\" → \"neutral)",
+      "Bash(brand)",
+      "Bash(danger\"\n- Actualizado variantColors con nuevos colores semánticos\n- Default variant: \"default\" → \"neutral\"\n\n**MacOSDock.tsx:**\n- getSaveVariant\\(\\) actualizado para usar nuevo sistema:\n  - has-changes: \"brand\" \\(azul destacado\\)\n  - saving: \"brand\" \\(mantener azul\\)\n  - saved: \"neutral\" \\(volver a gris\\)\n  - error: \"danger\" \\(rojo para errores\\)\n  - default: \"neutral\" \\(gris por defecto\\)\n- Todos los botones actualizados a variant=\"neutral\"\n- Solo botón Guardar usa variant dinámico\n\n### Impacto\n- ✅ 80% reducción en ruido visual del Dock\n- ✅ Jerarquía clara: solo acciones con cambios destacan\n- ✅ Apariencia profesional y moderna\n- ✅ Foco en lo importante \\(botón Guardar cuando hay cambios\\)\n\n---\n\n## C3: Mejorar usabilidad del Odontograma\n\n### Problema\n- Popover tenía botón \"Confirmar\" innecesario \\(extra click\\)\n- Flujo no intuitivo: seleccionar → confirmar → cerrar\n- Botón \"Editar\" confuso \\(¿editar qué?\\)\n\n### Solución\n- Eliminado botón \"Confirmar\" - usuario cierra con X o click fuera\n- Botón \"Editar\" renombrado a \"Editar plantillas\" \\(más claro\\)\n- Flujo simplificado: seleccionar diagnósticos → cerrar cuando quieras\n- Botón \"Limpiar\" mejorado: solo aparece si hay diagnósticos\n\n### Cambios técnicos\n**Odontogram.tsx:**\n- Eliminada sección completa de botones de acción con \"Confirmar\"\n- Botón \"Limpiar\" ahora condicional: solo si hasDiagnoses\n- Botón \"Limpiar\" texto mejorado: \"Limpiar\" → \"Limpiar todo\"\n- Botón \"Editar\" texto aclarado: \"Editar\" → \"Editar plantillas\"\n- Removido import de Check icon \\(ya no se usa\\)\n\n### Impacto\n- ✅ -1 click por selección de diagnóstico\n- ✅ Flujo más natural e intuitivo\n- ✅ Usuario mantiene control \\(puede seleccionar múltiples\\)\n- ✅ Claridad en labels de botones\n\n---\n\n## Impacto Combinado C2 + C3\n\n- Jerarquía visual mejorada \\(MacOSDock neutral con énfasis estratégico\\)\n- Workflows más rápidos \\(-1 click por diagnóstico\\)\n- Interfaces más limpias y profesionales\n- Mejor experiencia de usuario en tareas frecuentes\n\nCalificación actualizada: 8.5/10 → 9.0/10 \\(+0.5 puntos\\)\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []

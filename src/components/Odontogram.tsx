@@ -251,13 +251,23 @@ const Odontogram = memo(function Odontogram({
                       <button
                         type="button"
                         className={cn(
-                          "relative h-16 rounded-lg text-center border-2 transition-all",
+                          "relative h-16 rounded-lg text-center transition-all duration-200",
                           "flex flex-col items-center justify-center gap-1",
-                          "hover:scale-115 hover:shadow-lg cursor-pointer",
+                          "hover:scale-110 hover:shadow-xl cursor-pointer",
                           "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))] focus:ring-offset-2",
+                          isOpen && "ring-2 ring-[hsl(var(--brand))] ring-offset-2",
                           hasDiagnoses
-                            ? "border-[hsl(var(--brand))] bg-[color-mix(in_oklab,hsl(var(--brand))_15%,transparent)] font-semibold"
-                            : "border-[hsl(var(--border))] bg-[hsl(var(--surface))] hover:border-[hsl(var(--brand))]",
+                            ? [
+                                "border-[3px] border-[hsl(var(--brand))]",
+                                "bg-[color-mix(in_oklab,hsl(var(--brand))_25%,transparent)]",
+                                "shadow-[0_8px_20px_hsl(var(--brand)/0.25)]",
+                                "font-semibold",
+                              ]
+                            : [
+                                "border-2 border-[hsl(var(--border))]",
+                                "bg-[hsl(var(--surface))]",
+                                "hover:border-[hsl(var(--brand))]",
+                              ],
                         )}
                         title={
                           hasDiagnoses
@@ -276,13 +286,8 @@ const Odontogram = memo(function Odontogram({
                           {toothNum}
                         </span>
                         {hasDiagnoses && (
-                          <div className="flex gap-0.5">
-                            {diagnoses.slice(0, 3).map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-1 h-1 rounded-full bg-[hsl(var(--brand))]"
-                              />
-                            ))}
+                          <div className="absolute -top-2 -right-2 min-w-[24px] h-6 px-1.5 rounded-full bg-[hsl(var(--brand))] text-white text-xs font-bold flex items-center justify-center shadow-lg ring-2 ring-white animate-pulse-subtle">
+                            {diagnoses.length}
                           </div>
                         )}
                       </button>
@@ -550,6 +555,5 @@ const Odontogram = memo(function Odontogram({
 Odontogram.displayName = "Odontogram";
 
 export default Odontogram;
-
 
 

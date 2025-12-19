@@ -72,7 +72,8 @@ export function SessionContextBar({
         <Alert variant="info">
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium">
-              No hay sesion activa. Selecciona una sesion para editar.
+              No hay sesion activa. Selecciona una sesion o inicia un nuevo
+              diagnostico para crearla.
             </span>
             {sessions.length > 0 && (
               <div className="flex-1 max-w-[620px]">{renderPills()}</div>
