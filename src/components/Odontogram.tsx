@@ -7,7 +7,7 @@ import { Badge } from "./ui/Badge";
 import { CheckboxRoot } from "./ui/Checkbox";
 import { Input } from "./ui/Input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/Tabs";
-import { X, Check, Trash2, Plus, Save, Edit3 } from "lucide-react";
+import { X, Trash2, Plus, Save, Edit3 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { getRepository } from "../lib/storage/TauriSqliteRepository";
 
@@ -329,7 +329,7 @@ const Odontogram = memo(function Odontogram({
                                 disabled={isReadOnly}
                               >
                                 <Edit3 size={14} />
-                                Editar
+                                Editar plantillas
                               </Button>
                             )}
                             <Popover.Close asChild>
@@ -463,31 +463,18 @@ const Odontogram = memo(function Odontogram({
                         )}
 
                         {/* Acciones - Solo en modo normal */}
-                        {!isEditMode && (
+                        {!isEditMode && hasDiagnoses && (
                           <div className="flex gap-2 pt-3 border-t border-[hsl(var(--border))]">
-                            {hasDiagnoses && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => clearTooth(toothNum)}
-                                className="flex-1"
-                                disabled={isReadOnly}
-                              >
-                                <X size={14} />
-                                Limpiar
-                              </Button>
-                            )}
-                            <Popover.Close asChild>
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                className="flex-1"
-                                disabled={isReadOnly}
-                              >
-                                <Check size={14} />
-                                Confirmar
-                              </Button>
-                            </Popover.Close>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => clearTooth(toothNum)}
+                              className="w-full"
+                              disabled={isReadOnly}
+                            >
+                              <X size={14} />
+                              Limpiar todo
+                            </Button>
                           </div>
                         )}
 

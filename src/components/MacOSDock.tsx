@@ -95,15 +95,15 @@ export function MacOSDock({
   const getSaveVariant = () => {
     switch (saveState) {
       case "has-changes":
-        return "danger";
+        return "brand" as const; // Highlight with brand color when changes exist
       case "saving":
-        return "info";
+        return "brand" as const; // Keep brand color while saving
       case "saved":
-        return "success";
+        return "neutral" as const; // Return to neutral after save
       case "error":
-        return "danger";
+        return "danger" as const; // Red for errors
       default:
-        return "default";
+        return "neutral" as const; // Neutral by default
     }
   };
 
@@ -137,7 +137,7 @@ export function MacOSDock({
           icon={Plus}
           label="Nueva Historia"
           shortcut="Ctrl+N"
-          variant="success"
+          variant="neutral"
           onClick={onNewRecord}
           disabled={buttonsDisabled}
           magnification={getMagnification(0)}
@@ -150,7 +150,7 @@ export function MacOSDock({
           icon={Search}
           label="Búsqueda de Pacientes"
           shortcut="Ctrl+K"
-          variant="purple"
+          variant="neutral"
           onClick={onSearch}
           disabled={buttonsDisabled}
           magnification={getMagnification(1)}
@@ -163,7 +163,7 @@ export function MacOSDock({
           icon={Printer}
           label="Imprimir"
           shortcut="Ctrl+P"
-          variant="info"
+          variant="neutral"
           onClick={onPrint}
           disabled={false} // Always enabled
           magnification={getMagnification(2)}
@@ -191,7 +191,7 @@ export function MacOSDock({
           icon={Wallet}
           label="Cartera de Pendientes"
           shortcut=""
-          variant="danger"
+          variant="neutral"
           onClick={onPendingPayments}
           disabled={buttonsDisabled}
           magnification={getMagnification(4)}
