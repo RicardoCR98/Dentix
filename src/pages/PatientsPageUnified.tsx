@@ -2,18 +2,11 @@
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import Section from "../components/Section";
 import PatientForm from "../components/PatientForm";
-import PatientCard from "../components/PatientCard";
 import SessionsTable from "../components/sessions/SessionsTable";
 import Attachments from "../components/Attachments";
 import PatientSearchDialog from "../components/PatientSearchDialog";
 import PendingPaymentsDialog from "../components/PendingPaymentsDialog";
-import ShortcutsHelp from "../components/ShortcutsHelp";
 import { MacOSDock } from "../components/MacOSDock";
-import {
-  PopoverRoot,
-  PopoverTrigger,
-  PopoverContent,
-} from "../components/ui/Popover";
 import { Button } from "../components/ui/Button";
 import { Alert } from "../components/ui/Alert";
 import {
@@ -31,7 +24,6 @@ import {
   Paperclip,
   Search,
   Wallet,
-  Info,
   AlertTriangle,
   Stethoscope,
   Printer,
@@ -45,7 +37,7 @@ import { getRepository } from "../lib/storage/TauriSqliteRepository";
 import { usePatientRecord } from "../hooks/usePatientRecord";
 import { usePatientFromURL } from "../hooks/usePatientFromURL";
 import { useMasterData } from "../hooks/useMasterData";
-import { useScrollVisibility } from "../hooks/useScrollVisibility";
+// useScrollVisibility hook removed - no longer needed without Quick Actions section
 import { useAppStore } from "../stores";
 import type { Patient } from "../lib/types";
 import OdontogramDiagnosisSection from "../components/OdontogramDiagnosisSection";
@@ -107,16 +99,10 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   >([]);
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("odontogram");
-  const [isEditingPatient, setIsEditingPatient] = useState(true);
   const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(null);
   const [hasManuallyExited, setHasManuallyExited] = useState(false);
 
-  // Quick actions visibility from store
-  const showQuickActions = useAppStore((state) => state.showQuickActions);
-
-  // FAB scroll visibility
-  const quickActionsRef = useRef<HTMLElement>(null);
-  const showFAB = useScrollVisibility({ targetRef: quickActionsRef });
+  // Quick actions visibility removed - using MacOSDock only
 
   // Calculate total changes for badge
   const changesCount =
@@ -168,32 +154,22 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     const result = handleNew();
     if (result) {
       clearPatientURL();
-      // Always show edit form when creating a new patient
-      setIsEditingPatient(true);
     }
   }, [handleNew, clearPatientURL]);
 
   const handleSaveWrapper = useCallback(async () => {
     if (isSnapshotMode) return;
-    const result = await handleSave();
-    if (result && layoutMode === "tabs") {
-      setIsEditingPatient(false);
-    }
-  }, [handleSave, layoutMode, isSnapshotMode]);
+    await handleSave();
+  }, [handleSave, isSnapshotMode]);
 
   const handleSelectPatientWrapper = useCallback(
     async (selectedPatient: Patient) => {
       const result = await handleSelectPatient(selectedPatient);
       if (result) {
         setHasManuallyExited(false); // Reset manual exit flag when selecting new patient
-        // In tabs mode, show PatientCard (not edit form) after loading a patient
-        if (layoutMode === "tabs") {
-          setIsEditingPatient(false);
-          // Don't set snapshot here - let useEffect handle auto-snapshot
-        }
       }
     },
-    [handleSelectPatient, layoutMode],
+    [handleSelectPatient],
   );
 
   const handleQuickPaymentWrapper = useCallback(
@@ -318,71 +294,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           onSelectPatient={handleSelectPatientWrapper}
         />
 
-        {/* Quick actions */}
-        {showQuickActions && (
-          <Section
-            ref={quickActionsRef}
-            title="Acciones Rápidas"
-            icon={
-              <PopoverRoot>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Ver atajos de teclado"
-                    className="cursor-pointer inline-flex items-center justify-center rounded-full p-1.5 hover:bg-[hsl(var(--muted))]/60 transition"
-                  >
-                    <Info size={20} />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  side="bottom"
-                  align="start"
-                  className="w-[320px] p-3"
-                >
-                  <ShortcutsHelp />
-                </PopoverContent>
-              </PopoverRoot>
-            }
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-              <button
-                onClick={handleNewWrapper}
-                disabled={isSnapshotMode}
-                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-success font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(30,157,96,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-              >
-                <Plus size={28} />
-                Nueva historia
-              </button>
-
-              <button
-                onClick={handlePreview}
-                disabled={isSnapshotMode}
-                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-info font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(27,99,209,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-              >
-                <Printer size={28} />
-                Imprimir
-              </button>
-
-              <button
-                onClick={() => setSearchDialogOpen(true)}
-                disabled={isSnapshotMode}
-                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-purple font-semibold text-[15px] shadow-[0_2px_6px_rgba(214,69,69,0.16)] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(122,59,227,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-              >
-                <Search size={28} />
-                Búsqueda de pacientes
-              </button>
-
-              <button
-                onClick={() => setPaymentsDialogOpen(true)}
-                disabled={isSnapshotMode}
-                className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-danger font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(214,69,69,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-              >
-                <Wallet size={28} />
-                Cartera de pendientes
-              </button>
-            </div>
-          </Section>
-        )}
+        {/* Quick actions section removed - all actions now in MacOSDock only */}
 
         {/* Snapshot banner */}
         {isSnapshotMode && (
@@ -504,27 +416,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         </div>
       </Section>
 
-        {/* Action buttons */}
-        <div className="flex justify-end gap-3 mt-8 p-6 bg-[hsl(var(--muted))] rounded-lg">
-          <Button onClick={handleNewWrapper} variant="ghost" size="lg" disabled={isSnapshotMode}>
-            <Plus size={18} />
-            Nueva Historia
-          </Button>
-          <Button onClick={handlePreview} variant="secondary" size="lg" disabled={isSnapshotMode}>
-            <FileDown size={18} />
-            Vista previa/Imprimir
-          </Button>
-          <Button
-            onClick={handleSaveWrapper}
-            variant="primary"
-            size="lg"
-            disabled={!canSave || isSnapshotMode}
-            title="Guardar"
-          >
-            <Save size={18} />
-            Guardar Historia
-          </Button>
-        </div>
+        {/* Action buttons removed - all actions now via MacOSDock only */}
 
         {/* macOS Dock */}
         <MacOSDock
@@ -559,71 +451,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         onSelectPatient={handleSelectPatientWrapper}
       />
 
-      {/* Quick actions */}
-      {showQuickActions && (
-        <Section
-          ref={quickActionsRef}
-          title="Acciones Rápidas"
-          icon={
-            <PopoverRoot>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Ver atajos de teclado"
-                  className="cursor-pointer inline-flex items-center justify-center rounded-full p-1.5 hover:bg-[hsl(var(--muted))]/60 transition"
-                >
-                  <Info size={20} />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="bottom"
-                align="start"
-                className="w-[320px] p-3"
-              >
-                <ShortcutsHelp />
-              </PopoverContent>
-            </PopoverRoot>
-          }
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-            <button
-              onClick={handleNewWrapper}
-              disabled={isSnapshotMode}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-success font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(30,157,96,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-            >
-              <Plus size={28} />
-              Nueva historia
-            </button>
-
-            <button
-              onClick={handlePreview}
-              disabled={isSnapshotMode}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-info font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(27,99,209,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-            >
-              <Printer size={28} />
-              Imprimir
-            </button>
-
-            <button
-              onClick={() => setSearchDialogOpen(true)}
-              disabled={isSnapshotMode}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-purple font-semibold text-[15px] shadow-[0_2px_6px_rgba(214,69,69,0.16)] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(122,59,227,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-            >
-              <Search size={28} />
-              Búsqueda de pacientes
-            </button>
-
-            <button
-              onClick={() => setPaymentsDialogOpen(true)}
-              disabled={isSnapshotMode}
-              className="group flex flex-col items-center justify-center gap-2 px-5 py-6 rounded-2xl border-2 badge-danger font-semibold text-[15px] transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(214,69,69,0.24)] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-            >
-              <Wallet size={28} />
-              Cartera de pendientes
-            </button>
-          </div>
-        </Section>
-      )}
+      {/* Quick actions section removed - all actions now in MacOSDock only */}
 
       {/* Snapshot banner */}
       {isSnapshotMode && (
@@ -647,8 +475,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         title="Datos del Paciente"
         icon={<User size={20} />}
         right={
-          hasAllergy &&
-          !isEditingPatient && (
+          hasAllergy && (
             <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg">
               <AlertTriangle size={20} className="animate-pulse" />
               ALERGIA
@@ -657,23 +484,13 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         }
       >
         <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-          {/* In tabs mode: show PatientCard when patient is loaded (isEditingPatient=false) */}
-          {/* Show PatientForm when creating new patient or when user clicks "Editar datos" */}
-          {isEditingPatient ? (
-            <>
-              <PatientForm value={patient} onChange={setPatient} />
-              {!hasPatientData && (
-                <Alert variant="warning" className="mt-4">
-                  Por favor completa al menos el nombre y cédula del paciente para
-                  poder guardar.
-                </Alert>
-              )}
-            </>
-          ) : (
-            <PatientCard
-              patient={patient}
-              onEdit={() => setIsEditingPatient(true)}
-            />
+          {/* Always show PatientForm for consistency with vertical layout */}
+          <PatientForm value={patient} onChange={setPatient} />
+          {!hasPatientData && (
+            <Alert variant="warning" className="mt-4">
+              Por favor completa al menos el nombre y cédula del paciente para
+              poder guardar.
+            </Alert>
           )}
         </div>
       </Section>
@@ -795,27 +612,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         </TabsContent>
       </Tabs>
 
-      {/* Action buttons (same as vertical layout) */}
-      <div className="flex justify-end gap-3 mt-8 p-6 bg-[hsl(var(--muted))] rounded-lg">
-        <Button onClick={handleNewWrapper} variant="ghost" size="lg" disabled={isSnapshotMode}>
-          <Plus size={18} />
-          Nueva Historia
-        </Button>
-        <Button onClick={handlePreview} variant="secondary" size="lg" disabled={isSnapshotMode}>
-          <FileDown size={18} />
-          Vista previa/Imprimir
-        </Button>
-        <Button
-          onClick={handleSaveWrapper}
-          variant="primary"
-          size="lg"
-          disabled={!canSave || isSnapshotMode}
-          title="Guardar"
-        >
-          <Save size={18} />
-          Guardar Historia
-        </Button>
-      </div>
+      {/* Action buttons removed - all actions now via MacOSDock only */}
 
       {/* macOS Dock */}
       <MacOSDock

@@ -27,7 +27,7 @@ const Section = forwardRef<HTMLElement, SectionProps>(({
               {icon}
             </div>
           )}
-          <h2 className="text-xl font-bold text-[hsl(var(--foreground))]">
+          <h2 className="text-2xl font-bold text-[hsl(var(--foreground))] tracking-tight">
             {title}
           </h2>
         </div>

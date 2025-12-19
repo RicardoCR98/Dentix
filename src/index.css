@@ -777,29 +777,48 @@
         color: var(--text);
     }
 
+    /* Simplified badge system - semantic colors only */
     .badge-success {
         background: hsl(var(--success) / 0.1);
         color: hsl(var(--success));
-    }
-
-    .badge-warning {
-        background: hsl(var(--warning) / 0.1);
-        color: hsl(var(--warning));
+        border: 2px solid hsl(var(--success) / 0.3);
     }
 
     .badge-danger {
         background: hsl(var(--danger) / 0.1);
         color: hsl(var(--danger));
+        border: 2px solid hsl(var(--danger) / 0.3);
     }
 
+    .badge-neutral {
+        background: hsl(var(--muted));
+        color: hsl(var(--foreground));
+        border: 2px solid hsl(var(--border));
+    }
+
+    .badge-brand {
+        background: hsl(var(--brand) / 0.1);
+        color: hsl(var(--brand));
+        border: 2px solid hsl(var(--brand) / 0.3);
+    }
+
+    /* Legacy badge classes - redirect to neutral */
     .badge-info {
-        background: hsl(var(--info) / 0.1);
-        color: hsl(var(--info));
+        background: hsl(var(--muted));
+        color: hsl(var(--foreground));
+        border: 2px solid hsl(var(--border));
     }
 
     .badge-purple {
-        background: hsl(var(--purple) / 0.1);
-        color: hsl(var(--purple));
+        background: hsl(var(--muted));
+        color: hsl(var(--foreground));
+        border: 2px solid hsl(var(--border));
+    }
+
+    .badge-warning {
+        background: hsl(var(--warning) / 0.1);
+        color: hsl(var(--warning));
+        border: 2px solid hsl(var(--warning) / 0.3);
     }
 
     /* Alert */

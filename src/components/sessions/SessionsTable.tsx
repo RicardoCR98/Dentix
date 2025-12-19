@@ -6,10 +6,6 @@ import { Alert } from "../ui/Alert";
 import {
   Plus,
   FileText,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { SessionCard } from "./SessionCard";
 import type {
@@ -41,8 +37,6 @@ interface SessionsTableProps {
   onOpenSession?: (sessionId: number) => void;
   onViewReadOnly?: (sessionId: number, visitId?: number) => void;
 }
-
-const PAGE_SIZE = 5;
 
 const SessionsTable = memo(function SessionsTable({
   sessions,
@@ -76,9 +70,6 @@ const SessionsTable = memo(function SessionsTable({
   const [manualBudgetEnabled, setManualBudgetEnabled] = useState<
     Map<string, boolean>
   >(new Map());
-
-  // Paginado
-  const [page, setPage] = useState(0);
 
   // Efecto para expandir la sesión más reciente automáticamente cuando se crea una nueva
   useEffect(() => {
@@ -178,14 +169,8 @@ const SessionsTable = memo(function SessionsTable({
     return copy;
   }, [sessions]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedSessions.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const start = safePage * PAGE_SIZE;
-  const end = start + PAGE_SIZE;
-  const visibleSessions = useMemo(
-    () => sortedSessions.slice(start, end),
-    [sortedSessions, start, end],
-  );
+  // Pagination removed - show all sessions with scrolling
+  const visibleSessions = sortedSessions;
 
   // Agregar sesión
   const addRow = useCallback(() => {
@@ -232,7 +217,6 @@ const SessionsTable = memo(function SessionsTable({
         });
       }
     }
-    setPage(0);
   }, [sessions, onSessionsChange, onOpenSession, newRow]);
 
   useEffect(() => {
@@ -297,13 +281,7 @@ const SessionsTable = memo(function SessionsTable({
     [sessions, onSessionsChange, manualBudgetEnabled],
   );
 
-  const goFirst = useCallback(() => setPage(0), []);
-  const goPrev = useCallback(() => setPage((p) => Math.max(0, p - 1)), []);
-  const goNext = useCallback(
-    () => setPage((p) => Math.min(totalPages - 1, p + 1)),
-    [totalPages],
-  );
-  const goLast = useCallback(() => setPage(totalPages - 1), [totalPages]);
+  // Pagination navigation functions removed
 
   const handleToggleRow = useCallback(
     (id: number) => {
@@ -627,52 +605,7 @@ const SessionsTable = memo(function SessionsTable({
         </div>
       )}
 
-      {/* Paginación */}
-      {sessions.length > 0 && (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">
-            Página {safePage + 1} de {totalPages} · {PAGE_SIZE} por página
-          </span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={goFirst}
-              disabled={safePage === 0}
-              title="Primera página"
-            >
-              <ChevronsLeft size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={goPrev}
-              disabled={safePage === 0}
-              title="Anterior"
-            >
-              <ChevronLeft size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={goNext}
-              disabled={safePage >= totalPages - 1}
-              title="Siguiente"
-            >
-              <ChevronRight size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={goLast}
-              disabled={safePage >= totalPages - 1}
-              title="Última página"
-            >
-              <ChevronsRight size={16} />
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Pagination removed - sessions now scroll naturally */}
     </div>
   );
 });

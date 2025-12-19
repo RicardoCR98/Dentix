@@ -232,8 +232,8 @@ const Odontogram = memo(function Odontogram({
               )}
             </div>
 
-            {/* Grid de dientes (ligeramente más compacto) */}
-            <div className="grid grid-cols-8 gap-2">
+            {/* Grid de dientes (optimizado para mejor usabilidad) */}
+            <div className="grid grid-cols-8 gap-3">
               {arch.teeth.map((toothNum) => {
                 const diagnoses = value[toothNum] || [];
                 const hasDiagnoses = diagnoses.length > 0;
@@ -251,9 +251,9 @@ const Odontogram = memo(function Odontogram({
                       <button
                         type="button"
                         className={cn(
-                          "relative h-12 rounded-lg text-center border-2 transition-all",
+                          "relative h-16 rounded-lg text-center border-2 transition-all",
                           "flex flex-col items-center justify-center gap-1",
-                          "hover:scale-110 hover:shadow-md cursor-pointer",
+                          "hover:scale-115 hover:shadow-lg cursor-pointer",
                           "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))] focus:ring-offset-2",
                           hasDiagnoses
                             ? "border-[hsl(var(--brand))] bg-[color-mix(in_oklab,hsl(var(--brand))_15%,transparent)] font-semibold"
@@ -267,7 +267,7 @@ const Odontogram = memo(function Odontogram({
                       >
                         <span
                           className={cn(
-                            "text-sm font-bold leading-none",
+                            "text-base font-bold leading-none",
                             hasDiagnoses
                               ? "text-[hsl(var(--brand))]"
                               : "text-[hsl(var(--foreground))]",

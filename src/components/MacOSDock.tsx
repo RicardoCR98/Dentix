@@ -122,14 +122,14 @@ export function MacOSDock({
         pointerEvents: visible ? "auto" : "none",
       }}
     >
-      {/* Glass-morphism container */}
+      {/* Glass-morphism container with enhanced visibility */}
       <div
-        className="flex items-center gap-3 px-6 py-3 rounded-[24px] border border-white/20 shadow-2xl mb-6"
+        className="flex items-center gap-3 px-6 py-3 rounded-[24px] border border-white/30 shadow-2xl mb-6"
         style={{
-          background: "rgba(255, 255, 255, 0.1)",
-          backdropFilter: "blur(40px) saturate(180%)",
-          WebkitBackdropFilter: "blur(40px) saturate(180%)",
-          boxShadow: "0 12px 48px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
+          background: "rgba(255, 255, 255, 0.15)",
+          backdropFilter: "blur(50px) saturate(200%)",
+          WebkitBackdropFilter: "blur(50px) saturate(200%)",
+          boxShadow: "0 16px 64px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
         }}
       >
         {/* Nueva Historia */}
