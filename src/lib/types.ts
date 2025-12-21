@@ -259,6 +259,7 @@ export type AttachmentFile = {
   storage_key?: string; // File path on disk (for saved files)
   db_id?: number; // Attachment.id in database (for saved files)
   session_id?: number | null; // Link attachment to specific session (NEW)
+  isRecent?: boolean; // Highlight as recent during this edit session
 };
 
 /**

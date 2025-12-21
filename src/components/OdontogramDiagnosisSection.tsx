@@ -1,11 +1,13 @@
 import { memo } from "react";
 import { Activity, FileText } from "lucide-react";
 
-import type { ToothDx } from "../lib/types";
+import type { ToothDx, SessionWithItems } from "../lib/types";
 import Section from "./Section"; // ajusta el path si es distinto
 import Odontogram from "./Odontogram";
 import DiagnosisArea from "./DiagnosisArea";
 import { Alert } from "./ui/Alert";
+import { Badge } from "./ui/Badge";
+import { SessionContextBar } from "./sessions/SessionContextBar";
 
 type Props = {
   toothDx: ToothDx;
@@ -15,6 +17,10 @@ type Props = {
   manualDiagnosis: string;
   onManualDiagnosisChange: (next: string) => void;
   readOnly?: boolean;
+  activeSessionId: number | null;
+  sessions: SessionWithItems[];
+  onSessionChange: (sessionId: number | null) => void;
+  lastSavedSession: SessionWithItems | null;
 };
 
 const OdontogramDiagnosisSection = memo(function OdontogramDiagnosisSection({
@@ -24,9 +30,23 @@ const OdontogramDiagnosisSection = memo(function OdontogramDiagnosisSection({
   manualDiagnosis,
   onManualDiagnosisChange,
   readOnly = false,
+  activeSessionId,
+  sessions,
+  onSessionChange,
+  lastSavedSession,
 }: Props) {
+  const lastSavedLabel = lastSavedSession
+    ? `Última vez editado: Sesión #${lastSavedSession.session.id ?? "?"} - ${lastSavedSession.session.date || "Sin fecha"}`
+    : "Sin odontograma previo";
+
   return (
     <Section title="Odontograma por Cuadrantes" icon={<Activity size={20} />}>
+      <SessionContextBar
+        activeSessionId={activeSessionId}
+        sessions={sessions}
+        onSessionChange={onSessionChange}
+      />
+
       {readOnly && (
         <Alert variant="info" className="mb-3">
           <div className="flex items-center gap-2">
@@ -34,16 +54,26 @@ const OdontogramDiagnosisSection = memo(function OdontogramDiagnosisSection({
             <div>
               <div className="font-semibold">Modo lectura</div>
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                Estás revisando una sesión guardada. Selecciona un borrador para editar.
+                Estás revisando una sesión guardada.
               </p>
             </div>
           </div>
         </Alert>
       )}
 
+      <div className="mb-3 flex justify-end">
+        <Badge variant="info" className="text-xs">
+          {lastSavedLabel}
+        </Badge>
+      </div>
+
       {/* Bloque 1: Odontograma full-width */}
       <div>
-        <Odontogram value={toothDx} onChange={onToothDxChange} readOnly={readOnly} />
+        <Odontogram
+          value={toothDx}
+          onChange={onToothDxChange}
+          readOnly={readOnly}
+        />
       </div>
 
       {/* Separador visual */}

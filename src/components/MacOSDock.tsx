@@ -9,6 +9,7 @@ export interface MacOSDockProps {
   visible: boolean;
   onNewRecord: () => void;
   onSearch: () => void;
+  onNewSession?: () => void;
   onPrint: () => void;
   onSave: () => void;
   onPendingPayments: () => void;
@@ -26,6 +27,7 @@ export function MacOSDock({
   visible,
   onNewRecord,
   onSearch,
+  onNewSession,
   onPrint,
   onSave,
   onPendingPayments,
@@ -108,8 +110,16 @@ export function MacOSDock({
   };
 
   // Determine if buttons should be disabled
-  const buttonsDisabled = isSnapshotMode;
+  const buttonsDisabled = false;
   const saveButtonDisabled = saveDisabled || isSnapshotMode;
+
+  const newRecordIndex = 0;
+  const searchIndex = 1;
+  const showNewSessionButton = Boolean(isSnapshotMode && onNewSession);
+  const newSessionIndex = 2;
+  const printIndex = showNewSessionButton ? 3 : 2;
+  const saveIndex = showNewSessionButton ? 4 : 3;
+  const walletIndex = showNewSessionButton ? 5 : 4;
 
   return (
     <div
@@ -138,8 +148,8 @@ export function MacOSDock({
           variant="success"
           onClick={onNewRecord}
           disabled={buttonsDisabled}
-          magnification={getMagnification(0)}
-          onHover={() => setHoveredIndex(0)}
+          magnification={getMagnification(newRecordIndex)}
+          onHover={() => setHoveredIndex(newRecordIndex)}
           onLeave={() => setHoveredIndex(null)}
         />
 
@@ -151,10 +161,24 @@ export function MacOSDock({
           variant="info"
           onClick={onSearch}
           disabled={buttonsDisabled}
-          magnification={getMagnification(1)}
-          onHover={() => setHoveredIndex(1)}
+          magnification={getMagnification(searchIndex)}
+          onHover={() => setHoveredIndex(searchIndex)}
           onLeave={() => setHoveredIndex(null)}
         />
+
+        {showNewSessionButton && (
+          <MacOSDockButton
+            icon={Plus}
+            label="Nueva Sesion"
+            shortcut=""
+            variant="neutral"
+            onClick={onNewSession}
+            disabled={buttonsDisabled}
+            magnification={getMagnification(newSessionIndex)}
+            onHover={() => setHoveredIndex(newSessionIndex)}
+            onLeave={() => setHoveredIndex(null)}
+          />
+        )}
 
         {/* Imprimir - Always enabled even in snapshot mode */}
         <MacOSDockButton
@@ -164,8 +188,8 @@ export function MacOSDock({
           variant="warning"
           onClick={onPrint}
           disabled={false} // Always enabled
-          magnification={getMagnification(2)}
-          onHover={() => setHoveredIndex(2)}
+          magnification={getMagnification(printIndex)}
+          onHover={() => setHoveredIndex(printIndex)}
           onLeave={() => setHoveredIndex(null)}
         />
 
@@ -179,8 +203,8 @@ export function MacOSDock({
           disabled={saveButtonDisabled}
           hasChanges={hasChanges}
           badgeCount={changesCount}
-          magnification={getMagnification(3)}
-          onHover={() => setHoveredIndex(3)}
+          magnification={getMagnification(saveIndex)}
+          onHover={() => setHoveredIndex(saveIndex)}
           onLeave={() => setHoveredIndex(null)}
         />
 
@@ -192,8 +216,8 @@ export function MacOSDock({
           variant="brand"
           onClick={onPendingPayments}
           disabled={buttonsDisabled}
-          magnification={getMagnification(4)}
-          onHover={() => setHoveredIndex(4)}
+          magnification={getMagnification(walletIndex)}
+          onHover={() => setHoveredIndex(walletIndex)}
           onLeave={() => setHoveredIndex(null)}
         />
       </div>

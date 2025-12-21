@@ -1,9 +1,10 @@
 // src/hooks/usePatientRecord.ts
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import type {
   AttachmentFile,
   Patient,
   Session,
+  SessionItem,
   ToothDx,
   VisitWithProcedures,
   SessionWithItems,
@@ -34,6 +35,37 @@ const initialSession: Session = {
   cumulative_balance: 0,
 };
 
+const normalizeString = (value?: string | null) => value?.trim() ?? "";
+
+const normalizeNumber = (value?: number | null) => Number(value ?? 0);
+
+const normalizeBoolean = (value?: boolean | null) => Boolean(value);
+
+const serializeSessionForCompare = (row: SessionWithItems) =>
+  JSON.stringify({
+    session: {
+      date: row.session.date || "",
+      reason_type: normalizeString(row.session.reason_type),
+      reason_detail: normalizeString(row.session.reason_detail),
+      signer: normalizeString(row.session.signer),
+      clinical_notes: normalizeString(row.session.clinical_notes),
+      budget: normalizeNumber(row.session.budget),
+      discount: normalizeNumber(row.session.discount),
+      payment: normalizeNumber(row.session.payment),
+      payment_method_id: row.session.payment_method_id ?? null,
+      payment_notes: normalizeString(row.session.payment_notes),
+    },
+    items: row.items.map((item) => ({
+      name: normalizeString(item.name),
+      unit_price: normalizeNumber(item.unit_price),
+      quantity: normalizeNumber(item.quantity),
+      is_active: normalizeBoolean(item.is_active),
+      tooth_number: normalizeString(item.tooth_number),
+      procedure_notes: normalizeString(item.procedure_notes),
+      procedure_template_id: item.procedure_template_id ?? null,
+    })),
+  });
+
 export function usePatientRecord() {
   const toast = useToast();
 
@@ -52,7 +84,9 @@ export function usePatientRecord() {
 
   // NEW: Original state for change detection
   const [originalPatient, setOriginalPatient] = useState<Patient | null>(null);
+  const [originalManualDiagnosis, setOriginalManualDiagnosis] = useState("");
   const [originalSessionOdontograms, setOriginalSessionOdontograms] = useState<Map<number, ToothDx>>(new Map());
+  const [originalDraftSessions, setOriginalDraftSessions] = useState<Map<number, string>>(new Map());
 
   // Computed diagnosis from teeth (based on active session's odontogram)
   const diagnosisFromTeeth = useMemo(() => {
@@ -89,7 +123,12 @@ export function usePatientRecord() {
     return keys.some(key => patient[key] !== originalPatient[key]);
   }, [patient, originalPatient, hasPatientData]);
 
-  const hasOdontogramChanges = useMemo(() => {
+  const hasManualDiagnosisChanges = useMemo(
+    () => normalizeString(manualDiagnosis) !== normalizeString(originalManualDiagnosis),
+    [manualDiagnosis, originalManualDiagnosis],
+  );
+
+  const hasToothDxChanges = useMemo(() => {
     if (!activeSessionId) return false;
 
     const current = JSON.stringify(sessionOdontograms.get(activeSessionId) || {});
@@ -97,75 +136,68 @@ export function usePatientRecord() {
     return current !== original;
   }, [activeSessionId, sessionOdontograms, originalSessionOdontograms]);
 
+  const hasOdontogramChanges = hasToothDxChanges || hasManualDiagnosisChanges;
+
   const hasNewAttachments = useMemo(() => {
     return attachments.some(a => a.file && !a.db_id);
   }, [attachments]);
 
-  const hasDraftSessions = useMemo(() => {
-    return sessions.some(s => !s.session.is_saved);
+  const draftSessionChanges = useMemo(() => {
+    return sessions.filter((s) => {
+      if (s.session.is_saved || !s.session.id) return false;
+      const baseline = originalDraftSessions.get(s.session.id);
+      if (!baseline) return false;
+      return serializeSessionForCompare(s) !== baseline;
+    });
+  }, [sessions, originalDraftSessions]);
+
+  const draftSessionChangesCount = draftSessionChanges.length;
+  const hasDraftSessionChanges = draftSessionChangesCount > 0;
+
+  useEffect(() => {
+    setOriginalDraftSessions((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      const draftIds = new Set<number>();
+
+      for (const s of sessions) {
+        if (s.session.is_saved || !s.session.id) continue;
+        const id = s.session.id;
+        draftIds.add(id);
+        if (!next.has(id)) {
+          next.set(id, serializeSessionForCompare(s));
+          changed = true;
+        }
+      }
+
+      for (const id of next.keys()) {
+        if (!draftIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
   }, [sessions]);
 
   // Final canSave flag:
-  // - New patients (no id): require at least one draft session (business rule: no patient without a session).
+  // - New patients (no id): require session edits or odontogram changes.
   // - Existing patients: allow saving any change (patient data, odontogram, attachments, or sessions).
   const hasExistingPatient = Boolean(patient.id);
   const canSave =
     hasPatientData &&
     (hasExistingPatient
-      ? hasDraftSessions ||
+      ? hasDraftSessionChanges ||
         hasOdontogramChanges ||
         hasNewAttachments ||
         hasPatientChanges
-      : hasDraftSessions);
+      : hasDraftSessionChanges || hasOdontogramChanges);
 
   // Handler: Update tooth diagnosis (per-session)
   const onToothDxChange = useCallback((next: ToothDx) => {
     if (!activeSessionId) {
-      const newSessionId = -Date.now();
-      const today = new Date().toISOString().slice(0, 10);
-
-      const newSession: VisitWithProcedures = {
-        session: {
-          id: newSessionId,
-          date: today,
-          reason_type: "Control",
-          reason_detail: "Actualizacion de diagnostico",
-          budget: 0,
-          discount: 0,
-          payment: 0,
-          balance: 0,
-          cumulative_balance: 0,
-          is_saved: false,
-        },
-        items: [],
-      };
-
-      setSessions((prev) => [newSession, ...prev]);
-      setActiveSessionId(newSessionId);
-      setSession((prev) => ({
-        ...prev,
-        id: newSessionId,
-        date: today,
-        reason_type: "Control",
-        reason_detail: "Actualizacion de diagnostico",
-        budget: 0,
-        discount: 0,
-        payment: 0,
-        balance: 0,
-        cumulative_balance: 0,
-        is_saved: false,
-      }));
-
-      setSessionOdontograms((prev) => {
-        const updated = new Map(prev);
-        updated.set(newSessionId, next);
-        return updated;
-      });
-      setCurrentToothDx(next);
-      toast.info(
-        "Nueva sesion creada",
-        "Se creo una sesion automaticamente para este diagnostico",
-      );
+      console.warn('onToothDxChange called without active session');
       return;
     }
 
@@ -175,7 +207,85 @@ export function usePatientRecord() {
       return updated;
     });
     setCurrentToothDx(next);
-  }, [activeSessionId, toast]);
+  }, [activeSessionId]);
+
+  const createDraftSession = useCallback((items: SessionItem[]) => {
+    const newSessionId = -Date.now();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const savedSessions = sessions.filter(
+      (s) => s.session.is_saved && s.session.id,
+    );
+
+    let latestSaved: SessionWithItems | null = null;
+    for (const candidate of savedSessions) {
+      if (!latestSaved) {
+        latestSaved = candidate;
+        continue;
+      }
+
+      const latestDate = latestSaved.session.date || "";
+      const candidateDate = candidate.session.date || "";
+
+      if (candidateDate > latestDate) {
+        latestSaved = candidate;
+      } else if (
+        candidateDate === latestDate &&
+        (candidate.session.id || 0) > (latestSaved.session.id || 0)
+      ) {
+        latestSaved = candidate;
+      }
+    }
+
+    const latestSavedId = latestSaved?.session.id;
+    const latestOdontogram = latestSavedId
+      ? sessionOdontograms.get(latestSavedId)
+      : undefined;
+    const nextOdontogram: ToothDx = {};
+
+    if (latestOdontogram) {
+      for (const [tooth, diagnoses] of Object.entries(latestOdontogram)) {
+        nextOdontogram[tooth] = [...diagnoses];
+      }
+    }
+
+    const newSession: SessionWithItems = {
+      session: {
+        id: newSessionId,
+        date: today,
+        budget: 0,
+        discount: 0,
+        payment: 0,
+        balance: 0,
+        cumulative_balance: 0,
+        signer: "",
+        clinical_notes: "",
+        is_saved: false,
+      },
+      items,
+    };
+
+    setSessions((prev) => [newSession, ...prev]);
+    setSessionOdontograms((prev) => {
+      const updated = new Map(prev);
+      updated.set(newSessionId, nextOdontogram);
+      return updated;
+    });
+    setOriginalSessionOdontograms((prev) => {
+      const updated = new Map(prev);
+      updated.set(newSessionId, nextOdontogram);
+      return updated;
+    });
+    setOriginalDraftSessions((prev) => {
+      const updated = new Map(prev);
+      updated.set(newSessionId, serializeSessionForCompare(newSession));
+      return updated;
+    });
+    setCurrentToothDx(nextOdontogram);
+    setActiveSessionId(newSessionId);
+
+    return newSessionId;
+  }, [sessions, sessionOdontograms]);
 
   // Handler: Create new patient record
   const handleNew = useCallback(() => {
@@ -209,7 +319,9 @@ export function usePatientRecord() {
 
     // NEW: Reset original state
     setOriginalPatient(null);
+    setOriginalManualDiagnosis("");
     setOriginalSessionOdontograms(new Map());
+    setOriginalDraftSessions(new Map());
 
     return true; // Return true to indicate success (for URL clearing in caller)
   }, [sessions]);
@@ -219,21 +331,21 @@ export function usePatientRecord() {
     if (!hasPatientData) {
       toast.warning(
         "Datos incompletos",
-        "Completa al menos nombre y cédula del paciente para guardar.",
+        "Completa al menos nombre y cedula del paciente para guardar.",
       );
       return false;
     }
 
     const hasAllowedChanges = hasExistingPatient
-      ? hasDraftSessions || hasOdontogramChanges || hasNewAttachments || hasPatientChanges
-      : hasDraftSessions;
+      ? hasDraftSessionChanges || hasOdontogramChanges || hasNewAttachments || hasPatientChanges
+      : hasDraftSessionChanges || hasOdontogramChanges;
 
     if (!hasAllowedChanges) {
       toast.info(
-        "Sin cambios válidos",
+        "Sin cambios",
         hasExistingPatient
-          ? "Agrega sesiones, odontograma, adjuntos o modifica datos antes de guardar."
-          : "Agrega al menos una sesión para guardar un paciente nuevo.",
+          ? "No hay cambios para guardar."
+          : "Agrega al menos una sesion o un odontograma para guardar un paciente nuevo.",
       );
       return false;
     }
@@ -244,7 +356,7 @@ export function usePatientRecord() {
       // ============================================================
       // CASE 1: FULL SAVE (with draft sessions)
       // ============================================================
-      if (hasDraftSessions) {
+      if (hasDraftSessionChanges) {
         const safeReasonType: Session["reason_type"] =
           session.reason_type ?? ("Otro" as Session["reason_type"]);
 
@@ -278,20 +390,48 @@ export function usePatientRecord() {
 
         // Save files to disk BEFORE database transaction
         const newAttachments = attachments.filter((a) => a.file);
-        const attachmentMetadata: Array<{
+        const sessionAttachmentFiles = newAttachments.filter((a) => a.session_id != null);
+        const generalAttachmentFiles = newAttachments.filter((a) => a.session_id == null);
+        const sessionAttachmentMeta: Array<{
+          tempId: string;
+          session_id: number | null;
+          filename: string;
+          mime_type: string;
+          bytes: number;
+          storage_key: string;
+        }> = [];
+        const generalAttachmentMeta: Array<{
+          tempId: string;
           filename: string;
           mime_type: string;
           bytes: number;
           storage_key: string;
         }> = [];
 
-        for (const a of newAttachments) {
+        for (const a of sessionAttachmentFiles) {
           const { storage_key, bytes } = await saveAttachmentFile(
             a.file!,
             patient.id || 0,
             session.date,
           );
-          attachmentMetadata.push({
+          sessionAttachmentMeta.push({
+            tempId: a.id,
+            session_id: a.session_id ?? null,
+            filename: a.name,
+            mime_type: a.type || "application/octet-stream",
+            bytes,
+            storage_key,
+          });
+        }
+
+        for (const a of generalAttachmentFiles) {
+          const { storage_key, bytes } = await saveAttachmentFile(
+            a.file!,
+            patient.id || 0,
+            session.date,
+          );
+          generalAttachmentMeta.push({
+            tempId: a.id,
             filename: a.name,
             mime_type: a.type || "application/octet-stream",
             bytes,
@@ -324,12 +464,32 @@ export function usePatientRecord() {
           sessions: draftSessions,
         });
 
-        // Save attachment metadata
-        for (const meta of attachmentMetadata) {
-          await repo.createAttachment({
+        const savedAttachmentIds = new Map<string, number>();
+
+        for (const meta of sessionAttachmentMeta) {
+          const attachmentId = await repo.createAttachment({
             patient_id: patient_id,
-            session_id: session_id,
-            ...meta,
+            session_id: meta.session_id,
+            filename: meta.filename,
+            mime_type: meta.mime_type,
+            bytes: meta.bytes,
+            storage_key: meta.storage_key,
+          });
+          savedAttachmentIds.set(meta.tempId, attachmentId);
+        }
+
+        if (generalAttachmentMeta.length > 0) {
+          const attachmentIds = await repo.saveAttachmentsWithoutSession(
+            patient_id,
+            generalAttachmentMeta.map(({ tempId, ...meta }) => meta)
+          );
+          toast.info(
+            "Adjuntos guardados (sin sesion)",
+            "Se guardaron adjuntos generales del paciente.",
+          );
+          attachmentIds.forEach((id, idx) => {
+            const tempId = generalAttachmentMeta[idx]?.tempId;
+            if (tempId) savedAttachmentIds.set(tempId, id);
           });
         }
 
@@ -361,26 +521,30 @@ export function usePatientRecord() {
         );
 
         // Mark attachments as saved
-        setAttachments((prev) =>
-          prev.map((att) => {
-            if (att.file) {
+        if (savedAttachmentIds.size > 0) {
+          setAttachments((prev) =>
+            prev.map((att) => {
+              if (!att.file) return att;
+              const savedId = savedAttachmentIds.get(att.id);
+              if (!savedId) return att;
               return {
                 ...att,
                 file: undefined,
-                db_id: att.id ? parseInt(att.id) : undefined,
+                db_id: savedId,
+                isRecent: true,
               };
-            }
-            return att;
-          }),
-        );
+            }),
+          );
+        }
 
         toast.success(
           "Guardado exitoso",
-          "La historia clínica se ha guardado correctamente",
+          "La historia clinica se ha guardado correctamente",
         );
 
         // Snapshot saved odontograms
         setOriginalSessionOdontograms(new Map(sessionOdontograms));
+        setOriginalManualDiagnosis(manualDiagnosis);
 
         return true;
       }
@@ -410,52 +574,89 @@ export function usePatientRecord() {
         savedCount++;
       }
 
-      // 2B. Save new attachments WITHOUT session
+      // 2B. Save new attachments (session-specific or general)
       if (hasNewAttachments && patient.id) {
         const newAttachments = attachments.filter((a) => a.file);
-        const attachmentMetadata: Array<{
-          filename: string;
-          mime_type: string;
-          bytes: number;
-          storage_key: string;
-        }> = [];
+        const withSession = newAttachments.filter((a) => a.session_id != null);
+        const withoutSession = newAttachments.filter((a) => a.session_id == null);
+        const savedIds = new Map<string, number>();
 
-        // Save files to disk
-        for (const a of newAttachments) {
+        for (const a of withSession) {
           const { storage_key, bytes } = await saveAttachmentFile(
             a.file!,
             patient.id,
             new Date().toISOString().slice(0, 10),
           );
-          attachmentMetadata.push({
+          const attachmentId = await repo.createAttachment({
+            patient_id: patient.id,
+            session_id: a.session_id ?? null,
             filename: a.name,
             mime_type: a.type || "application/octet-stream",
             bytes,
             storage_key,
           });
+          savedIds.set(a.id, attachmentId);
         }
 
-        // Save metadata with session_id = NULL
-        const attachmentIds = await repo.saveAttachmentsWithoutSession(
-          patient.id,
-          attachmentMetadata
-        );
+        if (withoutSession.length > 0) {
+          const attachmentMetadata: Array<{
+            filename: string;
+            mime_type: string;
+            bytes: number;
+            storage_key: string;
+          }> = [];
+          const generalIds: string[] = [];
 
-        // Update local state
-        setAttachments((prev) =>
-          prev.map((att, idx) => {
-            if (att.file) {
-              return {
-                ...att,
-                file: undefined,
-                db_id: attachmentIds[idx],
-              };
-            }
-            return att;
-          }),
-        );
+          for (const a of withoutSession) {
+            const { storage_key, bytes } = await saveAttachmentFile(
+              a.file!,
+              patient.id,
+              new Date().toISOString().slice(0, 10),
+            );
+            attachmentMetadata.push({
+              filename: a.name,
+              mime_type: a.type || "application/octet-stream",
+              bytes,
+              storage_key,
+            });
+            generalIds.push(a.id);
+          }
 
-        savedCount++;
+          const attachmentIds = await repo.saveAttachmentsWithoutSession(
+            patient.id,
+            attachmentMetadata
+          );
+          toast.info(
+            "Adjuntos guardados (sin sesion)",
+            "Se guardaron adjuntos generales del paciente.",
+          );
+
+          attachmentIds.forEach((id, idx) => {
+            const tempId = generalIds[idx];
+            if (tempId) savedIds.set(tempId, id);
+          });
+        }
+
+        if (savedIds.size > 0) {
+          setAttachments((prev) =>
+            prev.map((att) => {
+              if (att.file) {
+                const savedId = savedIds.get(att.id);
+                if (!savedId) {
+                  return att;
+                }
+                return {
+                  ...att,
+                  file: undefined,
+                  db_id: savedId,
+                  isRecent: true,
+                };
+              }
+              return att;
+            }),
+          );
+          savedCount++;
+        }
       }
 
       // 2C. Save odontogram as "Diagnostic Update" session
@@ -482,6 +683,7 @@ export function usePatientRecord() {
             return updated;
           });
         }
+        setOriginalManualDiagnosis(manualDiagnosis);
 
         savedCount++;
       }
@@ -516,9 +718,10 @@ export function usePatientRecord() {
     hasPatientChanges,
     hasOdontogramChanges,
     hasNewAttachments,
-    hasDraftSessions,
+    hasDraftSessionChanges,
     activeSessionId,
     sessionOdontograms,
+    manualDiagnosis,
   ]);
 
   // Handler: Delete attachment
@@ -555,6 +758,15 @@ export function usePatientRecord() {
       ]);
 
       setSessions(allSess);
+      setManualDiagnosis("");
+      setOriginalManualDiagnosis("");
+      setOriginalDraftSessions(
+        new Map(
+          allSess
+            .filter((s) => !s.session.is_saved && s.session.id)
+            .map((s) => [s.session.id as number, serializeSessionForCompare(s)]),
+        ),
+      );
 
       // NEW: Load odontograms for ALL sessions into Map
       const odontogramMap = new Map<number, ToothDx>();
@@ -581,14 +793,14 @@ export function usePatientRecord() {
 
       if (drafts.length > 0) {
         selectedSession = drafts.reduce((prev, curr) =>
-          (curr.session.date || '') > (prev.session.date || '') ? curr : prev
+          (curr.session.date || "") > (prev.session.date || "") ? curr : prev
         );
       } else {
         // Priority 2: Most recent saved
         const saved = allSess.filter((s) => s.session.is_saved);
         if (saved.length > 0) {
           selectedSession = saved.reduce((prev, curr) =>
-            (curr.session.date || '') > (prev.session.date || '') ? curr : prev
+            (curr.session.date || "") > (prev.session.date || "") ? curr : prev
           );
         }
       }
@@ -628,7 +840,9 @@ export function usePatientRecord() {
         url: "",
         uploadDate: att.created_at || "",
         storage_key: att.storage_key,
+        session_id: att.session_id ?? null,
         db_id: att.id,
+        isRecent: false,
       }));
       setAttachments(attachmentFiles);
 
@@ -639,7 +853,6 @@ export function usePatientRecord() {
       return false;
     }
   }, []);
-
   // Handler: Quick payment
   const handleQuickPayment = useCallback(
     async (payment: {
@@ -752,7 +965,8 @@ export function usePatientRecord() {
     hasPatientChanges,
     hasOdontogramChanges,
     hasNewAttachments,
-    hasDraftSessions,
+    hasDraftSessionChanges,
+    draftSessionChangesCount,
 
     // Handlers
     onToothDxChange,
@@ -762,5 +976,6 @@ export function usePatientRecord() {
     handleSelectPatient,
     handleQuickPayment,
     handleSessionChange, // NEW: Switch active session
+    createDraftSession,
   };
 }

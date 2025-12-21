@@ -32,10 +32,7 @@ interface Props {
   patientName?: string;
   readOnly?: boolean;
 
-  // NEW PROPS: Session filtering
-  activeSessionId?: number | null;
-  filterMode?: "all" | "session";
-  onFilterModeChange?: (mode: "all" | "session") => void;
+  defaultSessionId?: number | null;
 }
 
 const getFileIcon = (type: string) => {
@@ -103,9 +100,7 @@ const Attachments = memo(function Attachments({
   onFileDelete,
   patientName,
   readOnly,
-  activeSessionId,
-  filterMode = "all",
-  onFilterModeChange,
+  defaultSessionId,
 }: Props) {
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<{
@@ -116,21 +111,7 @@ const Attachments = memo(function Attachments({
     null,
   );
 
-  // NEW: Filter files by session
-  const filteredFiles = useMemo(() => {
-    if (filterMode === "all") {
-      return files;
-    }
-
-    if (filterMode === "session") {
-      if (!activeSessionId) {
-        return []; // No active session, show nothing
-      }
-      return files.filter((f) => f.session_id === activeSessionId);
-    }
-
-    return files;
-  }, [files, filterMode, activeSessionId]);
+  const displayFiles = files;
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -164,7 +145,7 @@ const Attachments = memo(function Attachments({
       file,
       url: URL.createObjectURL(file),
       uploadDate: new Date().toISOString(),
-      session_id: filterMode === "session" ? activeSessionId : undefined, // AUTO-ASSIGN
+      session_id: defaultSessionId ?? undefined,
     }));
     onFilesChange([...files, ...newFiles]);
   };
@@ -190,21 +171,24 @@ const Attachments = memo(function Attachments({
     onFilesChange([]);
   };
 
-  // Use filteredFiles for all calculations
-  const totalSize = filteredFiles.reduce((acc, f) => acc + f.size, 0);
+  // Use displayFiles for all calculations
+  const totalSize = displayFiles.reduce((acc, f) => acc + f.size, 0);
   const images = useMemo(
-    () => filteredFiles.filter((f) => f.type?.startsWith("image/")),
-    [filteredFiles],
+    () => displayFiles.filter((f) => f.type?.startsWith("image/")),
+    [displayFiles],
   );
   const docs = useMemo(
-    () => filteredFiles.filter((f) => !f.type?.startsWith("image/")),
-    [filteredFiles],
+    () => displayFiles.filter((f) => !f.type?.startsWith("image/")),
+    [displayFiles],
   );
 
   const FileCard = memo(({ file }: { file: AttachmentFile }) => {
     const isNew = !!file.file;
+    const isRecent = !!file.isRecent;
     const isSaved = !!file.storage_key;
     const isImage = file.type?.startsWith("image/");
+    const isGeneral = file.session_id == null;
+    const showRecent = isRecent && !isNew;
     const fileName = getDisplayName(file);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const thumbSrc = isNew ? file.url : imageUrl;
@@ -297,7 +281,9 @@ const Attachments = memo(function Attachments({
           "hover:shadow-md hover:border-[hsl(var(--primary)/0.5)]",
           isNew
             ? "bg-[hsl(var(--success)/0.05)] border-[hsl(var(--success))]"
-            : "bg-[hsl(var(--card))] border-[hsl(var(--border))]",
+            : showRecent
+              ? "bg-[hsl(var(--success)/0.03)] border-[hsl(var(--success)/0.45)]"
+              : "bg-[hsl(var(--card))] border-[hsl(var(--border))]",
         )}
       >
         <div className="p-4 flex items-center gap-3">
@@ -334,6 +320,11 @@ const Attachments = memo(function Attachments({
               >
                 {isNew ? "Nuevo" : getFileTypeLabel(file.type)}
               </Badge>
+              {isGeneral && (
+                <Badge variant="default" className="text-xs flex-shrink-0">
+                  General
+                </Badge>
+              )}
             </div>
             <div className="text-xs text-[hsl(var(--muted-foreground))] space-y-1">
               <div>
@@ -404,19 +395,25 @@ const Attachments = memo(function Attachments({
   });
   FileCard.displayName = "FileCard";
 
-  const EmptyState = ({ type }: { type: "images" | "docs" }) => (
+  const EmptyState = ({ type }: { type: "all" | "images" | "docs" }) => (
     <div className="py-8 text-center">
       <div className="mx-auto w-12 h-12 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mb-3">
         {type === "images" ? (
           <Image size={24} className="text-[hsl(var(--muted-foreground))]" />
-        ) : (
+        ) : type === "docs" ? (
           <File size={24} className="text-[hsl(var(--muted-foreground))]" />
+        ) : (
+          <Paperclip size={24} className="text-[hsl(var(--muted-foreground))]" />
         )}
       </div>
       <p className="text-sm text-[hsl(var(--muted-foreground))]">
         {readOnly
-          ? `No hay ${type === "images" ? "imágenes" : "documentos"} para esta visita.`
-          : `No hay ${type === "images" ? "imágenes" : "documentos"}. Arrastra archivos arriba o usa el selector.`}
+          ? type === "all"
+            ? "No hay adjuntos para este paciente."
+            : `No hay ${type === "images" ? "imagenes" : "documentos"} para este paciente.`
+          : type === "all"
+            ? "No hay adjuntos. Arrastra archivos arriba o usa el selector."
+            : `No hay ${type === "images" ? "imagenes" : "documentos"}. Arrastra archivos arriba o usa el selector.`}
       </p>
     </div>
   );
@@ -436,40 +433,8 @@ const Attachments = memo(function Attachments({
         </div>
       )}
 
-      {/* Session Filter Toggle */}
-      {activeSessionId !== undefined && onFilterModeChange && (
-        <div className="flex items-center justify-center gap-2 p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)]">
-          <button
-            onClick={() => onFilterModeChange("all")}
-            className={cn(
-              "px-4 py-2 rounded-md text-sm font-medium transition-all",
-              filterMode === "all"
-                ? "bg-[hsl(var(--primary))] text-white"
-                : "bg-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]",
-            )}
-          >
-            Todo el paciente
-          </button>
-          <button
-            onClick={() => onFilterModeChange("session")}
-            className={cn(
-              "px-4 py-2 rounded-md text-sm font-medium transition-all",
-              filterMode === "session"
-                ? "bg-[hsl(var(--primary))] text-white"
-                : "bg-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]",
-            )}
-            disabled={!activeSessionId}
-          >
-            Sesión activa
-            {activeSessionId && filterMode === "session" && (
-              <span className="ml-1 opacity-75">({activeSessionId})</span>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Summary Card */}
-      {filteredFiles.length > 0 && (
+      {displayFiles.length > 0 && (
         <div className="flex items-center justify-between p-4 rounded-lg bg-[hsl(var(--muted))] border border-[hsl(var(--border))]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center">
@@ -477,12 +442,7 @@ const Attachments = memo(function Attachments({
             </div>
             <div>
               <div className="font-medium text-sm">
-                {filteredFiles.length} archivo{filteredFiles.length !== 1 ? "s" : ""}
-                {filterMode === "session" && (
-                  <span className="ml-1 text-xs text-[hsl(var(--muted-foreground))]">
-                    (sesión)
-                  </span>
-                )}
+                {displayFiles.length} archivo{displayFiles.length !== 1 ? "s" : ""}
               </div>
               <div className="text-xs text-[hsl(var(--muted-foreground))]">
                 {formatFileSize(totalSize)} total
@@ -490,7 +450,7 @@ const Attachments = memo(function Attachments({
             </div>
           </div>
 
-          {!readOnly && filteredFiles.length > 0 && (
+          {!readOnly && displayFiles.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
@@ -548,11 +508,6 @@ const Attachments = memo(function Attachments({
               o haz clic para seleccionar • Formatos: Imágenes, PDF, Word
             </p>
 
-            {filterMode === "session" && activeSessionId && (
-              <p className="text-xs text-[hsl(var(--brand))] mb-4 font-medium">
-                Los archivos se vincularán a la sesión activa
-              </p>
-            )}
 
             <label htmlFor="file-upload" className="cursor-pointer">
               <Button variant="secondary" size="sm" className="cursor-pointer">
@@ -567,11 +522,22 @@ const Attachments = memo(function Attachments({
       )}
 
       {/* Tabs */}
-      {filteredFiles.length > 0 && (
-        <Tabs defaultValue="images" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+      {displayFiles.length > 0 && (
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="all" className="relative">
+              Todos
+              {displayFiles.length > 0 && (
+                <Badge
+                  variant="info"
+                  className="ml-2 px-1.5 h-5 min-w-5 flex items-center justify-center text-xs"
+                >
+                  {displayFiles.length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="images" className="relative">
-              Imágenes / Rx
+              Imagenes / Rx
               {images.length > 0 && (
                 <Badge
                   variant="info"
@@ -593,6 +559,18 @@ const Attachments = memo(function Attachments({
               )}
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="all" className="space-y-3 mt-4">
+            {displayFiles.length > 0 ? (
+              <div className="grid md:grid-cols-2 gap-3">
+                {displayFiles.map((file) => (
+                  <FileCard key={file.id} file={file} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState type="all" />
+            )}
+          </TabsContent>
 
           <TabsContent value="images" className="space-y-3 mt-4">
             {images.length > 0 ? (

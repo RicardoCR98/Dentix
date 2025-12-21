@@ -27,6 +27,7 @@ interface SessionsTableProps {
       procedure_template_id?: number;
     }>,
   ) => Promise<void>;
+  onCreateSession?: () => void;
   signers: Array<{ id: number; name: string }>;
   onSignersChange: () => Promise<void>;
   reasonTypes: ReasonType[];
@@ -43,6 +44,7 @@ const SessionsTable = memo(function SessionsTable({
   onSessionsChange,
   procedureTemplates,
   onUpdateTemplates,
+  onCreateSession,
   signers,
   onSignersChange,
   reasonTypes,
@@ -174,6 +176,11 @@ const SessionsTable = memo(function SessionsTable({
 
   // Agregar sesión
   const addRow = useCallback(() => {
+    if (onCreateSession) {
+      onCreateSession();
+      return;
+    }
+
     let previousSession: VisitWithProcedures | null = null;
     const validSessions = sessions.filter((s) => s.session);
     if (validSessions.length > 0) {
@@ -217,7 +224,7 @@ const SessionsTable = memo(function SessionsTable({
         });
       }
     }
-  }, [sessions, onSessionsChange, onOpenSession, newRow]);
+  }, [onCreateSession, sessions, onSessionsChange, onOpenSession, newRow]);
 
   useEffect(() => {
     if (autoCreateDraftKey === undefined || autoCreateDraftKey === null) return;

@@ -1,6 +1,6 @@
 // src/components/sessions/SessionContextBar.tsx
 import { useMemo } from "react";
-import { Activity, Clock3, Lock, Pencil } from "lucide-react";
+import { Activity, Clock3, Pencil } from "lucide-react";
 import { Badge } from "../ui/Badge";
 import { Alert } from "../ui/Alert";
 import type { SessionWithItems } from "../../lib/types";
@@ -83,56 +83,6 @@ export function SessionContextBar({
       </div>
     );
   }
-
-  const isReadOnly = Boolean(activeSession.session.is_saved);
-
-  return (
-    <div className="mb-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface))] shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="w-10 h-10 rounded-full bg-[hsl(var(--brand))] text-white flex items-center justify-center">
-            <Activity size={18} />
-          </div>
-          <div className="flex-1">
-            <div className="text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-              Contexto de sesion
-            </div>
-            <div className="font-semibold text-base">
-              {formatDate(activeSession.session.date)}
-            </div>
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">
-              {activeSession.session.reason_type || "Sin motivo registrado"}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs">
-              {isReadOnly ? (
-                <>
-                  <Badge variant="success">Guardada</Badge>
-                  <Badge variant="info" className="flex items-center gap-1">
-                    <Lock size={12} />
-                    Modo lectura
-                  </Badge>
-                </>
-              ) : (
-                <Badge variant="warning" className="flex items-center gap-1">
-                  <Pencil size={12} />
-                  Borrador editable
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="text-right text-xs text-[hsl(var(--muted-foreground))] leading-tight">
-          <div className="font-semibold text-[hsl(var(--foreground))]">
-            {isReadOnly ? "Historico bloqueado" : "Sesion editable"}
-          </div>
-          <div>{sessionLabel(activeSession)}</div>
-        </div>
-      </div>
-
-      {renderPills()}
-    </div>
-  );
 }
 
 type PillStatus = "saved" | "draft" | "empty";

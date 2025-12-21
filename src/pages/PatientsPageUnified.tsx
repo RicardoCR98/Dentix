@@ -39,7 +39,7 @@ import { usePatientFromURL } from "../hooks/usePatientFromURL";
 import { useMasterData } from "../hooks/useMasterData";
 // useScrollVisibility hook removed - no longer needed without Quick Actions section
 import { useAppStore } from "../stores";
-import type { Patient } from "../lib/types";
+import type { Patient, SessionItem } from "../lib/types";
 import OdontogramDiagnosisSection from "../components/OdontogramDiagnosisSection";
 
 interface PatientsPageUnifiedProps {
@@ -67,8 +67,10 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     hasPatientChanges,
     hasOdontogramChanges,
     hasNewAttachments,
-    hasDraftSessions,
+    hasDraftSessionChanges,
+    draftSessionChangesCount,
     onToothDxChange,
+    createDraftSession,
     handleSessionChange,
     handleNew,
     handleSave,
@@ -111,13 +113,13 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     (hasPatientChanges ? 1 : 0) +
     (hasOdontogramChanges ? 1 : 0) +
     (hasNewAttachments ? 1 : 0) +
-    (hasDraftSessions ? sessions.filter((s) => !s.session.is_saved).length : 0);
+    draftSessionChangesCount;
 
   const hasAnyChanges =
     hasPatientChanges ||
     hasOdontogramChanges ||
     hasNewAttachments ||
-    hasDraftSessions;
+    hasDraftSessionChanges;
 
   // Snapshot helpers
   const isSnapshotMode = snapshotSessionId !== null;
@@ -130,6 +132,22 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       .map((s) => s.session.id!)
       .find(Boolean) as number | null;
   }, [sessions]);
+
+  const latestSavedSession = useMemo(() => {
+    const saved = sessions.filter((s) => s.session.is_saved);
+    if (saved.length === 0) return null;
+    const sorted = [...saved].sort((a, b) =>
+      (b.session.date || "").localeCompare(a.session.date || ""),
+    );
+    return sorted[0] || null;
+  }, [sessions]);
+
+  const activeSavedSessionId = useMemo(() => {
+    if (!activeSessionId) return null;
+    const active = sessions.find((s) => s.session.id === activeSessionId);
+    if (!active?.session?.is_saved) return null;
+    return active.session.id ?? null;
+  }, [activeSessionId, sessions]);
 
   const sessionsToRender = useMemo(() => {
     if (!snapshotSessionId) return sessions;
@@ -218,6 +236,48 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     [handleSessionChange, isSnapshotMode],
   );
 
+  const buildDraftSessionItems = useCallback((): SessionItem[] => {
+    const timestamp = Date.now();
+    const baseItems: SessionItem[] = procedureTemplates.map(
+      (template, index) => ({
+        id: timestamp + index,
+        name: template.name,
+        unit_price: template.default_price,
+        quantity: 0,
+        subtotal: 0,
+        is_active: false,
+        procedure_template_id: template.id,
+      }),
+    );
+
+    let previousSession = null;
+    const validSessions = sessions.filter((s) => s.session);
+    if (validSessions.length > 0) {
+      previousSession = validSessions[0];
+      for (const session of validSessions) {
+        if ((session.session?.date ?? "") > (previousSession.session?.date ?? "")) {
+          previousSession = session;
+        }
+      }
+    }
+
+    if (!previousSession) return baseItems;
+
+    const prevQtyMap = new Map(
+      previousSession.items.map((item) => [item.name, item.quantity]),
+    );
+
+    return baseItems.map((item, index) => {
+      const quantity = prevQtyMap.get(item.name) || 0;
+      return {
+        ...item,
+        id: -(timestamp + index + 1000),
+        quantity,
+        subtotal: item.unit_price * quantity,
+      };
+    });
+  }, [procedureTemplates, sessions]);
+
   const handleOpenSnapshot = useCallback((sessionId: number) => {
     setSnapshotSessionId(sessionId);
   }, []);
@@ -226,6 +286,16 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     setSnapshotSessionId(null);
     setHasManuallyExited(true); // Mark that user manually exited
   }, []);
+
+  const handleCreateDraftSession = useCallback(() => {
+    const items = buildDraftSessionItems();
+    createDraftSession(items);
+  }, [buildDraftSessionItems, createDraftSession]);
+
+  const handleNewSessionFromDock = useCallback(() => {
+    handleCreateDraftSession();
+    handleCloseSnapshot();
+  }, [handleCloseSnapshot, handleCreateDraftSession]);
 
   // Auto snapshot to última sesión guardada cuando se carga un paciente
   // But only if user hasn't manually exited snapshot mode
@@ -280,8 +350,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   // Data loss prevention
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      const draftSessions = sessions.filter((s) => !s.session.is_saved);
-      if (draftSessions.length > 0) {
+      if (hasAnyChanges) {
         e.preventDefault();
         e.returnValue = "";
         return "";
@@ -290,7 +359,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [sessions]);
+  }, [hasAnyChanges]);
 
   // Render vertical layout
   if (layoutMode === "vertical") {
@@ -322,9 +391,6 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
                 Vista solo lectura. Los campos están deshabilitados hasta salir.
               </div>
             </div>
-            <Button variant="primary" size="sm" onClick={handleCloseSnapshot}>
-              Volver a edición
-            </Button>
           </Alert>
         )}
 
@@ -364,6 +430,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           activeSessionId={odontogramActiveSessionId}
           sessions={odontogramSessions}
           onSessionChange={handleOdontogramSessionChange}
+          lastSavedSession={latestSavedSession}
         />
       </div>
       {/* Sessions */}
@@ -382,6 +449,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             reasonTypes={reasonTypes}
             paymentMethods={paymentMethods}
             onReasonTypesChange={handleReasonTypesChange}
+            onCreateSession={handleCreateDraftSession}
             activeId={activeSessionId}
             onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
             onViewReadOnly={handleOpenSnapshot}
@@ -432,6 +500,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             onFilesChange={isSnapshotMode ? () => {} : setAttachments}
             onFileDelete={isSnapshotMode ? () => Promise.resolve() : handleDeleteAttachment}
             patientName={patient.full_name}
+            defaultSessionId={activeSavedSessionId}
           />
         </div>
       </Section>
@@ -443,6 +512,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           visible={true}
           onNewRecord={handleNewWrapper}
           onSearch={() => setSearchDialogOpen(true)}
+          onNewSession={handleNewSessionFromDock}
           onPrint={handlePreview}
           onSave={handleSaveWrapper}
           onPendingPayments={() => setPaymentsDialogOpen(true)}
@@ -484,9 +554,6 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               Vista solo lectura. Los campos están deshabilitados hasta salir.
             </div>
           </div>
-          <Button variant="primary" size="sm" onClick={handleCloseSnapshot}>
-            Volver a edición
-          </Button>
         </Alert>
       )}
 
@@ -549,6 +616,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               activeSessionId={odontogramActiveSessionId}
               sessions={odontogramSessions}
               onSessionChange={handleOdontogramSessionChange}
+              lastSavedSession={latestSavedSession}
             />
           </div>
         </TabsContent>
@@ -570,6 +638,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
                 reasonTypes={reasonTypes}
                 paymentMethods={paymentMethods}
                 onReasonTypesChange={handleReasonTypesChange}
+                onCreateSession={handleCreateDraftSession}
                 activeId={activeSessionId}
                 onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
                 onViewReadOnly={handleOpenSnapshot}
@@ -631,6 +700,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
                 onFilesChange={isSnapshotMode ? () => {} : setAttachments}
                 onFileDelete={isSnapshotMode ? () => Promise.resolve() : handleDeleteAttachment}
                 patientName={patient.full_name}
+                defaultSessionId={activeSavedSessionId}
               />
             </div>
           </Section>
@@ -644,6 +714,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         visible={true}
         onNewRecord={handleNewWrapper}
         onSearch={() => setSearchDialogOpen(true)}
+        onNewSession={handleNewSessionFromDock}
         onPrint={handlePreview}
         onSave={handleSaveWrapper}
         onPendingPayments={() => setPaymentsDialogOpen(true)}

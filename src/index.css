@@ -217,10 +217,14 @@
 @keyframes savePulse {
     0%,
     100% {
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+        box-shadow:
+            0 8px 20px rgba(0, 0, 0, 0.25),
+            0 2px 8px rgba(0, 0, 0, 0.15);
     }
     50% {
-        box-shadow: 0 8px 24px rgba(214, 69, 69, 0.4), 0 2px 12px rgba(214, 69, 69, 0.3);
+        box-shadow:
+            0 8px 24px rgba(214, 69, 69, 0.4),
+            0 2px 12px rgba(214, 69, 69, 0.3);
     }
 }
 
@@ -804,9 +808,8 @@
 
     /* Legacy badge classes - redirect to neutral */
     .badge-info {
-        background: hsl(var(--muted));
-        color: hsl(var(--foreground));
-        border: 2px solid hsl(var(--border));
+        background: hsl(var(--info) / 0.1);
+        color: hsl(var(--info));
     }
 
     .badge-purple {
