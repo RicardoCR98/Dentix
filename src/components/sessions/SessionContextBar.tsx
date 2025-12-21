@@ -15,55 +15,10 @@ interface SessionContextBarProps {
 export function SessionContextBar({
   activeSessionId,
   sessions,
-  onSessionChange,
 }: SessionContextBarProps) {
-  const sortedSessions = useMemo(
-    () =>
-      [...sessions].sort((a, b) =>
-        (b.session.date || "").localeCompare(a.session.date || ""),
-      ),
-    [sessions],
-  );
-
   const activeSession = useMemo(
     () => sessions.find((s) => s.session.id === activeSessionId),
     [sessions, activeSessionId],
-  );
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    if (Number.isNaN(date.getTime())) return "Sin fecha";
-
-    return date.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const sessionLabel = (session: SessionWithItems) =>
-    `${formatDate(session.session.date)} - ${
-      session.session.reason_type || "Sin motivo"
-    }`;
-
-  const renderPills = () => (
-    <div className="mt-3 flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-      <SessionPill
-        label="Sin sesion activa"
-        status="empty"
-        onClick={() => onSessionChange(null)}
-        active={activeSessionId === null}
-      />
-      {sortedSessions.map((s) => (
-        <SessionPill
-          key={s.session.id}
-          label={sessionLabel(s)}
-          status={s.session.is_saved ? "saved" : "draft"}
-          onClick={() => onSessionChange(s.session.id!)}
-          active={s.session.id === activeSessionId}
-        />
-      ))}
-    </div>
   );
 
   if (!activeSession) {
@@ -75,9 +30,6 @@ export function SessionContextBar({
               No hay sesion activa. Selecciona una sesion o inicia un nuevo
               diagnostico para crearla.
             </span>
-            {sessions.length > 0 && (
-              <div className="flex-1 max-w-[620px]">{renderPills()}</div>
-            )}
           </div>
         </Alert>
       </div>

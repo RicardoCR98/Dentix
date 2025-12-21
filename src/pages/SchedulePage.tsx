@@ -1,3 +1,6 @@
+import { Calendar } from "lucide-react";
+import { Alert } from "../components/ui/Alert";
+
 export const SchedulePage = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))] ">
@@ -9,31 +12,17 @@ export const SchedulePage = () => {
         </header>
 
         <main className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 lg:px-8">
-          <div className="w-full max-w-3xl sm:max-w-4xl lg:max-w-6xl 2xl:max-w-[1400px] mx-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-              <div className="card cardh">
-                <div className="card-body">
-                  <h2 className="card-title">
-                    <span className="badge badge-success">
-                      <span className="visually-hidden">Nueva</span>
-                    </span>
-                    Nueva historia
-                  </h2>
-                  <p className="card-text">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-                    Vestibulum et ligula in nunc bibendum fringilla a eu lectus.
-                  </p>
-                  <div className="card-actions">
-                    <button className="btn btn-primary">
-                      <span className="visually-hidden">Abrir</span>
-                    </button>
-                  </div>
-                </div>
+          <Alert variant="info">
+            <div className="flex items-center gap-2">
+              <Calendar size={20} />
+              <div>
+                <p className="font-medium">Sección en desarrollo</p>
+                <p className="text-sm mt-1">
+                  Esta sección se encuentra en desarrollo y no está disponible
+                </p>
               </div>
-
-              {/* Repeat for each card */}
             </div>
-          </div>
+          </Alert>
         </main>
       </div>
     </div>

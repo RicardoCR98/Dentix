@@ -13,7 +13,6 @@ import { Button } from "./ui/Button";
 import { Label } from "./ui/Label";
 import { Divider } from "./ui/Divider";
 import { Badge } from "./ui/Badge";
-import { CheckboxRoot } from "./ui/Checkbox";
 import { cn } from "../lib/cn";
 import {
   Palette,
@@ -28,7 +27,6 @@ import {
   RotateCcw,
   Layout,
   Columns,
-  Zap,
 } from "lucide-react";
 
 type LayoutMode = "tabs" | "vertical";
@@ -66,10 +64,6 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
   const layoutMode = useAppStore((state) => state.layoutMode);
   const setLayoutMode = useAppStore((state) => state.setLayoutMode);
 
-  // Quick actions visibility from store (persisted to database)
-  const showQuickActions = useAppStore((state) => state.showQuickActions);
-  const setShowQuickActions = useAppStore((state) => state.setShowQuickActions);
-
   const [open, setOpen] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -98,12 +92,6 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
   const handleLayoutModeChange = async (newMode: LayoutMode) => {
     // Store's setLayoutMode automatically persists to database
     await setLayoutMode(newMode);
-    // No need to mark as unsaved since it saves immediately to DB
-  };
-
-  const handleQuickActionsToggle = async (enabled: boolean) => {
-    // Store's setShowQuickActions automatically persists to database
-    await setShowQuickActions(enabled);
     // No need to mark as unsaved since it saves immediately to DB
   };
 
@@ -570,32 +558,6 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
           </div>
 
           <Divider />
-
-          {/* Quick Actions Visibility */}
-          <div className="mb-6">
-            <Label className="flex items-center gap-2 mb-3">
-              <Zap size={16} className="text-[hsl(var(--brand))]" />
-              Acciones Rápidas
-            </Label>
-            <div className="flex items-center justify-between p-4 rounded-lg border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] transition-colors">
-              <div>
-                <div className="font-semibold">Mostrar Acciones Rápidas</div>
-                <div className="text-xs text-[hsl(var(--muted-foreground))]">
-                  Muestra/oculta la sección de acciones rápidas en la parte
-                  superior
-                </div>
-              </div>
-              <CheckboxRoot
-                checked={showQuickActions}
-                onCheckedChange={handleQuickActionsToggle}
-              />
-            </div>
-            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2 flex items-start gap-2">
-              <span className="inline-block w-1 h-1 rounded-full bg-[hsl(var(--brand))] mt-1.5" />
-              La sección de acciones rápidas incluye botones para nueva sesión,
-              abono rápido y más
-            </p>
-          </div>
 
           {/* Footer con información */}
           <div className="mt-auto pt-4 border-t border-[hsl(var(--border))]">
