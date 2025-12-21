@@ -282,7 +282,7 @@ pub async fn get_all_patients_list(
             p.allergy_detail,
             p.status,
             MAX(s.date) as last_visit_date,
-            COALESCE(SUM(CASE WHEN s.is_saved = 1 THEN s.balance ELSE 0 END), 0) as pending_balance
+            COALESCE(CAST(SUM(CASE WHEN s.is_saved = 1 THEN s.balance ELSE 0 END) AS REAL), 0.0) as pending_balance
          FROM patients p
          LEFT JOIN sessions s ON s.patient_id = p.id
          WHERE p.status = 'active'
@@ -2081,17 +2081,17 @@ pub async fn create_diagnostic_update_session(
     // Get today's date in ISO format
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
-    // Create new session with type "Actualización diagnóstica"
+    // Create new session for odontogram-only updates
     let result = sqlx::query(
         "INSERT INTO sessions (patient_id, date, reason_type, reason_detail,
                               tooth_dx_json, auto_dx_text, full_dx_text,
                               budget, discount, payment, balance, cumulative_balance, is_saved)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 0, 0, 0, 0, 0)"
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 0, 0, 0, 0, 1)"
     )
     .bind(patient_id)
     .bind(&today)
-    .bind("Actualización diagnóstica")
-    .bind("Actualización de odontograma sin procedimientos asociados")
+    .bind("Otro")
+    .bind("Sistema: Odontograma")
     .bind(&tooth_dx_json)
     .bind(&auto_dx_text)
     .bind(&full_dx_text)

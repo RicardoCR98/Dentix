@@ -391,9 +391,21 @@ CREATE INDEX IF NOT EXISTS idx_sync_queue_table ON sync_queue(table_name);
 INSERT OR IGNORE INTO procedure_templates (name, default_price) VALUES
   ('Curación', 0),
   ('Resinas simples', 0),
-  ('Extracción simple', 0),
-  ('Endodoncia', 0),
-  ('Limpieza', 0);
+  ('Resinas compuestas', 0),
+  ('Extracciones simples', 0),
+  ('Extracciones complejas', 0),
+  ('Correctivo inicial', 0),
+  ('Control mensual', 0),
+  ('Prótesis total', 0),
+  ('Prótesis removible', 0),
+  ('Prótesis fija', 0),
+  ('Retenedor', 0),
+  ('Endodoncia simple', 0),
+  ('Endodoncia compleja', 0),
+  ('Limpieza simple', 0),
+  ('Limpieza compleja', 0),
+  ('Reposición', 0),
+  ('Pegada', 0);
 
 INSERT OR IGNORE INTO signers (name) VALUES
   ('Dr. Ejemplo 1'),
@@ -401,23 +413,26 @@ INSERT OR IGNORE INTO signers (name) VALUES
 
 INSERT OR IGNORE INTO diagnosis_options (label, color, sort_order) VALUES
   ('Sano', 'success', 0),
-  ('Caries', 'danger', 1),
-  ('Fractura', 'danger', 2),
-  ('Sensibilidad', 'warning', 3),
-  ('Obturación', 'info', 4);
+  ('Caries', 'info', 1),
+  ('Fractura', 'info', 2),
+  ('Sensibilidad', 'info', 3),
+  ('Obturación', 'info', 4),
+  ('Corona', 'info', 5),
+  ('Endodoncia', 'info', 6),
+  ('Implante', 'info', 7),
+  ('Ausente', 'info', 8);
 
 INSERT OR IGNORE INTO reason_types (name, sort_order) VALUES
   ('Dolor', 1),
   ('Control', 2),
   ('Emergencia', 3),
-  ('Abono a cuenta', 4),
-  ('Presupuesto', 5),
-  ('Otro', 6);
+  ('Estética', 4),
+  ('Otro', 5);
 
 INSERT OR IGNORE INTO payment_methods (name, sort_order) VALUES
   ('Efectivo', 1),
-  ('Tarjeta débito', 2),
-  ('Transferencia bancaria', 3),
+  ('Transferencia bancaria', 2),
+  ('Tarjeta débito', 3),
   ('Otro', 4);
 
 INSERT OR IGNORE INTO user_settings (key, value, category) VALUES

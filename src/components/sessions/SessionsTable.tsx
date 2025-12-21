@@ -113,7 +113,9 @@ const SessionsTable = memo(function SessionsTable({
 
   // Determinar cuál es la sesión más reciente EN BORRADOR (la única editable)
   const mostRecentDraftId = useMemo(() => {
-    const drafts = sessions.filter((s) => s.session && !s.session.is_saved);
+    const drafts = sessions.filter(
+      (s) => s.session && s.session.is_saved === false,
+    );
     if (drafts.length === 0) return null;
 
     let mostRecent = drafts[0];
@@ -456,7 +458,9 @@ const SessionsTable = memo(function SessionsTable({
               const idxReal = sessions.findIndex(
                 (s) => s.session?.id === row.session?.id,
               );
-              const isEditable = row.session?.id === mostRecentDraftId;
+              const isEditable =
+                row.session?.is_saved === false &&
+                row.session?.id === mostRecentDraftId;
               const inEditMode =
                 editModeSessionId === row.session?.id?.toString();
 

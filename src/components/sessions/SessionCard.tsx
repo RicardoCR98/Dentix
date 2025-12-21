@@ -119,7 +119,12 @@ export const SessionCard = memo(
     const activeProcs = session.items.filter((it) => it.quantity > 0);
 
     // Determine what to show based on state
-    const isPaymentOnly = session.session.reason_type === "Abono a cuenta";
+    const reasonDetail = session.session.reason_detail?.trim() || "";
+    const isSystemPayment = reasonDetail
+      .toLowerCase()
+      .startsWith("sistema: abono");
+    const isPaymentOnly =
+      session.session.reason_type === "Abono a cuenta" || isSystemPayment;
     const showFinancial = !session.session.is_saved;
     const showProcedures = !isPaymentOnly;
 

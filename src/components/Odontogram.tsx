@@ -427,6 +427,10 @@ const Odontogram = memo(function Odontogram({
                           <div className="space-y-2 mb-3">
                             {diagOptions.map((diag) => {
                               const checked = diagnoses.includes(diag.label);
+                              const handleToggle = () => {
+                                if (isReadOnly) return;
+                                toggleDx(toothNum, diag.label);
+                              };
                               return (
                                 <label
                                   key={diag.id || diag.label}
@@ -435,13 +439,24 @@ const Odontogram = memo(function Odontogram({
                                     "hover:bg-[hsl(var(--muted))]",
                                     checked && "bg-[hsl(var(--muted))]",
                                   )}
+                                  role="checkbox"
+                                  aria-checked={checked}
+                                  aria-disabled={isReadOnly}
+                                  tabIndex={isReadOnly ? -1 : 0}
+                                  onClick={handleToggle}
+                                  onKeyDown={(e) => {
+                                    if (isReadOnly) return;
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      handleToggle();
+                                    }
+                                  }}
                                 >
                                   <CheckboxRoot
                                     checked={checked}
-                                    onCheckedChange={() =>
-                                      toggleDx(toothNum, diag.label)
-                                    }
                                     disabled={isReadOnly}
+                                    tabIndex={-1}
+                                    aria-hidden="true"
                                   />
                                   <span className="flex-1 text-sm">
                                     {diag.label}
@@ -555,5 +570,3 @@ const Odontogram = memo(function Odontogram({
 Odontogram.displayName = "Odontogram";
 
 export default Odontogram;
-
-

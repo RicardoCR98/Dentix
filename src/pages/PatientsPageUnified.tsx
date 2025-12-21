@@ -212,14 +212,6 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     [handleQuickPayment],
   );
 
-  const handleToothDxChange = useCallback(
-    (next: typeof toothDx) => {
-      if (isSnapshotMode) return;
-      onToothDxChange(next);
-    },
-    [isSnapshotMode, onToothDxChange],
-  );
-
   const handleManualDiagnosisChange = useCallback(
     (next: string) => {
       if (isSnapshotMode) return;
@@ -236,47 +228,102 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     [handleSessionChange, isSnapshotMode],
   );
 
-  const buildDraftSessionItems = useCallback((): SessionItem[] => {
-    const timestamp = Date.now();
-    const baseItems: SessionItem[] = procedureTemplates.map(
-      (template, index) => ({
-        id: timestamp + index,
-        name: template.name,
-        unit_price: template.default_price,
-        quantity: 0,
-        subtotal: 0,
-        is_active: false,
-        procedure_template_id: template.id,
-      }),
-    );
+  type DraftItemsOptions = {
+    usePreviousItems?: boolean;
+    resetQuantities?: boolean;
+  };
 
-    let previousSession = null;
-    const validSessions = sessions.filter((s) => s.session);
-    if (validSessions.length > 0) {
-      previousSession = validSessions[0];
-      for (const session of validSessions) {
-        if ((session.session?.date ?? "") > (previousSession.session?.date ?? "")) {
-          previousSession = session;
+  const buildDraftSessionItems = useCallback(
+    (options?: DraftItemsOptions): SessionItem[] => {
+      const timestamp = Date.now();
+      const baseItems: SessionItem[] = procedureTemplates.map(
+        (template, index) => ({
+          id: timestamp + index,
+          name: template.name,
+          unit_price: template.default_price,
+          quantity: 0,
+          subtotal: 0,
+          is_active: false,
+          procedure_template_id: template.id,
+        }),
+      );
+
+      let previousSession = null;
+      const validSessions = sessions.filter((s) => s.session);
+      if (validSessions.length > 0) {
+        previousSession = validSessions[0];
+        for (const session of validSessions) {
+          if (
+            (session.session?.date ?? "") >
+            (previousSession.session?.date ?? "")
+          ) {
+            previousSession = session;
+          }
         }
       }
-    }
 
-    if (!previousSession) return baseItems;
+      if (!previousSession) return baseItems;
 
-    const prevQtyMap = new Map(
-      previousSession.items.map((item) => [item.name, item.quantity]),
-    );
+      if (options?.usePreviousItems) {
+        return previousSession.items.map((item, index) => {
+          const quantity = options?.resetQuantities ? 0 : item.quantity ?? 0;
+          return {
+            id: -(timestamp + index + 1000),
+            name: item.name,
+            unit_price: item.unit_price,
+            quantity,
+            subtotal: item.unit_price * quantity,
+            is_active: options?.resetQuantities
+              ? false
+              : item.is_active ?? quantity > 0,
+            procedure_template_id: item.procedure_template_id,
+          };
+        });
+      }
 
-    return baseItems.map((item, index) => {
-      const quantity = prevQtyMap.get(item.name) || 0;
-      return {
-        ...item,
-        id: -(timestamp + index + 1000),
-        quantity,
-        subtotal: item.unit_price * quantity,
-      };
-    });
-  }, [procedureTemplates, sessions]);
+      const prevQtyMap = new Map(
+        previousSession.items.map((item) => [item.name, item.quantity]),
+      );
+
+      return baseItems.map((item, index) => {
+        const quantity = prevQtyMap.get(item.name) || 0;
+        return {
+          ...item,
+          id: -(timestamp + index + 1000),
+          quantity,
+          subtotal: item.unit_price * quantity,
+        };
+      });
+    },
+    [procedureTemplates, sessions],
+  );
+
+  const handleToothDxChange = useCallback(
+    (next: typeof toothDx) => {
+      if (isSnapshotMode) return;
+      if (!activeSessionId) {
+        const items = buildDraftSessionItems({
+          usePreviousItems: true,
+          resetQuantities: true,
+        });
+        const newSessionId = createDraftSession(items, {
+          reasonType: "Otro",
+          reasonDetail: "Sistema: Odontograma",
+          copyLatestOdontogram: false,
+        });
+        onToothDxChange(next, newSessionId);
+        return;
+      }
+      onToothDxChange(next);
+    },
+    [
+      activeSessionId,
+      buildDraftSessionItems,
+      createDraftSession,
+      isSnapshotMode,
+      onToothDxChange,
+    ],
+  );
 
   const handleOpenSnapshot = useCallback((sessionId: number) => {
     setSnapshotSessionId(sessionId);

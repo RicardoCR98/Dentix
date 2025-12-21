@@ -732,12 +732,14 @@ export function FinancesPage() {
               const newCumulativeBalance = previousCumulativeBalance - payment.amount;
 
               // 4. Create payment session
+              const reasonDetail = `Sistema: Abono de ${payment.amount} a cuenta`;
+
               const paymentSession = {
                 id: undefined,
                 patient_id: selectedPatient.patient_id,
                 date: payment.date,
-                reason_type: "Abono a cuenta",
-                reason_detail: null,
+                reason_type: "Otro",
+                reason_detail: reasonDetail,
                 diagnosis_text: null,
                 auto_dx_text: null,
                 full_dx_text: null,
