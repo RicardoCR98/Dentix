@@ -556,7 +556,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
         {/* macOS Dock */}
         <MacOSDock
-          visible={true}
+          visible={!quickPaymentOpen}
           onNewRecord={handleNewWrapper}
           onSearch={() => setSearchDialogOpen(true)}
           onNewSession={handleNewSessionFromDock}
@@ -758,7 +758,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
       {/* macOS Dock */}
       <MacOSDock
-        visible={true}
+        visible={!quickPaymentOpen}
         onNewRecord={handleNewWrapper}
         onSearch={() => setSearchDialogOpen(true)}
         onNewSession={handleNewSessionFromDock}
