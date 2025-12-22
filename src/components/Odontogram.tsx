@@ -432,7 +432,7 @@ const Odontogram = memo(function Odontogram({
                                 toggleDx(toothNum, diag.label);
                               };
                               return (
-                                <label
+                                <div
                                   key={diag.id || diag.label}
                                   className={cn(
                                     "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors",
@@ -476,7 +476,7 @@ const Odontogram = memo(function Odontogram({
                                       Activo
                                     </Badge>
                                   )}
-                                </label>
+                                </div>
                               );
                             })}
                           </div>

@@ -439,7 +439,8 @@ INSERT OR IGNORE INTO user_settings (key, value, category) VALUES
   ('theme', 'dark', 'appearance'),
   ('brandHsl', '172 49% 56%', 'appearance'),
   ('font', 'Inter', 'appearance'),
-  ('size', '16', 'appearance');
+  ('size', '16', 'appearance'),
+  ('layoutMode', 'vertical', 'appearance');
 
 -- Seeds mínimos de text_templates
 INSERT OR IGNORE INTO text_templates (kind, title, body, source, sort_order) VALUES

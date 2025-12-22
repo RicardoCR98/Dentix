@@ -1579,6 +1579,35 @@ pub async fn save_setting(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn reset_all_settings(
+    db_pool: State<'_, DbPool>,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+
+    sqlx::query("DELETE FROM user_settings")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    sqlx::query(
+        "INSERT INTO user_settings (key, value, category) VALUES
+            ('theme', 'dark', 'appearance'),
+            ('brandHsl', '172 49% 56%', 'appearance'),
+            ('font', 'Inter', 'appearance'),
+            ('size', '16', 'appearance'),
+            ('layoutMode', 'vertical', 'appearance')"
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 // =========================
 // PENDING PAYMENTS SUMMARY
 // =========================

@@ -105,6 +105,7 @@ fn main() {
             // Settings commands
             get_all_settings,
             save_setting,
+            reset_all_settings,
             // Complex command
             save_visit_with_sessions,
             // Reports

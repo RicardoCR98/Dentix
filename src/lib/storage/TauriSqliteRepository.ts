@@ -837,8 +837,12 @@ export class TauriSqliteRepository {
   }
 
   async resetAllSettings(): Promise<void> {
-    console.warn("resetAllSettings: Not implemented in Rust backend yet");
-    throw new Error("resetAllSettings not implemented yet");
+    try {
+      await invoke("reset_all_settings");
+    } catch (error) {
+      console.error("Error en resetAllSettings:", error);
+      throw error;
+    }
   }
 
   /**
