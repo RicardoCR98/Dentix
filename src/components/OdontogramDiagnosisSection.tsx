@@ -21,6 +21,7 @@ type Props = {
   sessions: SessionWithItems[];
   onSessionChange: (sessionId: number | null) => void;
   lastSavedSession: SessionWithItems | null;
+  lastSavedOrdinal?: number | null;
 };
 
 const OdontogramDiagnosisSection = memo(function OdontogramDiagnosisSection({
@@ -34,9 +35,10 @@ const OdontogramDiagnosisSection = memo(function OdontogramDiagnosisSection({
   sessions,
   onSessionChange,
   lastSavedSession,
+  lastSavedOrdinal,
 }: Props) {
   const lastSavedLabel = lastSavedSession
-    ? `Última vez editado: Sesión #${lastSavedSession.session.id ?? "?"} - ${lastSavedSession.session.date || "Sin fecha"}`
+    ? `Última vez editado: Sesión #${lastSavedOrdinal ?? "?"} - ${lastSavedSession.session.date || "Sin fecha"}`
     : "Sin odontograma previo";
 
   return (

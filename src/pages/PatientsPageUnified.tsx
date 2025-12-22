@@ -121,23 +121,44 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const isSnapshotMode = snapshotSessionId !== null;
   const showPatientSummaryOnly = Boolean(patient.id) && !isEditingPatient;
 
-  const latestSavedSessionId = useMemo(() => {
-    const saved = sessions.filter((s) => s.session.is_saved);
-    if (saved.length === 0) return null;
-    return saved
-      .sort((a, b) => (b.session.date || "").localeCompare(a.session.date || ""))
-      .map((s) => s.session.id!)
-      .find(Boolean) as number | null;
+  const savedSessionsChrono = useMemo(() => {
+    const saved = sessions.filter((s) => s.session.is_saved === true);
+    return [...saved].sort((a, b) => {
+      const dateA = a.session.date || "";
+      const dateB = b.session.date || "";
+      if (dateA === dateB) {
+        return (a.session.id || 0) - (b.session.id || 0);
+      }
+      return dateA.localeCompare(dateB);
+    });
   }, [sessions]);
 
-  const latestSavedSession = useMemo(() => {
-    const saved = sessions.filter((s) => s.session.is_saved);
-    if (saved.length === 0) return null;
-    const sorted = [...saved].sort((a, b) =>
-      (b.session.date || "").localeCompare(a.session.date || ""),
-    );
-    return sorted[0] || null;
-  }, [sessions]);
+  const savedSessionOrdinalById = useMemo(() => {
+    const map = new Map<number, number>();
+    savedSessionsChrono.forEach((s, index) => {
+      if (s.session.id) {
+        map.set(s.session.id, index + 1);
+      }
+    });
+    return map;
+  }, [savedSessionsChrono]);
+
+  const latestSavedSession =
+    savedSessionsChrono.length > 0
+      ? savedSessionsChrono[savedSessionsChrono.length - 1]
+      : null;
+
+  const latestSavedSessionId = latestSavedSession?.session.id ?? null;
+
+  const snapshotSessionOrdinal = useMemo(() => {
+    if (!snapshotSessionId) return null;
+    return savedSessionOrdinalById.get(snapshotSessionId) ?? null;
+  }, [snapshotSessionId, savedSessionOrdinalById]);
+
+  const latestSavedSessionOrdinal = useMemo(() => {
+    if (!latestSavedSessionId) return null;
+    return savedSessionOrdinalById.get(latestSavedSessionId) ?? null;
+  }, [latestSavedSessionId, savedSessionOrdinalById]);
 
   const activeSavedSessionId = useMemo(() => {
     if (!activeSessionId) return null;
@@ -177,10 +198,16 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       const result = await handleSelectPatient(selectedPatient);
       if (result) {
         setHasManuallyExited(false); // Reset manual exit flag when selecting new patient
+        setSnapshotSessionId(null);
         setIsEditingPatient(false);
       }
     },
-    [handleSelectPatient, setHasManuallyExited, setIsEditingPatient],
+    [
+      handleSelectPatient,
+      setHasManuallyExited,
+      setSnapshotSessionId,
+      setIsEditingPatient,
+    ],
   );
 
   // URL parameter handling
@@ -192,9 +219,17 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     const result = handleNew();
     if (result) {
       clearPatientURL();
+      setSnapshotSessionId(null);
+      setHasManuallyExited(false);
       setIsEditingPatient(true);
     }
-  }, [handleNew, clearPatientURL, setIsEditingPatient]);
+  }, [
+    handleNew,
+    clearPatientURL,
+    setSnapshotSessionId,
+    setHasManuallyExited,
+    setIsEditingPatient,
+  ]);
 
   const handleSaveWrapper = useCallback(async () => {
     if (isSnapshotMode) return;
@@ -436,7 +471,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           <Alert variant="info" className="mb-4 flex items-center justify-between">
             <div>
               <div className="font-semibold">
-                Modo histórico: sesión #{snapshotSessionId ?? ""}
+                Modo histórico: sesión #{snapshotSessionOrdinal ?? "?"}
               </div>
               <div className="text-sm text-[hsl(var(--muted-foreground))]">
                 Vista solo lectura. Los campos están deshabilitados hasta salir.
@@ -476,18 +511,19 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
       {/* Odontogram */}
       <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-        <OdontogramDiagnosisSection
-          toothDx={toothDx}
-          onToothDxChange={handleToothDxChange}
-          diagnosisFromTeeth={diagnosisFromTeeth}
-          manualDiagnosis={manualDiagnosis}
-          onManualDiagnosisChange={handleManualDiagnosisChange}
-          readOnly={isSnapshotMode}
-          activeSessionId={odontogramActiveSessionId}
-          sessions={odontogramSessions}
-          onSessionChange={handleOdontogramSessionChange}
-          lastSavedSession={latestSavedSession}
-        />
+          <OdontogramDiagnosisSection
+            toothDx={toothDx}
+            onToothDxChange={handleToothDxChange}
+            diagnosisFromTeeth={diagnosisFromTeeth}
+            manualDiagnosis={manualDiagnosis}
+            onManualDiagnosisChange={handleManualDiagnosisChange}
+            readOnly={isSnapshotMode}
+            activeSessionId={odontogramActiveSessionId}
+            sessions={odontogramSessions}
+            onSessionChange={handleOdontogramSessionChange}
+            lastSavedSession={latestSavedSession}
+            lastSavedOrdinal={latestSavedSessionOrdinal}
+          />
       </div>
       {/* Sessions */}
       <Section
@@ -604,7 +640,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         <Alert variant="info" className="mb-4 flex items-center justify-between">
           <div>
             <div className="font-semibold">
-              Modo histórico: sesión #{snapshotSessionId ?? ""}
+              Modo histórico: sesión #{snapshotSessionOrdinal ?? "?"}
             </div>
             <div className="text-sm text-[hsl(var(--muted-foreground))]">
               Vista solo lectura. Los campos están deshabilitados hasta salir.
@@ -678,6 +714,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               sessions={odontogramSessions}
               onSessionChange={handleOdontogramSessionChange}
               lastSavedSession={latestSavedSession}
+              lastSavedOrdinal={latestSavedSessionOrdinal}
             />
           </div>
         </TabsContent>
