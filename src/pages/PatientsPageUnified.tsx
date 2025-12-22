@@ -90,11 +90,6 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     handleReasonTypesChange,
   } = useMasterData();
 
-  // URL parameter handling
-  const { clearPatientURL } = usePatientFromURL({
-    onPatientLoaded: handleSelectPatient,
-  });
-
   // Local UI state
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [paymentsDialogOpen, setPaymentsDialogOpen] = useState(false);
@@ -105,6 +100,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const [activeTab, setActiveTab] = useState("odontogram");
   const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(null);
   const [hasManuallyExited, setHasManuallyExited] = useState(false);
+  const [isEditingPatient, setIsEditingPatient] = useState(true);
 
   // Quick actions visibility removed - using MacOSDock only
 
@@ -123,6 +119,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
   // Snapshot helpers
   const isSnapshotMode = snapshotSessionId !== null;
+  const showPatientSummaryOnly = Boolean(patient.id) && !isEditingPatient;
 
   const latestSavedSessionId = useMemo(() => {
     const saved = sessions.filter((s) => s.session.is_saved);
@@ -175,27 +172,34 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   // Handlers
   const handlePreview = useCallback(() => window.print(), []);
 
-  const handleNewWrapper = useCallback(() => {
-    const result = handleNew();
-    if (result) {
-      clearPatientURL();
-    }
-  }, [handleNew, clearPatientURL]);
-
-  const handleSaveWrapper = useCallback(async () => {
-    if (isSnapshotMode) return;
-    await handleSave();
-  }, [handleSave, isSnapshotMode]);
-
   const handleSelectPatientWrapper = useCallback(
     async (selectedPatient: Patient) => {
       const result = await handleSelectPatient(selectedPatient);
       if (result) {
         setHasManuallyExited(false); // Reset manual exit flag when selecting new patient
+        setIsEditingPatient(false);
       }
     },
-    [handleSelectPatient],
+    [handleSelectPatient, setHasManuallyExited, setIsEditingPatient],
   );
+
+  // URL parameter handling
+  const { clearPatientURL } = usePatientFromURL({
+    onPatientLoaded: handleSelectPatientWrapper,
+  });
+
+  const handleNewWrapper = useCallback(() => {
+    const result = handleNew();
+    if (result) {
+      clearPatientURL();
+      setIsEditingPatient(true);
+    }
+  }, [handleNew, clearPatientURL, setIsEditingPatient]);
+
+  const handleSaveWrapper = useCallback(async () => {
+    if (isSnapshotMode) return;
+    await handleSave();
+  }, [handleSave, isSnapshotMode]);
 
   const handleQuickPaymentWrapper = useCallback(
     async (payment: {
@@ -455,7 +459,12 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           }
         >
         <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-          <PatientForm value={patient} onChange={setPatient} />
+          <PatientForm
+            value={patient}
+            onChange={setPatient}
+            showSummaryOnly={showPatientSummaryOnly}
+            onEditSummary={() => setIsEditingPatient(true)}
+          />
           {!hasPatientData && (
             <Alert variant="warning" className="mt-4">
               Por favor completa al menos el nombre y cédula del paciente para
@@ -619,7 +628,12 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       >
         <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
           {/* Always show PatientForm for consistency with vertical layout */}
-          <PatientForm value={patient} onChange={setPatient} />
+          <PatientForm
+            value={patient}
+            onChange={setPatient}
+            showSummaryOnly={showPatientSummaryOnly}
+            onEditSummary={() => setIsEditingPatient(true)}
+          />
           {!hasPatientData && (
             <Alert variant="warning" className="mt-4">
               Por favor completa al menos el nombre y cédula del paciente para
