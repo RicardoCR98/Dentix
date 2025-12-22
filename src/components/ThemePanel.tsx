@@ -117,11 +117,12 @@ export default function ThemePanel({ inlineTrigger = false }: ThemePanelProps) {
   const handleReset = async () => {
     if (
       confirm(
-        "¿Restaurar la configuración a los valores por defecto?\n\nTema: Oscuro\nColor: Verde Menta (#5CC5B5)\nTipografía: Inter\nTamaño: 16px",
+        "¿Restaurar la configuración a los valores por defecto?\n\nTema: Oscuro\nColor: Verde Menta (#5CC5B5)\nTipografía: Inter\nTamaño: 16px\nDiseño: Vertical",
       )
     ) {
       try {
         await resetToDefaults();
+        await setLayoutMode("vertical");
         setUnsavedChanges(false);
       } catch (error) {
         console.error("Error restaurando configuración:", error);
