@@ -31,7 +31,9 @@ import {
 
 import { FinancialHistoryBlock } from "../components/FinancialHistoryBlock";
 import { QuickPaymentModal } from "../components/QuickPaymentModal";
-import { getRepository } from "../lib/storage/TauriSqliteRepository";
+import { getRepository, tauriSqliteRepository } from "../lib/storage/TauriSqliteRepository";
+import { PrintTemplate } from "../components/print/PrintTemplate";
+import type { DoctorProfile } from "../lib/types";
 
 // Custom hooks
 import { usePatientRecord } from "../hooks/usePatientRecord";
@@ -101,6 +103,11 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(null);
   const [hasManuallyExited, setHasManuallyExited] = useState(false);
   const [isEditingPatient, setIsEditingPatient] = useState(true);
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile>({
+    doctor_id: crypto.randomUUID(),
+    name: "",
+    clinic_name: "Clínica Dental",
+  });
 
   // Quick actions visibility removed - using MacOSDock only
 
@@ -189,6 +196,41 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const odontogramActiveSessionId = isSnapshotMode
     ? snapshotSessionId
     : activeSessionId;
+
+  // Get session data for print template
+  const printSessionData = useMemo(() => {
+    const targetSessionId = isSnapshotMode ? snapshotSessionId : activeSessionId;
+
+    console.log("[PrintSessionData] Computing:", {
+      isSnapshotMode,
+      snapshotSessionId,
+      activeSessionId,
+      targetSessionId,
+      sessionsCount: sessions.length,
+    });
+
+    if (!targetSessionId) {
+      console.log("[PrintSessionData] No target session ID");
+      return null;
+    }
+
+    const sessionWithItems = sessions.find((s) => s.session.id === targetSessionId);
+    if (!sessionWithItems) {
+      console.log("[PrintSessionData] Session not found for ID:", targetSessionId);
+      return null;
+    }
+
+    console.log("[PrintSessionData] Found session:", {
+      sessionId: sessionWithItems.session.id,
+      date: sessionWithItems.session.date,
+      itemsCount: sessionWithItems.items.length,
+    });
+
+    return {
+      session: sessionWithItems.session,
+      items: sessionWithItems.items,
+    };
+  }, [sessions, activeSessionId, snapshotSessionId, isSnapshotMode]);
 
   // Handlers
   const handlePreview = useCallback(() => window.print(), []);
@@ -408,6 +450,21 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     return () => clearTimeout(timeoutId);
   }, [searchDialogOpen]);
 
+  // Load doctor profile for print template
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await tauriSqliteRepository.getDoctorProfile();
+        if (profile) {
+          setDoctorProfile(profile);
+        }
+      } catch (error) {
+        console.error("Error loading doctor profile for print:", error);
+      }
+    };
+    loadProfile();
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -613,6 +670,16 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           saveDisabled={!canSave}
           isSnapshotMode={isSnapshotMode}
         />
+
+        {/* Print Template - Hidden, only visible when printing */}
+        {printSessionData && patient.id && (
+          <PrintTemplate
+            patient={patient}
+            session={printSessionData.session}
+            sessionItems={printSessionData.items}
+            doctorProfile={doctorProfile}
+          />
+        )}
       </>
     );
   }
@@ -821,6 +888,16 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         saveDisabled={!canSave}
         isSnapshotMode={isSnapshotMode}
       />
+
+      {/* Print Template - Hidden, only visible when printing */}
+      {printSessionData && patient.id && (
+        <PrintTemplate
+          patient={patient}
+          session={printSessionData.session}
+          sessionItems={printSessionData.items}
+          doctorProfile={doctorProfile}
+        />
+      )}
     </>
   );
 }

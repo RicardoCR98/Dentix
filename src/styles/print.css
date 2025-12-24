@@ -1,0 +1,731 @@
+/* =====================================================
+   PRINT TEMPLATE STYLES - PROFESSIONAL DESIGN
+   Optimized for A4/Letter paper printing
+   Completely different from web app interface
+   ===================================================== */
+
+/* =====================================================
+   HIDE ON SCREEN, SHOW ON PRINT
+   ===================================================== */
+@media screen {
+  .print-wrapper {
+    display: none !important;
+  }
+}
+
+@media print {
+  /* Hide all body content */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only print template and its children */
+  .print-wrapper,
+  .print-wrapper * {
+    visibility: visible;
+  }
+
+  .print-wrapper {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .print-template {
+    display: block !important;
+  }
+
+  /* Ensure body doesn't have margins in print */
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hide non-printable elements completely */
+  .no-print,
+  button,
+  .fab,
+  nav,
+  header:not(.print-header-professional),
+  footer:not(.print-footer-professional),
+  .sidebar,
+  [class*="dock"],
+  [class*="Dock"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* =====================================================
+   PAGE SETUP
+   ===================================================== */
+@page {
+  size: A4 portrait;
+  margin: 15mm 15mm 12mm 15mm;
+}
+
+/* =====================================================
+   PROFESSIONAL PRINT TEMPLATE LAYOUT
+   ===================================================== */
+.print-template {
+  background: white;
+  color: #000;
+  font-family: "Inter", "Arial", sans-serif;
+  font-size: 10pt;
+  line-height: 1.4;
+  max-width: 210mm;
+  margin: 0 auto;
+}
+
+@media print {
+  .print-template {
+    width: 100%;
+    max-width: none;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+}
+
+/* =====================================================
+   PROFESSIONAL HEADER
+   ===================================================== */
+.print-header-professional {
+  margin-bottom: 8mm;
+  page-break-after: avoid;
+}
+
+.print-header-top-border {
+  height: 4mm;
+  background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 50%, #1e3a8a 100%);
+  margin-bottom: 5mm;
+}
+
+.print-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0 3mm;
+  margin-bottom: 4mm;
+}
+
+.print-header-left {
+  flex: 1;
+}
+
+.print-header-clinic-name {
+  font-family: "Poppins", "Inter", sans-serif;
+  font-size: 18pt;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 1mm;
+  letter-spacing: 0.5px;
+}
+
+.print-header-slogan {
+  font-size: 9pt;
+  color: #4b5563;
+  font-style: italic;
+  margin-bottom: 2mm;
+}
+
+.print-header-doctor {
+  font-size: 10pt;
+  font-weight: 600;
+  color: #1f2937;
+  margin-top: 2mm;
+}
+
+.print-header-right {
+  border: 1.5px solid #d1d5db;
+  border-radius: 3px;
+  padding: 3mm 4mm;
+  background: #f9fafb;
+  min-width: 70mm;
+}
+
+.print-header-contact-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5pt;
+  margin-bottom: 1.5mm;
+  line-height: 1.3;
+}
+
+.print-header-contact-line:last-child {
+  margin-bottom: 0;
+}
+
+.print-header-label {
+  font-weight: 600;
+  color: #374151;
+  margin-right: 3mm;
+}
+
+.print-document-title {
+  text-align: center;
+  font-size: 14pt;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: #eff6ff;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  padding: 3mm;
+  margin: 0 3mm 6mm 3mm;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* =====================================================
+   PROFESSIONAL SECTIONS
+   ===================================================== */
+.print-section-professional {
+  margin-bottom: 6mm;
+  page-break-inside: avoid;
+}
+
+.print-section-title-box {
+  background: #1e3a8a;
+  color: white;
+  padding: 2mm 4mm;
+  margin-bottom: 3mm;
+  border-radius: 2px;
+}
+
+.print-section-title {
+  font-size: 10.5pt;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* =====================================================
+   DATA TABLE (PATIENT INFO, SESSION INFO)
+   ===================================================== */
+.print-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 3mm;
+  border: 1.5px solid #9ca3af;
+}
+
+.print-data-table tr {
+  page-break-inside: avoid;
+}
+
+.print-data-label {
+  background: #f3f4f6;
+  font-weight: 600;
+  font-size: 9pt;
+  color: #374151;
+  padding: 2.5mm 3mm;
+  border: 0.5px solid #d1d5db;
+  width: 28%;
+  vertical-align: top;
+}
+
+.print-data-value {
+  background: white;
+  font-size: 9.5pt;
+  color: #000;
+  padding: 2.5mm 3mm;
+  border: 0.5px solid #d1d5db;
+  width: 22%;
+  vertical-align: top;
+}
+
+/* =====================================================
+   ALERT BOXES
+   ===================================================== */
+.print-alert-box {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding: 3mm 4mm;
+  margin-top: 3mm;
+  border-radius: 3px;
+  border: 2px solid;
+  page-break-inside: avoid;
+}
+
+.print-alert-danger {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.print-alert-icon {
+  font-size: 16pt;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.print-alert-content {
+  flex: 1;
+}
+
+.print-alert-title {
+  font-weight: 700;
+  font-size: 10pt;
+  color: #991b1b;
+  margin-bottom: 1mm;
+}
+
+.print-alert-text {
+  font-size: 9.5pt;
+  color: #7f1d1d;
+  line-height: 1.4;
+}
+
+/* =====================================================
+   ANAMNESIS BOX
+   ===================================================== */
+.print-anamnesis-box {
+  margin-top: 3mm;
+  padding: 3mm 4mm;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-left: 4px solid #f59e0b;
+  border-radius: 3px;
+  page-break-inside: avoid;
+}
+
+.print-anamnesis-title {
+  font-weight: 700;
+  font-size: 9pt;
+  color: #92400e;
+  margin-bottom: 2mm;
+}
+
+.print-anamnesis-text {
+  font-size: 9pt;
+  color: #78350f;
+  line-height: 1.5;
+}
+
+/* =====================================================
+   ODONTOGRAM PROFESSIONAL
+   ===================================================== */
+.print-odontogram-container {
+  margin-bottom: 4mm;
+  page-break-inside: avoid;
+}
+
+.print-odontogram-label {
+  font-weight: 700;
+  font-size: 9.5pt;
+  color: #1f2937;
+  margin-bottom: 2mm;
+  padding-left: 2mm;
+  border-left: 4px solid #3b82f6;
+}
+
+.print-odontogram-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2mm;
+  gap: 3mm;
+}
+
+.print-odontogram-position {
+  font-weight: 600;
+  font-size: 8.5pt;
+  color: #4b5563;
+  min-width: 18mm;
+}
+
+.print-teeth-grid-professional {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 1.5px;
+  flex: 1;
+  border: 1px solid #9ca3af;
+  padding: 2mm;
+  background: #f9fafb;
+}
+
+.print-teeth-grid-deciduous {
+  grid-template-columns: repeat(10, 1fr);
+}
+
+.print-tooth-box {
+  aspect-ratio: 1;
+  border: 1.5px solid #6b7280;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7pt;
+  font-weight: 700;
+  background: white;
+  position: relative;
+  color: #1f2937;
+}
+
+.print-tooth-box.tooth-success {
+  border-color: #059669;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.print-tooth-box.tooth-warning {
+  border-color: #d97706;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.print-tooth-box.tooth-danger {
+  border-color: #dc2626;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.print-tooth-box.tooth-missing {
+  background: #e5e7eb;
+  color: #6b7280;
+  border-color: #9ca3af;
+}
+
+.print-tooth-box.tooth-missing::before {
+  content: "✕";
+  font-size: 9pt;
+}
+
+/* Monochrome print fallback */
+@media print and (monochrome) {
+  .print-tooth-box.tooth-danger {
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 1px,
+      #000 1px,
+      #000 2px
+    );
+  }
+
+  .print-tooth-box.tooth-warning {
+    background: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 1px,
+      #666 1px,
+      #666 2px
+    );
+  }
+
+  .print-tooth-box.tooth-success {
+    border-color: #333;
+    background: white;
+  }
+}
+
+/* =====================================================
+   ODONTOGRAM LEGEND
+   ===================================================== */
+.print-odontogram-legend-professional {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding: 2.5mm 3mm;
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 2px;
+  margin-top: 3mm;
+  margin-bottom: 4mm;
+}
+
+.print-legend-title {
+  font-weight: 700;
+  font-size: 8.5pt;
+  color: #374151;
+  margin-right: 2mm;
+}
+
+.print-legend-items {
+  display: flex;
+  gap: 4mm;
+  flex-wrap: wrap;
+}
+
+.print-legend-item-pro {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  font-size: 8pt;
+  color: #1f2937;
+}
+
+.print-legend-box {
+  width: 4mm;
+  height: 4mm;
+  border-radius: 1px;
+  border: 1px solid;
+}
+
+.print-legend-box.success {
+  border-color: #059669;
+  background: #d1fae5;
+}
+
+.print-legend-box.warning {
+  border-color: #d97706;
+  background: #fef3c7;
+}
+
+.print-legend-box.danger {
+  border-color: #dc2626;
+  background: #fee2e2;
+}
+
+.print-legend-box.neutral {
+  border-color: #9ca3af;
+  background: #e5e7eb;
+}
+
+/* =====================================================
+   DIAGNOSIS PROFESSIONAL
+   ===================================================== */
+.print-diagnosis-professional {
+  margin-top: 4mm;
+  border: 1.5px solid #9ca3af;
+  border-radius: 3px;
+  page-break-inside: avoid;
+}
+
+.print-diagnosis-header {
+  background: #f3f4f6;
+  font-weight: 700;
+  font-size: 9.5pt;
+  color: #1f2937;
+  padding: 2.5mm 3mm;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.print-diagnosis-content {
+  padding: 3mm 4mm;
+  background: white;
+}
+
+.print-diagnosis-text {
+  font-size: 9.5pt;
+  color: #000;
+  line-height: 1.6;
+  margin-bottom: 2mm;
+}
+
+.print-diagnosis-notes {
+  font-size: 9pt;
+  color: #4b5563;
+  line-height: 1.6;
+  margin-top: 3mm;
+  padding-top: 3mm;
+  border-top: 1px dashed #d1d5db;
+}
+
+.print-diagnosis-empty {
+  font-size: 9pt;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* =====================================================
+   PROCEDURES TABLE PROFESSIONAL
+   ===================================================== */
+.print-procedures-table-professional {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 3mm;
+  border: 1.5px solid #9ca3af;
+}
+
+.print-procedures-table-professional thead {
+  background: #1e3a8a;
+  color: white;
+  page-break-after: avoid;
+}
+
+.print-procedures-table-professional thead th {
+  padding: 2.5mm 2mm;
+  text-align: left;
+  font-weight: 700;
+  font-size: 9pt;
+  border: 0.5px solid #1e40af;
+  letter-spacing: 0.3px;
+}
+
+.print-procedures-table-professional tbody tr {
+  border-bottom: 0.5px solid #d1d5db;
+  page-break-inside: avoid;
+}
+
+.print-procedures-table-professional tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.print-procedures-table-professional tbody tr:nth-child(odd) {
+  background: white;
+}
+
+.print-procedures-table-professional tbody td {
+  padding: 2.5mm 2mm;
+  vertical-align: top;
+  font-size: 9pt;
+  color: #000;
+  border: 0.5px solid #e5e7eb;
+}
+
+.print-table-center {
+  text-align: center;
+  font-weight: 600;
+}
+
+.print-table-notes {
+  font-size: 8.5pt;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+/* =====================================================
+   CLINICAL NOTES BOX
+   ===================================================== */
+.print-clinical-notes-box {
+  margin-top: 3mm;
+  padding: 4mm;
+  background: white;
+  border: 1.5px solid #9ca3af;
+  border-radius: 3px;
+  min-height: 30mm;
+  page-break-inside: avoid;
+}
+
+.print-clinical-notes-text {
+  font-size: 9.5pt;
+  color: #000;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* =====================================================
+   EMPTY MESSAGE
+   ===================================================== */
+.print-empty-message {
+  padding: 4mm;
+  text-align: center;
+  font-size: 9pt;
+  color: #6b7280;
+  font-style: italic;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 2px;
+  margin-top: 2mm;
+}
+
+/* =====================================================
+   PROFESSIONAL FOOTER
+   ===================================================== */
+.print-footer-professional {
+  margin-top: 10mm;
+  page-break-inside: avoid;
+}
+
+.print-signature-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6mm;
+}
+
+.print-signature-box {
+  text-align: center;
+  min-width: 80mm;
+}
+
+.print-signature-line {
+  width: 70mm;
+  height: 1.5px;
+  background: #000;
+  margin: 0 auto 2mm auto;
+}
+
+.print-signature-label {
+  font-size: 8pt;
+  color: #6b7280;
+  margin-bottom: 1mm;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.print-signature-name {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 1mm;
+}
+
+.print-signature-reg {
+  font-size: 8.5pt;
+  color: #4b5563;
+}
+
+.print-footer-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 2.5mm 3mm;
+  background: #f3f4f6;
+  border-top: 2px solid #1e3a8a;
+  font-size: 7.5pt;
+  color: #4b5563;
+}
+
+.print-footer-left {
+  text-align: left;
+}
+
+.print-footer-right {
+  text-align: right;
+}
+
+.print-footer-small {
+  font-size: 7pt;
+  color: #6b7280;
+  margin-top: 0.5mm;
+}
+
+/* =====================================================
+   ORPHANS AND WIDOWS
+   ===================================================== */
+@media print {
+  p,
+  li,
+  .print-diagnosis-text,
+  .print-clinical-notes-text {
+    orphans: 3;
+    widows: 3;
+  }
+
+  h1,
+  h2,
+  h3,
+  .print-section-title-box,
+  .print-odontogram-label {
+    page-break-after: avoid;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  .print-section-professional {
+    page-break-inside: avoid;
+  }
+}
