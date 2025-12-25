@@ -2132,3 +2132,103 @@ pub async fn create_diagnostic_update_session(
         session_id: result.last_insert_rowid(),
     })
 }
+
+// =========================
+// PDF GENERATION COMMAND
+// =========================
+
+use headless_chrome::{Browser, types::PrintToPdfOptions};
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GeneratePdfResponse {
+    pub file_path: String,
+}
+
+/// Generate PDF from HTML content with "Save As" dialog
+///
+/// This command:
+/// 1. Shows a native "Save As" dialog for user to choose location
+/// 2. Uses headless Chrome to render HTML to PDF (respects @media print)
+/// 3. Saves the PDF to the chosen location
+/// 4. Returns the file path
+#[tauri::command]
+pub async fn generate_pdf_with_dialog(
+    app_handle: tauri::AppHandle,
+    html_content: String,
+    default_filename: String,
+) -> Result<GeneratePdfResponse, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    // Show "Save As" dialog
+    let file_path = app_handle
+        .dialog()
+        .file()
+        .add_filter("PDF", &["pdf"])
+        .set_file_name(&default_filename)
+        .blocking_save_file();
+
+    // User cancelled the dialog
+    let Some(file_path) = file_path else {
+        return Err("User cancelled save dialog".to_string());
+    };
+
+    // Convert FilePath to PathBuf
+    let file_path_str = file_path.to_string();
+    let mut file_path = PathBuf::from(file_path_str);
+
+    // Ensure .pdf extension
+    if !file_path.to_string_lossy().ends_with(".pdf") {
+        file_path = file_path.with_extension("pdf");
+    }
+
+    // Generate PDF using headless Chrome
+    let browser = Browser::default()
+        .map_err(|e| format!("Failed to launch browser: {}", e))?;
+
+    let tab = browser.new_tab()
+        .map_err(|e| format!("Failed to create tab: {}", e))?;
+
+    // Navigate to data URL with HTML content
+    let data_url = format!("data:text/html;charset=utf-8,{}", urlencoding::encode(&html_content));
+    tab.navigate_to(&data_url)
+        .map_err(|e| format!("Failed to navigate: {}", e))?;
+
+    // Wait for page to load
+    tab.wait_until_navigated()
+        .map_err(|e| format!("Failed to wait for navigation: {}", e))?;
+
+    // Generate PDF with print media emulation
+    let pdf_options = PrintToPdfOptions {
+        landscape: Some(false),
+        display_header_footer: Some(false),
+        print_background: Some(true),
+        scale: Some(1.0),
+        paper_width: Some(8.27),  // A4 width in inches
+        paper_height: Some(11.69), // A4 height in inches
+        margin_top: Some(0.59),    // 15mm top margin
+        margin_bottom: Some(0.47), // 12mm bottom margin
+        margin_left: Some(0.59),   // 15mm left margin
+        margin_right: Some(0.59),  // 15mm right margin
+        page_ranges: None,
+        ignore_invalid_page_ranges: Some(false),
+        header_template: None,
+        footer_template: None,
+        prefer_css_page_size: Some(true),
+        transfer_mode: None,
+        generate_document_outline: Some(false),
+        generate_tagged_pdf: Some(false),
+    };
+
+    let pdf_data = tab.print_to_pdf(Some(pdf_options))
+        .map_err(|e| format!("Failed to generate PDF: {}", e))?;
+
+    // Write PDF to file
+    fs::write(&file_path, pdf_data)
+        .map_err(|e| format!("Failed to write PDF: {}", e))?;
+
+    Ok(GeneratePdfResponse {
+        file_path: file_path.to_string_lossy().to_string(),
+    })
+}

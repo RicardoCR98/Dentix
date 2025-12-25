@@ -1,6 +1,6 @@
 // src/components/MacOSDock.tsx
 import { useState, useCallback, useMemo } from "react";
-import { Plus, Search, Printer, Save, Wallet } from "lucide-react";
+import { Plus, Search, Printer, Save, Wallet, FileDown } from "lucide-react";
 import { MacOSDockButton } from "./MacOSDockButton";
 
 export type SaveButtonState = "no-changes" | "has-changes" | "saving" | "saved" | "error";
@@ -11,6 +11,7 @@ export interface MacOSDockProps {
   onSearch: () => void;
   onNewSession?: () => void;
   onPrint: () => void;
+  onDownloadPDF: () => void;
   onSave: () => void;
   onPendingPayments: () => void;
   hasChanges?: boolean;
@@ -29,6 +30,7 @@ export function MacOSDock({
   onSearch,
   onNewSession,
   onPrint,
+  onDownloadPDF,
   onSave,
   onPendingPayments,
   hasChanges = false,
@@ -118,8 +120,9 @@ export function MacOSDock({
   const showNewSessionButton = Boolean(isSnapshotMode && onNewSession);
   const newSessionIndex = 2;
   const printIndex = showNewSessionButton ? 3 : 2;
-  const saveIndex = showNewSessionButton ? 4 : 3;
-  const walletIndex = showNewSessionButton ? 5 : 4;
+  const downloadIndex = showNewSessionButton ? 4 : 3;
+  const saveIndex = showNewSessionButton ? 5 : 4;
+  const walletIndex = showNewSessionButton ? 6 : 5;
 
   return (
     <div
@@ -190,6 +193,19 @@ export function MacOSDock({
           disabled={false} // Always enabled
           magnification={getMagnification(printIndex)}
           onHover={() => setHoveredIndex(printIndex)}
+          onLeave={() => setHoveredIndex(null)}
+        />
+
+        {/* Descargar PDF - Always enabled even in snapshot mode */}
+        <MacOSDockButton
+          icon={FileDown}
+          label="Descargar PDF"
+          shortcut=""
+          variant="purple"
+          onClick={onDownloadPDF}
+          disabled={false} // Always enabled
+          magnification={getMagnification(downloadIndex)}
+          onHover={() => setHoveredIndex(downloadIndex)}
           onLeave={() => setHoveredIndex(null)}
         />
 

@@ -1,5 +1,5 @@
 // src/components/print/PrintOdontogram.tsx
-import { memo } from "react";
+import { memo, useMemo, useCallback } from "react";
 import type { ToothDx } from "../../lib/types";
 import {
   getPermanentTeethRanges,
@@ -19,15 +19,30 @@ export const PrintOdontogram = memo(function PrintOdontogram({
   autoDiagnosis,
   manualDiagnosis,
 }: PrintOdontogramProps) {
-  const { permanent, deciduous } = groupTeethByType(toothDx);
-  const hasPermanent = Object.keys(permanent).length > 0 || Object.keys(toothDx).length === 0;
-  const hasDeciduous = Object.keys(deciduous).length > 0;
+  // Memoize tooth grouping (can be expensive)
+  const toothGroups = useMemo(
+    () => groupTeethByType(toothDx),
+    [toothDx]
+  );
 
-  const permanentRanges = getPermanentTeethRanges();
-  const deciduousRanges = getDeciduousTeethRanges();
+  const { permanent, deciduous } = toothGroups;
 
-  // Render tooth box
-  const renderTooth = (toothNumber: string, diagnoses?: string[]) => {
+  const hasPermanent = useMemo(
+    () => Object.keys(permanent).length > 0 || Object.keys(toothDx).length === 0,
+    [permanent, toothDx]
+  );
+
+  const hasDeciduous = useMemo(
+    () => Object.keys(deciduous).length > 0,
+    [deciduous]
+  );
+
+  // Memoize tooth ranges (static data, but called on every render)
+  const permanentRanges = useMemo(() => getPermanentTeethRanges(), []);
+  const deciduousRanges = useMemo(() => getDeciduousTeethRanges(), []);
+
+  // Render tooth box (memoized)
+  const renderTooth = useCallback((toothNumber: string, diagnoses?: string[]) => {
     if (!diagnoses || diagnoses.length === 0) {
       return (
         <div key={toothNumber} className="print-tooth-box">
@@ -49,7 +64,7 @@ export const PrintOdontogram = memo(function PrintOdontogram({
         {!isMissing && toothNumber}
       </div>
     );
-  };
+  }, []);
 
   return (
     <section className="print-section-professional">

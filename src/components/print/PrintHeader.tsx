@@ -1,5 +1,5 @@
 // src/components/print/PrintHeader.tsx
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { DoctorProfile } from "../../lib/types";
 import { getClinicInitials } from "../../lib/print-utils";
 
@@ -10,12 +10,17 @@ interface PrintHeaderProps {
 export const PrintHeader = memo(function PrintHeader({
   doctorProfile,
 }: PrintHeaderProps) {
-  const clinicName = doctorProfile.clinic_name || "Clínica Dental";
-  const clinicSlogan = doctorProfile.clinic_slogan || "Cuidado Profesional de Tu Salud Bucal";
-  const doctorName = doctorProfile.name || "";
-  const phone = doctorProfile.phone || "";
-  const email = doctorProfile.email || "";
-  const location = doctorProfile.location || "";
+  const headerData = useMemo(
+    () => ({
+      clinicName: doctorProfile.clinic_name || "Clínica Dental",
+      clinicSlogan: doctorProfile.clinic_slogan || "Cuidado Profesional de Tu Salud Bucal",
+      doctorName: doctorProfile.name || "",
+      phone: doctorProfile.phone || "",
+      email: doctorProfile.email || "",
+      location: doctorProfile.location || "",
+    }),
+    [doctorProfile]
+  );
 
   return (
     <header className="print-header-professional">
@@ -25,31 +30,31 @@ export const PrintHeader = memo(function PrintHeader({
       <div className="print-header-content">
         {/* Left side - Clinic Info */}
         <div className="print-header-left">
-          <div className="print-header-clinic-name">{clinicName}</div>
-          <div className="print-header-slogan">{clinicSlogan}</div>
-          {doctorName && (
-            <div className="print-header-doctor">Dr. {doctorName}</div>
+          <div className="print-header-clinic-name">{headerData.clinicName}</div>
+          <div className="print-header-slogan">{headerData.clinicSlogan}</div>
+          {headerData.doctorName && (
+            <div className="print-header-doctor">Dr. {headerData.doctorName}</div>
           )}
         </div>
 
         {/* Right side - Contact Info in box */}
         <div className="print-header-right">
-          {location && (
+          {headerData.location && (
             <div className="print-header-contact-line">
               <span className="print-header-label">Dirección:</span>
-              <span>{location}</span>
+              <span>{headerData.location}</span>
             </div>
           )}
-          {phone && (
+          {headerData.phone && (
             <div className="print-header-contact-line">
               <span className="print-header-label">Teléfono:</span>
-              <span>{phone}</span>
+              <span>{headerData.phone}</span>
             </div>
           )}
-          {email && (
+          {headerData.email && (
             <div className="print-header-contact-line">
               <span className="print-header-label">Email:</span>
-              <span>{email}</span>
+              <span>{headerData.email}</span>
             </div>
           )}
         </div>

@@ -76,12 +76,14 @@
   line-height: 1.4;
   max-width: 210mm;
   margin: 0 auto;
+  padding: 5mm; /* Internal padding for content spacing */
 }
 
 @media print {
   .print-template {
     width: 100%;
     max-width: none;
+    padding: 0; /* Remove internal padding in print - margins handled by PDF generator */
   }
 
   * {

@@ -1,5 +1,5 @@
 // src/components/print/PrintTemplate.tsx
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { Patient, Session, SessionItem, DoctorProfile } from "../../lib/types";
 import {
   formatDate,
@@ -45,29 +45,33 @@ export const PrintTemplate = memo(function PrintTemplate({
   doctorProfile,
   printedAt = new Date(),
 }: PrintTemplateProps) {
-  // Debug logging
-  console.log("[PrintTemplate] Rendering with:", {
-    patientId: patient.id,
-    patientName: patient.full_name,
-    sessionId: session.id,
-    sessionDate: session.date,
-    itemsCount: sessionItems.length,
-    doctorProfile: doctorProfile.clinic_name,
-  });
+  // Parse tooth diagnosis from session (memoized - can be expensive)
+  const toothDx = useMemo(
+    () => parseToothDx(session.tooth_dx_json),
+    [session.tooth_dx_json]
+  );
 
-  // Parse tooth diagnosis from session
-  const toothDx = parseToothDx(session.tooth_dx_json);
+  // Calculate patient age (memoized)
+  const patientAge = useMemo(
+    () => calculateAge(patient.date_of_birth),
+    [patient.date_of_birth]
+  );
 
-  // Calculate patient age
-  const patientAge = calculateAge(patient.date_of_birth);
+  // Extract diagnosis texts (memoized)
+  const diagnosisData = useMemo(
+    () => ({
+      autoDiagnosis: session.auto_dx_text || "",
+      manualDiagnosis: session.diagnosis_text || "",
+      fullDiagnosis: session.full_dx_text || session.auto_dx_text || "",
+    }),
+    [session.auto_dx_text, session.diagnosis_text, session.full_dx_text]
+  );
 
-  // Extract diagnosis texts
-  const autoDiagnosis = session.auto_dx_text || "";
-  const manualDiagnosis = session.diagnosis_text || "";
-  const fullDiagnosis = session.full_dx_text || autoDiagnosis;
-
-  // Clinical notes
-  const clinicalNotes = session.clinical_notes || "";
+  // Clinical notes (memoized)
+  const clinicalNotes = useMemo(
+    () => session.clinical_notes || "",
+    [session.clinical_notes]
+  );
 
   return (
     <div className="print-wrapper">
@@ -84,8 +88,8 @@ export const PrintTemplate = memo(function PrintTemplate({
         {/* Odontogram + Diagnosis */}
         <PrintOdontogram
           toothDx={toothDx}
-          autoDiagnosis={autoDiagnosis}
-          manualDiagnosis={manualDiagnosis}
+          autoDiagnosis={diagnosisData.autoDiagnosis}
+          manualDiagnosis={diagnosisData.manualDiagnosis}
         />
 
         {/* Procedures Performed */}

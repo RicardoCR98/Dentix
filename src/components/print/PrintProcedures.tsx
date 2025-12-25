@@ -1,5 +1,5 @@
 // src/components/print/PrintProcedures.tsx
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { SessionItem } from "../../lib/types";
 
 interface PrintProceduresProps {
@@ -9,8 +9,11 @@ interface PrintProceduresProps {
 export const PrintProcedures = memo(function PrintProcedures({
   sessionItems,
 }: PrintProceduresProps) {
-  // Filter active items only
-  const activeItems = sessionItems.filter((item) => item.is_active !== false);
+  // Filter active items only (memoized)
+  const activeItems = useMemo(
+    () => sessionItems.filter((item) => item.is_active !== false),
+    [sessionItems]
+  );
 
   if (activeItems.length === 0) {
     return (

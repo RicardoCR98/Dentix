@@ -34,6 +34,8 @@ import { QuickPaymentModal } from "../components/QuickPaymentModal";
 import { getRepository, tauriSqliteRepository } from "../lib/storage/TauriSqliteRepository";
 import { PrintTemplate } from "../components/print/PrintTemplate";
 import type { DoctorProfile } from "../lib/types";
+import { generatePDFWithDialog } from "../lib/pdf-generator-tauri";
+import { useToast } from "../hooks/useToast";
 
 // Custom hooks
 import { usePatientRecord } from "../hooks/usePatientRecord";
@@ -91,6 +93,9 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     reloadSigners,
     handleReasonTypesChange,
   } = useMasterData();
+
+  // Toast notifications
+  const toast = useToast();
 
   // Local UI state
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
@@ -234,6 +239,34 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
   // Handlers
   const handlePreview = useCallback(() => window.print(), []);
+
+  const handleDownloadPDF = useCallback(async () => {
+    if (!printSessionData || !patient.id) {
+      toast.error("Error", "No hay sesión seleccionada para descargar");
+      return;
+    }
+
+    try {
+      toast.success("Generando PDF", "Selecciona dónde guardar el archivo...");
+
+      const filePath = await generatePDFWithDialog({
+        patient,
+        session: printSessionData.session,
+        sessionItems: printSessionData.items,
+        doctorProfile,
+      });
+
+      toast.success("PDF Guardado", `Archivo guardado en: ${filePath}`);
+    } catch (error) {
+      console.error("[PDF Download] Error:", error);
+      const errorMessage = error instanceof Error ? error.message : "No se pudo generar el PDF";
+
+      // Don't show error toast if user cancelled
+      if (!errorMessage.includes("cancelada")) {
+        toast.error("Error", errorMessage);
+      }
+    }
+  }, [printSessionData, patient, doctorProfile, toast]);
 
   const handleSelectPatientWrapper = useCallback(
     async (selectedPatient: Patient) => {
@@ -663,6 +696,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           onSearch={() => setSearchDialogOpen(true)}
           onNewSession={handleNewSessionFromDock}
           onPrint={handlePreview}
+          onDownloadPDF={handleDownloadPDF}
           onSave={handleSaveWrapper}
           onPendingPayments={() => setPaymentsDialogOpen(true)}
           hasChanges={hasAnyChanges}
@@ -881,6 +915,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         onSearch={() => setSearchDialogOpen(true)}
         onNewSession={handleNewSessionFromDock}
         onPrint={handlePreview}
+        onDownloadPDF={handleDownloadPDF}
         onSave={handleSaveWrapper}
         onPendingPayments={() => setPaymentsDialogOpen(true)}
         hasChanges={hasAnyChanges}

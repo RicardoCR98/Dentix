@@ -14,6 +14,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Obtener el path del app data directory
             let app_data_dir = app
@@ -129,6 +130,8 @@ fn main() {
             update_patient_only,
             save_attachments_without_session,
             create_diagnostic_update_session,
+            // PDF generation
+            generate_pdf_with_dialog,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
