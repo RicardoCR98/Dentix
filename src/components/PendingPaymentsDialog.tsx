@@ -86,10 +86,11 @@ export default function PendingPaymentsDialog({
   const visible = hasTyped ? filteredPatients.slice(0, 5) : top5;
 
   const totalDebt = patientsWithDebt.reduce(
-    (sum, p) => sum + p.total_debt,
+    (sum, p) => sum + p.current_balance,
     0
   );
-  const overdueCount = patientsWithDebt.filter((p) => p.is_overdue).length;
+  // Consider overdue if debt is older than 90 days (3 months)
+  const overdueCount = patientsWithDebt.filter((p) => p.days_overdue > 90).length;
 
   const handleSelect = async (summary: PatientDebtSummary) => {
     // Load full patient data
@@ -217,29 +218,31 @@ export default function PendingPaymentsDialog({
                 <div className="text-center">Acción</div>
               </div>
 
-              {visible.map((item) => (
-                <div
-                  key={item.patient_id}
-                  className={cn(
-                    "grid grid-cols-[2fr_1fr_1.5fr_120px] gap-4 items-center px-4 py-3 rounded-lg transition-all",
-                    "hover:bg-[hsl(var(--muted))] border",
-                    item.is_overdue
-                      ? "bg-red-500/5 border-red-500/30 hover:border-red-500/50"
-                      : "bg-[hsl(var(--surface))] border-transparent hover:border-[hsl(var(--brand))]/30"
-                  )}
-                >
+              {visible.map((item) => {
+                const isOverdue = item.days_overdue > 90; // 3+ months
+                return (
+                  <div
+                    key={item.patient_id}
+                    className={cn(
+                      "grid grid-cols-[2fr_1fr_1.5fr_120px] gap-4 items-center px-4 py-3 rounded-lg transition-all",
+                      "hover:bg-[hsl(var(--muted))] border",
+                      isOverdue
+                        ? "bg-red-500/5 border-red-500/30 hover:border-red-500/50"
+                        : "bg-[hsl(var(--surface))] border-transparent hover:border-[hsl(var(--brand))]/30"
+                    )}
+                  >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <User
                         size={16}
                         className={
-                          item.is_overdue
+                          isOverdue
                             ? "text-red-500"
                             : "text-[hsl(var(--brand))]"
                         }
                       />
                       <span className="font-semibold">{item.full_name}</span>
-                      {item.is_overdue && (
+                      {isOverdue && (
                         <Badge variant="danger" className="text-xs animate-pulse">
                           MORA
                         </Badge>
@@ -257,10 +260,10 @@ export default function PendingPaymentsDialog({
                     <p
                       className={cn(
                         "font-bold text-lg",
-                        item.is_overdue ? "text-red-600" : "text-orange-600"
+                        isOverdue ? "text-red-600" : "text-orange-600"
                       )}
                     >
-                      {money(item.total_debt)}
+                      {money(item.current_balance)}
                     </p>
                   </div>
 
@@ -270,11 +273,11 @@ export default function PendingPaymentsDialog({
                         size={14}
                         className="text-[hsl(var(--muted-foreground))]"
                       />
-                      <span>{formatDate(item.last_session_date)}</span>
+                      <span>{formatDate(item.debt_opened_at || "")}</span>
                     </div>
-                    {item.is_overdue && (
+                    {isOverdue && (
                       <p className="text-xs text-red-600 mt-0.5">
-                        Hace {item.days_since_last} días
+                        Hace {item.days_overdue} días
                       </p>
                     )}
                   </div>
@@ -282,7 +285,7 @@ export default function PendingPaymentsDialog({
                   <div className="text-center">
                     <Button
                       onClick={() => handleSelect(item)}
-                      variant={item.is_overdue ? "primary" : "secondary"}
+                      variant={isOverdue ? "primary" : "secondary"}
                       size="sm"
                       className="w-full"
                       disabled={loading}
@@ -291,7 +294,8 @@ export default function PendingPaymentsDialog({
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </>
           )}
         </div>
