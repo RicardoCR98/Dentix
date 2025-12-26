@@ -1,163 +1,120 @@
 <div align="center">
 
-# 🦷 Oklus
+# Oklus
 
-### Sistema de Gestión Dental Profesional
+Sistema de gestion dental profesional
 
-*Solución completa para la administración de clínicas odontológicas*
+Solucion de escritorio para la administracion de clinicas odontologicas.
 
 [![Tauri](https://img.shields.io/badge/Tauri-2.8.0-24C8DB?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-19.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.1-06B6D4?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
-[Características](#-características-principales) • [Instalación](#-instalación) • [Uso](#-uso) • [Documentación](#-documentación)
+[Descripcion](#descripcion) | [Caracteristicas](#caracteristicas) | [Instalacion](#instalacion) | [Uso](#uso) | [Documentacion](#documentacion)
 
 </div>
 
 ---
 
-## 📋 Tabla de Contenidos
+## Descripcion
 
-- [Descripción](#-descripción)
-- [Características Principales](#-características-principales)
-- [Capturas de Pantalla](#-capturas-de-pantalla)
-- [Tecnologías](#-tecnologías)
-- [Requisitos Previos](#-requisitos-previos)
-- [Instalación](#-instalación)
-- [Uso](#-uso)
-- [Scripts Disponibles](#-scripts-disponibles)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Base de Datos](#-base-de-datos)
-- [Temas Personalizados](#-temas-personalizados)
-- [Roadmap](#-roadmap)
-- [Contribuir](#-contribuir)
-- [Licencia](#-licencia)
-- [Contacto](#-contacto)
+**Oklus** es una aplicacion de escritorio multiplataforma para la gestion integral de clinicas dentales. Construida con React, TypeScript y Tauri, ofrece una experiencia rapida y estable, pensada para operar sin conexion.
+
+**Por que Oklus?**
+- Rendimiento nativo con Tauri.
+- Datos locales en SQLite con migraciones y WAL.
+- Funcionamiento 100% offline.
+- UI moderna con Tailwind CSS y Radix UI.
+- Configuracion y temas personalizables.
 
 ---
 
-## 🎯 Descripción
+## Caracteristicas
 
-**Oklus** es una aplicación de escritorio multiplataforma diseñada específicamente para la gestión integral de clínicas dentales. Desarrollada con tecnologías modernas como React, TypeScript y Tauri, ofrece una experiencia de usuario fluida y profesional.
+### Gestion de pacientes
+- Registro de datos demograficos y contacto.
+- Busqueda rapida y filtros.
+- Historial medico, alergias y alertas.
+- Adjuntos (radiografias, fotos, documentos).
 
-### ¿Por qué Oklus?
+### Odontograma interactivo
+- Denticion permanente (11-48) y decidua (51-85).
+- Seleccion visual de dientes.
+- Diagnosticos por diente con texto automatico.
 
-- **🚀 Rendimiento Nativo**: Construido con Tauri, más ligero y rápido que Electron
-- **🔒 Seguridad**: Datos almacenados localmente en SQLite con WAL mode
-- **💾 Sin Dependencia de Internet**: Funciona 100% offline
-- **🎨 Interfaz Moderna**: UI/UX profesional con Tailwind CSS y Radix UI
-- **📊 Base de Datos Robusta**: Sistema de migraciones y relaciones bien definidas
-- **🌈 Personalizable**: Múltiples temas y opciones de fuentes
+### Visitas y sesiones
+- Registro de consultas con motivo y diagnostico.
+- Historial completo por paciente.
+- Plantillas de procedimientos reutilizables.
 
----
+### Finanzas
+- Presupuestos, descuentos y saldos.
+- Control de pagos pendientes.
+- Paginacion para grandes volumenes.
 
-## ✨ Características Principales
-
-### 👥 Gestión de Pacientes
-- ✅ Registro completo de datos demográficos
-- ✅ Sistema de búsqueda rápida (Ctrl+K)
-- ✅ Historial médico y alergias con alertas visuales
-- ✅ Gestión de adjuntos (radiografías, fotos, documentos)
-
-### 🦷 Odontograma Interactivo
-- ✅ Soporte para dentición permanente (11-48) y decidua (51-85)
-- ✅ Selección visual de dientes
-- ✅ Diagnósticos personalizables por diente
-- ✅ Generación automática de texto de diagnóstico
-
-### 📅 Control de Visitas
-- ✅ Registro de consultas con motivo categorizado
-- ✅ Diagnóstico manual y automatizado combinado
-- ✅ Historial completo de visitas por paciente
-- ✅ Navegación temporal intuitiva
-
-### 💰 Gestión Financiera
-- ✅ Sesiones de tratamiento con presupuestos
-- ✅ Cálculo automático de totales y saldos
-- ✅ Sistema de descuentos
-- ✅ Control de pagos pendientes
-- ✅ Paginación para grandes volúmenes de datos
-
-### 📎 Archivos Adjuntos
-- ✅ Almacenamiento organizado por paciente/año/mes
-- ✅ Soporte para múltiples formatos
-- ✅ Apertura nativa de archivos desde la app
-- ✅ Metadata en base de datos para búsquedas rápidas
-
-### 👨‍⚕️ Múltiples Doctores
-- ✅ Sistema de firmantes configurables
-- ✅ Asignación de doctor por sesión
-- ✅ Plantillas de procedimientos reutilizables
-
-### 🎨 Personalización
-- ✅ **3 Temas**: Light, Dark, Green Apple
-- ✅ **4 Fuentes**: Inter, Poppins, Roboto, System
-- ✅ **Tamaño de Fuente**: Ajustable (14-24px)
-- ✅ Configuración persistente en localStorage
+### Configuracion y personalizacion
+- Temas y tipografias configurables.
+- Tamano de fuente ajustable.
+- Preferencias persistentes.
 
 ---
 
-## 📸 Capturas de Pantalla
+## Capturas de pantalla
 
-> **Nota**: Agrega capturas de pantalla de tu aplicación en la carpeta `docs/screenshots/` y actualiza los enlaces a continuación.
+Agrega capturas en `docs/screenshots/` y actualiza los enlaces.
 
 <details>
-<summary>Ver capturas de pantalla</summary>
+<summary>Ver capturas</summary>
 
-### Dashboard Principal
+### Dashboard
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ### Odontograma
 ![Odontograma](docs/screenshots/odontogram.png)
 
-### Gestión de Pacientes
+### Pacientes
 ![Pacientes](docs/screenshots/patients.png)
 
-### Temas Disponibles
+### Temas
 ![Temas](docs/screenshots/themes.png)
 
 </details>
 
 ---
 
-## 🛠️ Tecnologías
+## Tecnologias
 
 ### Frontend
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **React** | 19.1.1 | Framework UI |
-| **TypeScript** | 5.9.3 | Type safety |
-| **Vite** | 7.1.7 | Build tool |
-| **Tailwind CSS** | 4.1.14 | Styling |
-| **Radix UI** | Latest | Componentes accesibles |
-| **Lucide React** | 0.545.0 | Iconos |
-| **TanStack Virtual** | 3.13.12 | Virtual scrolling |
+| Tecnologia | Version | Uso |
+|------------|---------|-----|
+| React | 19.1.1 | UI |
+| TypeScript | 5.9 | Tipado |
+| Vite | 7.1 | Build |
+| Tailwind CSS | 4.1 | Estilos |
+| Radix UI | Latest | Componentes accesibles |
+| Zustand | 5.0 | Estado global |
+| TanStack Virtual | 3.13 | Virtualizacion |
+| Lucide React | 0.545 | Iconos |
 
-### Backend/Desktop
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **Tauri** | 2.8.0 | Framework de escritorio |
-| **Rust** | 1.77.2+ | Backend nativo |
-| **SQLite** | Latest | Base de datos |
-| **tauri-plugin-sql** | 2.3.0 | Integración SQLite |
-| **tauri-plugin-fs** | 2.4.2 | Sistema de archivos |
-
-### Herramientas de Desarrollo
-- **ESLint** - Linting de código
-- **pnpm** - Gestor de paquetes rápido
-- **TypeScript ESLint** - Reglas de linting para TS
+### Desktop/Backend
+| Tecnologia | Version | Uso |
+|------------|---------|-----|
+| Tauri | 2.8 | Desktop shell |
+| Rust | 1.77+ | Backend nativo |
+| SQLite | Latest | Base de datos |
+| tauri-plugin-sql | 2.3 | Acceso a SQLite |
+| tauri-plugin-fs | 2.4 | Sistema de archivos |
+| tauri-plugin-opener | 2.5 | Apertura de archivos |
 
 ---
 
-## 📦 Requisitos Previos
+## Requisitos previos
 
-Antes de comenzar, asegúrate de tener instalado:
-
-- **Node.js** >= 18.0.0 ([Descargar](https://nodejs.org/))
-- **pnpm** >= 8.0.0 (o npm/yarn)
-- **Rust** >= 1.77.2 ([Instalar rustup](https://rustup.rs/))
-- **Dependencias de Tauri** según tu sistema operativo:
+- Node.js >= 18
+- pnpm >= 8
+- Rust >= 1.77 (via rustup)
+- Dependencias de Tauri segun tu sistema operativo:
 
 ### Linux
 ```bash
@@ -179,321 +136,181 @@ xcode-select --install
 ```
 
 ### Windows
-- Instalar [Microsoft Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- Instalar [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (generalmente ya está instalado)
+- Instala Microsoft Visual Studio C++ Build Tools.
+- Instala WebView2 si no esta presente.
 
 ---
 
-## 🚀 Instalación
+## Instalacion
 
-### 1. Clonar el Repositorio
+### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/tu-usuario/dentix.git
-cd dentix
+git clone https://github.com/tu-usuario/oklus.git
+cd oklus
 ```
 
-### 2. Instalar Dependencias de Node
+### 2. Instalar dependencias
 ```bash
 pnpm install
-# o con npm
-npm install
-# o con yarn
-yarn install
 ```
 
-### 3. Instalar Dependencias de Rust
+### 3. Compilar dependencias de Rust (opcional la primera vez)
 ```bash
 cd src-tauri
 cargo build
 cd ..
 ```
 
-### 4. Configurar Base de Datos
-La base de datos SQLite se crea automáticamente al ejecutar la aplicación por primera vez. Las migraciones se ejecutan automáticamente.
+La base de datos SQLite se crea automaticamente al ejecutar la app por primera vez.
 
 ---
 
-## 💻 Uso
+## Uso
 
-### Modo Desarrollo
-
-**Opción 1: Frontend + Backend**
+### Desarrollo
 ```bash
 pnpm tauri:dev
 ```
 
-**Opción 2: Solo Frontend (para desarrollo de UI)**
+### Solo frontend (UI)
 ```bash
 pnpm dev
 ```
 
-La aplicación se abrirá automáticamente en modo desarrollo con hot-reload habilitado.
-
-### Compilar para Producción
-
+### Build de produccion
 ```bash
 pnpm tauri:build
 ```
 
-Los ejecutables se generarán en:
-- **Windows**: `src-tauri/target/release/bundle/msi/`
-- **macOS**: `src-tauri/target/release/bundle/dmg/`
-- **Linux**: `src-tauri/target/release/bundle/deb/` o `appimage/`
+Los ejecutables se generan en `src-tauri/target/release/bundle/`.
 
 ---
 
-## 📜 Scripts Disponibles
+## Scripts disponibles
 
-| Comando | Descripción |
+| Comando | Descripcion |
 |---------|-------------|
-| `pnpm dev` | Inicia servidor de desarrollo Vite |
-| `pnpm build` | Compila el frontend para producción |
-| `pnpm lint` | Ejecuta ESLint en el código |
-| `pnpm preview` | Previsualiza el build de producción |
-| `pnpm tauri:dev` | Inicia la app Tauri en modo desarrollo |
-| `pnpm tauri:build` | Compila la aplicación completa |
+| `pnpm dev` | Inicia Vite en modo desarrollo |
+| `pnpm build` | Compila el frontend |
+| `pnpm lint` | Ejecuta ESLint |
+| `pnpm preview` | Previsualiza el build |
+| `pnpm tauri:dev` | Ejecuta la app Tauri en desarrollo |
+| `pnpm tauri:build` | Compila la app completa |
 
 ---
 
-## 📁 Estructura del Proyecto
+## Estructura del proyecto
 
 ```
-dentix/
-├── src/                          # Código fuente del frontend
-│   ├── components/               # Componentes React
-│   │   ├── ui/                  # Componentes UI reutilizables (Radix)
-│   │   │   ├── button.tsx
-│   │   │   ├── dialog.tsx
-│   │   │   ├── input.tsx
-│   │   │   └── ...
-│   │   ├── App.tsx              # Componente principal
-│   │   ├── PatientForm.tsx      # Formulario de pacientes
-│   │   ├── Odontogram.tsx       # Odontograma interactivo
-│   │   ├── SessionsTable.tsx    # Tabla de sesiones
-│   │   └── ...
-│   ├── lib/                     # Lógica de negocio
-│   │   ├── storage/             # Capa de persistencia
-│   │   │   └── TauriSqliteRepository.ts
-│   │   ├── files/               # Manejo de archivos
-│   │   ├── os/                  # Operaciones del SO
-│   │   └── types.ts             # Definiciones TypeScript
-│   ├── theme/                   # Sistema de temas
-│   │   └── theme.ts
-│   ├── assets/                  # Recursos estáticos
-│   └── main.tsx                 # Punto de entrada
-├── src-tauri/                   # Backend Rust
-│   ├── src/
-│   │   ├── lib.rs              # Código Rust
-│   │   └── main.rs
-│   ├── migrations/              # Migraciones SQL
-│   │   ├── 001_initial.sql
-│   │   ├── 002_add_fields.sql
-│   │   └── ...
-│   ├── Cargo.toml              # Dependencias Rust
-│   └── tauri.conf.json         # Configuración Tauri
-├── public/                      # Archivos públicos
-├── docs/                        # Documentación
-├── package.json                 # Dependencias Node
-├── tsconfig.json               # Configuración TypeScript
-├── tailwind.config.ts          # Configuración Tailwind
-├── vite.config.ts              # Configuración Vite
-└── README.md
+oklus/
+  src/
+    components/         # UI (Radix/Tailwind)
+    pages/              # Rutas
+    hooks/
+    stores/             # Zustand
+    theme/              # Tokens y temas
+    assets/
+    main.tsx
+  src-tauri/
+    migrations/
+    src/
+    tauri.conf.json
+  public/
+  docs/
+  package.json
 ```
 
 ---
 
-## 🗄️ Base de Datos
+## Base de datos
 
-Oklus utiliza **SQLite** con modo **WAL (Write-Ahead Logging)** para mejor concurrencia.
+Oklus usa SQLite en modo WAL con migraciones en `src-tauri/migrations/`.
 
-### Esquema Principal
-
+Esquema principal:
 ```
-patients (pacientes)
-  ├── visits (visitas)
-  │     ├── sessions (sesiones de tratamiento)
-  │     │     └── session_items (items de sesión)
-  │     └── tooth_dx (diagnósticos dentales)
-  └── attachments (archivos adjuntos)
+patients
+  visits
+    sessions
+      session_items
+    tooth_dx
+  attachments
 
-procedure_templates (plantillas de procedimientos)
-signers (doctores/firmantes)
-diagnosis_options (opciones de diagnóstico)
+procedure_templates
+signers
+diagnosis_options
 ```
-
-### Migraciones
-
-Las migraciones se encuentran en `src-tauri/migrations/` y se ejecutan automáticamente al iniciar la aplicación:
-
-1. `001_initial.sql` - Schema inicial
-2. `002_add_fields.sql` - Campos adicionales
-3. `003_attachments.sql` - Sistema de adjuntos
-4. `004_indexes.sql` - Optimización de índices
 
 ---
 
-## 🎨 Temas Personalizados
+## Temas personalizados
 
-Oklus incluye un sistema de temas CSS variables que permite personalización completa:
+Edita `src/theme/theme.ts` para agregar o ajustar temas:
 
-### Temas Incluidos
-
-1. **Light** - Tema claro profesional
-2. **Dark** - Tema oscuro para reducir fatiga visual
-3. **Green Apple** - Tema personalizado con verde menta
-
-### Personalizar Temas
-
-Edita `src/theme/theme.ts` para agregar nuevos temas:
-
-```typescript
+```ts
 export const themes = {
   myTheme: {
     light: {
-      '--background': '0 0% 100%',
-      '--foreground': '222.2 84% 4.9%',
-      // ... más variables
+      "--background": "0 0% 100%",
+      "--foreground": "222.2 84% 4.9%"
     }
   }
-}
-```
-
-### Variables CSS Disponibles
-
-```css
---background
---foreground
---primary
---secondary
---accent
---destructive
---muted
---border
---input
---ring
+};
 ```
 
 ---
 
-## 🗺️ Roadmap
+## Documentacion
 
-### ✅ Completado (v0.1.0)
-- [x] Gestión básica de pacientes
-- [x] Odontograma interactivo
-- [x] Sistema de visitas y sesiones
-- [x] Adjuntos de archivos
-- [x] Temas personalizables
-- [x] Base de datos con migraciones
-
-### 🚧 En Desarrollo (v0.2.0)
-- [ ] **Sistema de Tests** (Vitest + React Testing Library)
-- [ ] **Refactorización de componentes grandes**
-- [ ] **Error Boundaries**
-- [ ] **Validación de formularios** (Zod)
-- [ ] **Estados de carga** consistentes
-- [ ] **Documentación JSDoc**
-
-### 📋 Planificado (v0.3.0)
-- [ ] Reportes y estadísticas
-- [ ] Exportación a PDF
-- [ ] Recordatorios de citas
-- [ ] Backup automático de base de datos
-- [ ] Multi-idioma (i18n)
-- [ ] Calendario de citas
-- [ ] Gráficos de ingresos
-
-### 🔮 Futuro (v1.0.0)
-- [ ] Integración con equipos de diagnóstico
-- [ ] API REST para integración externa
-- [ ] Sincronización en la nube (opcional)
-- [ ] App móvil complementaria
-- [ ] Sistema de permisos/roles
-- [ ] Firma digital de documentos
+- Guias y runbooks en `docs/`.
+- Contexto adicional en los `*.md` de la raiz.
 
 ---
 
-## 🤝 Contribuir
+## Roadmap
 
-Las contribuciones son bienvenidas y apreciadas. Para contribuir:
+### En desarrollo
+- Sistema de tests (Vitest + React Testing Library).
+- Refactor de componentes grandes.
+- Validacion de formularios (Zod).
 
-### 1. Fork el Proyecto
-```bash
-git clone https://github.com/tu-usuario/dentix.git
-cd dentix
-```
-
-### 2. Crea una Rama de Feature
-```bash
-git checkout -b feature/nueva-funcionalidad
-```
-
-### 3. Realiza tus Cambios
-```bash
-git add .
-git commit -m "feat: agregar nueva funcionalidad"
-```
-
-### 4. Push a tu Fork
-```bash
-git push origin feature/nueva-funcionalidad
-```
-
-### 5. Abre un Pull Request
-
-### Guías de Contribución
-
-- Sigue las convenciones de código existentes
-- Escribe mensajes de commit descriptivos ([Conventional Commits](https://www.conventionalcommits.org/))
-- Agrega tests para nuevas funcionalidades
-- Actualiza la documentación si es necesario
-- Asegúrate de que `pnpm lint` pase sin errores
+### Planificado
+- Reportes y estadisticas.
+- Exportacion a PDF.
+- Recordatorios de citas.
+- Backup automatico.
 
 ---
 
-## 📄 Licencia
+## Contribuir
 
-Este proyecto está bajo la Licencia **MIT**. Consulta el archivo [LICENSE](LICENSE) para más detalles.
-
-```
-MIT License
-
-Copyright (c) 2025 [Tu Nombre/Empresa]
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction...
-```
+1. Haz un fork del proyecto.
+2. Crea una rama: `git checkout -b feature/mi-cambio`.
+3. Commit con prefijos `add:`, `fix:` o `update:`.
+4. Ejecuta `pnpm lint`.
+5. Abre un Pull Request con proposito, resumen y notas de prueba manual.
 
 ---
 
-## 📞 Contacto
+## Licencia
 
-**Desarrollador Principal**: [Tu Nombre]
-
-- 🌐 Website: [tu-sitio.com](https://tu-sitio.com)
-- 📧 Email: [tu-email@ejemplo.com](mailto:tu-email@ejemplo.com)
-- 💼 LinkedIn: [tu-perfil](https://linkedin.com/in/tu-perfil)
-- 🐙 GitHub: [@tu-usuario](https://github.com/tu-usuario)
-
-**Repositorio del Proyecto**: [https://github.com/tu-usuario/dentix](https://github.com/tu-usuario/dentix)
+MIT. Ver `LICENSE`.
 
 ---
 
-## 🙏 Agradecimientos
+## Contacto
 
-- [Tauri](https://tauri.app/) - Framework de aplicaciones de escritorio
-- [React](https://react.dev/) - Biblioteca UI
-- [Radix UI](https://www.radix-ui.com/) - Componentes accesibles
-- [Tailwind CSS](https://tailwindcss.com/) - Framework CSS
-- [Lucide](https://lucide.dev/) - Iconos hermosos
-- [shadcn/ui](https://ui.shadcn.com/) - Inspiración para componentes
+Desarrollador principal: [Tu Nombre]
+
+- Website: https://tu-sitio.com
+- Email: tu-email@ejemplo.com
+- GitHub: https://github.com/tu-usuario
 
 ---
 
-<div align="center">
+## Agradecimientos
 
-**⭐ Si este proyecto te resulta útil, considera darle una estrella en GitHub ⭐**
-
-Hecho con ❤️ para la comunidad odontológica
-
-</div>
+- Tauri
+- React
+- Radix UI
+- Tailwind CSS
+- Lucide
