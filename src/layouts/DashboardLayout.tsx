@@ -1,6 +1,6 @@
 // src/layouts/DashboardLayout.tsx
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useOutletContext } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import ThemePanel from "../components/ThemePanel";
 import ShortcutsHelp from "../components/ShortcutsHelp";
@@ -10,15 +10,21 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "../components/ui/Popover";
-import { Info, Menu, X } from "lucide-react";
+import { Info, Menu, X, History } from "lucide-react";
 
 interface DashboardLayoutProps {
   clinicName: string;
   slogan?: string;
 }
 
+interface OutletContextType {
+  isTimelineSidebarOpen: boolean;
+  setIsTimelineSidebarOpen: (isOpen: boolean) => void;
+}
+
 export function DashboardLayout({ clinicName, slogan }: DashboardLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isTimelineSidebarOpen, setIsTimelineSidebarOpen] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))] ">
@@ -52,6 +58,22 @@ export function DashboardLayout({ clinicName, slogan }: DashboardLayoutProps) {
 
           {/* Right side - Actions */}
           <div className="flex items-center gap-2">
+            {/* Timeline Toggle Button */}
+            <button
+              onClick={() => setIsTimelineSidebarOpen(!isTimelineSidebarOpen)}
+              className="inline-flex items-center justify-center rounded-full p-1.5 hover:bg-[hsl(var(--muted))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))] transition-colors"
+              title="Timeline de sesiones"
+            >
+              <History
+                size={20}
+                className={`transition-colors ${
+                  isTimelineSidebarOpen
+                    ? "text-[hsl(var(--brand))]"
+                    : "text-[hsl(var(--muted-foreground))]"
+                }`}
+              />
+            </button>
+
             {/* Theme Panel */}
             <ThemePanel inlineTrigger />
 
@@ -78,10 +100,20 @@ export function DashboardLayout({ clinicName, slogan }: DashboardLayoutProps) {
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 lg:px-8">
           <div className="w-full max-w-3xl sm:max-w-4xl lg:max-w-6xl 2xl:max-w-[1400px] mx-auto">
-            <Outlet />
+            <Outlet
+              context={{
+                isTimelineSidebarOpen,
+                setIsTimelineSidebarOpen,
+              } satisfies OutletContextType}
+            />
           </div>
         </main>
       </div>
     </div>
   );
+}
+
+// Hook for child components to access the context
+export function useTimelineSidebar() {
+  return useOutletContext<OutletContextType>();
 }

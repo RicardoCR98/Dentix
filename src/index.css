@@ -379,6 +379,16 @@
             Roboto, sans-serif;
         --font-size-base: 16px;
 
+        /* Historical Mode Colors (Sepia/Amber theme) */
+        --historical-overlay: 45 90% 60% / 0.08;
+        --historical-accent: 38 92% 50%;
+        --historical-accent-light: 38 100% 70%;
+        --historical-border: 38 100% 70%;
+        --historical-surface: 45 60% 97%;
+        --historical-text-opacity: 0.85;
+        --historical-banner-start: 38 92% 50%;
+        --historical-banner-end: 45 93% 47%;
+
         /* Mapeos cortos */
         --bg: hsl(var(--background));
         --fg: hsl(var(--foreground));
@@ -416,6 +426,16 @@
                 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
             --shadow-lg:
                 0 12px 24px rgba(0, 0, 0, 0.55), 0 4px 8px rgba(0, 0, 0, 0.35);
+
+            /* Historical Mode Colors - Dark Theme */
+            --historical-overlay: 38 50% 50% / 0.06;
+            --historical-accent: 38 80% 55%;
+            --historical-accent-light: 38 70% 60%;
+            --historical-border: 38 40% 35%;
+            --historical-surface: 38 15% 12%;
+            --historical-text-opacity: 0.80;
+            --historical-banner-start: 38 60% 25%;
+            --historical-banner-end: 45 55% 22%;
         }
     }
 
@@ -443,6 +463,16 @@
         --shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
         --shadow-lg:
             0 12px 24px rgba(0, 0, 0, 0.55), 0 4px 8px rgba(0, 0, 0, 0.35);
+
+        /* Historical Mode Colors - Dark Theme */
+        --historical-overlay: 38 50% 50% / 0.06;
+        --historical-accent: 38 80% 55%;
+        --historical-accent-light: 38 70% 60%;
+        --historical-border: 38 40% 35%;
+        --historical-surface: 38 15% 12%;
+        --historical-text-opacity: 0.80;
+        --historical-banner-start: 38 60% 25%;
+        --historical-banner-end: 45 55% 22%;
     }
 
     /* Reset global */
@@ -1019,4 +1049,407 @@
             page-break-inside: avoid;
         }
     }
+}
+
+/* =====================================================
+   HISTORICAL MODE STYLES (SEPIA/AMBER THEME)
+   ===================================================== */
+
+/* Historical Mode Banner - Top sticky banner */
+.historical-mode-banner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    height: 64px;
+    background: linear-gradient(135deg, hsl(var(--historical-banner-start)), hsl(var(--historical-banner-end)));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid hsl(var(--historical-accent-light) / 0.5);
+    animation: slideDownBanner 250ms ease-out;
+}
+
+.historical-banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    padding: 0 24px;
+    max-width: 100%;
+}
+
+.historical-banner-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.historical-banner-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    color: white;
+    opacity: 0.9;
+}
+
+.historical-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.historical-banner-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+    line-height: 1.2;
+}
+
+.historical-banner-subtitle {
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.2;
+}
+
+.historical-banner-close {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease-out;
+}
+
+.historical-banner-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.historical-banner-close:active {
+    transform: scale(0.98);
+}
+
+/* Historical Mode Container Wrapper */
+.historical-mode {
+    position: relative;
+}
+
+/* Background overlay with amber tint */
+.historical-mode::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: hsl(var(--historical-overlay));
+    pointer-events: none;
+    z-index: 0;
+    animation: fadeInOverlay 300ms ease-out;
+}
+
+/* Left accent border (4px amber stripe) */
+.historical-mode::after {
+    content: "";
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to bottom, hsl(var(--historical-accent)), hsl(var(--historical-accent-light)));
+    box-shadow: 2px 0 4px hsl(var(--historical-accent) / 0.2);
+    z-index: 49;
+    animation: growDownBorder 300ms ease-in-out;
+}
+
+/* Historical mode cards/surfaces */
+.historical-mode .card,
+.historical-mode [class*="card-"],
+.historical-mode [class*="surface-"] {
+    background: hsl(var(--historical-surface)) !important;
+    border-color: hsl(var(--historical-border)) !important;
+    box-shadow:
+        0 1px 3px hsl(var(--historical-accent) / 0.1),
+        0 0 0 1px hsl(var(--historical-accent) / 0.05) !important;
+}
+
+/* Historical mode inputs (disabled appearance but readable) */
+.historical-mode input,
+.historical-mode textarea,
+.historical-mode select {
+    background: hsl(var(--historical-surface) / 0.5) !important;
+    border-color: hsl(var(--historical-border) / 0.5) !important;
+    color: hsl(var(--foreground) / var(--historical-text-opacity)) !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
+
+/* Historical mode buttons - hide edit actions, show only view actions */
+.historical-mode button[type="submit"],
+.historical-mode button[class*="save"],
+.historical-mode button[class*="add"],
+.historical-mode button[class*="edit"],
+.historical-mode button[class*="delete"] {
+    display: none !important;
+}
+
+/* Allow specific interactions in historical mode */
+/* Allow eye buttons (view/preview) */
+.historical-mode button[title*="Vista previa"],
+.historical-mode button[title*="Ver"],
+.historical-mode button[aria-label*="Vista previa"],
+.historical-mode button[aria-label*="Ver"] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+
+/* Allow tabs to be clickable */
+.historical-mode [role="tab"],
+.historical-mode [data-state="active"],
+.historical-mode [data-state="inactive"] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Allow expand/collapse buttons (chevrons) */
+.historical-mode button[title*="Expandir"],
+.historical-mode button[title*="Contraer"],
+.historical-mode button[aria-label*="Expandir"],
+.historical-mode button[aria-label*="Contraer"] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Disable most other interactions in cards */
+.historical-mode .card button:not([title*="Ver"]):not([title*="Vista previa"]):not([title*="Expandir"]):not([title*="Contraer"]),
+.historical-mode .card input:not([type="hidden"]),
+.historical-mode .card textarea,
+.historical-mode .card select {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+}
+
+/* Animations */
+@keyframes slideDownBanner {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInOverlay {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes growDownBorder {
+    from {
+        height: 0;
+    }
+    to {
+        height: 100%;
+    }
+}
+
+/* =====================================================
+   HISTORICAL SESSIONS SIDEBAR (Timeline)
+   ===================================================== */
+
+/* Sidebar container - slides from right */
+.historical-sidebar {
+    position: fixed;
+    top: 48px; /* Below header */
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    background: hsl(var(--surface));
+    border-left: 1px solid hsl(var(--border));
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 300ms ease-out;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.historical-sidebar-open {
+    transform: translateX(0);
+}
+
+/* Header */
+.historical-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--surface-elevated));
+}
+
+.historical-sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+}
+
+.historical-sidebar-close-btn {
+    padding: 6px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+    transition: all 150ms ease-out;
+}
+
+.historical-sidebar-close-btn:hover {
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+}
+
+/* Content area */
+.historical-sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Empty state */
+.historical-sidebar-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+    gap: 16px;
+}
+
+/* Session list */
+.historical-sidebar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Session item */
+.historical-session-item {
+    padding: 16px;
+    background: hsl(var(--surface-elevated));
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    transition: all 150ms ease-out;
+}
+
+.historical-session-item:hover {
+    border-color: hsl(var(--brand) / 0.5);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.historical-session-item.active {
+    background: hsl(var(--historical-surface));
+    border-color: hsl(var(--historical-accent));
+    box-shadow: 0 0 0 1px hsl(var(--historical-accent) / 0.2);
+}
+
+/* Session item header */
+.historical-session-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.historical-session-item-number {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: hsl(var(--brand));
+    background: hsl(var(--brand) / 0.1);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.historical-session-item.active .historical-session-item-number {
+    color: hsl(var(--historical-accent));
+    background: hsl(var(--historical-accent) / 0.15);
+}
+
+.historical-session-item-date {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+}
+
+/* Session info */
+.historical-session-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.historical-session-item-signer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+}
+
+.historical-session-item-reason {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--muted));
+    padding: 4px 8px;
+    border-radius: 4px;
+    width: fit-content;
+}
+
+.historical-session-item-procedures {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+}
+
+/* Actions */
+.historical-session-item-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.historical-session-active-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: hsl(var(--historical-accent));
+    background: hsl(var(--historical-accent) / 0.1);
+    padding: 6px 12px;
+    border-radius: 12px;
+    border: 1px solid hsl(var(--historical-accent) / 0.3);
+}
+
+.historical-session-view-btn {
+    gap: 6px;
 }

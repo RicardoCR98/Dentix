@@ -37,6 +37,7 @@ interface SessionsTableProps {
   activeId?: number | null;
   onOpenSession?: (sessionId: number) => void;
   onViewReadOnly?: (sessionId: number, visitId?: number) => void;
+  isSnapshotMode?: boolean;
 }
 
 const SessionsTable = memo(function SessionsTable({
@@ -54,8 +55,10 @@ const SessionsTable = memo(function SessionsTable({
   activeId,
   onOpenSession,
   onViewReadOnly,
+  isSnapshotMode = false,
 }: SessionsTableProps) {
   // Estado interno para IDs expandidos (múltiples cards pueden estar expandidas)
+  // In snapshot mode, start with all cards collapsed
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Estado para modo edición de plantilla de procedimientos
@@ -75,6 +78,9 @@ const SessionsTable = memo(function SessionsTable({
 
   // Efecto para expandir la sesión más reciente automáticamente cuando se crea una nueva
   useEffect(() => {
+    // Skip auto-expansion in snapshot mode - all cards start collapsed
+    if (isSnapshotMode) return;
+
     // Filtrar sesiones válidas (con session definido)
     const validSessions = sessions.filter((s) => s.session);
 
@@ -97,10 +103,13 @@ const SessionsTable = memo(function SessionsTable({
         });
       }
     }
-  }, [sessions.length, activeId]);
+  }, [sessions.length, activeId, isSnapshotMode]);
 
   // NEW: Sync expansion with activeId (when session context changes)
   useEffect(() => {
+    // Skip auto-expansion in snapshot mode
+    if (isSnapshotMode) return;
+
     if (activeId !== undefined && activeId !== null) {
       const idStr = String(activeId);
       setExpandedIds((prev) => {
@@ -109,7 +118,7 @@ const SessionsTable = memo(function SessionsTable({
         return next;
       });
     }
-  }, [activeId]);
+  }, [activeId, isSnapshotMode]);
 
   // Determinar cuál es la sesión más reciente EN BORRADOR (la única editable)
   const mostRecentDraftId = useMemo(() => {

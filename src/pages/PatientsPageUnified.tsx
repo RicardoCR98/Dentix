@@ -31,8 +31,12 @@ import {
 
 import { FinancialHistoryBlock } from "../components/FinancialHistoryBlock";
 import { QuickPaymentModal } from "../components/QuickPaymentModal";
-import { getRepository, tauriSqliteRepository } from "../lib/storage/TauriSqliteRepository";
+import {
+  getRepository,
+  tauriSqliteRepository,
+} from "../lib/storage/TauriSqliteRepository";
 import { PrintTemplate } from "../components/print/PrintTemplate";
+import { HistoricalModeBanner } from "../components/HistoricalModeBanner";
 import type { DoctorProfile } from "../lib/types";
 import { generatePDFWithDialog } from "../lib/pdf-generator-tauri";
 import { useToast } from "../hooks/useToast";
@@ -41,10 +45,12 @@ import { useToast } from "../hooks/useToast";
 import { usePatientRecord } from "../hooks/usePatientRecord";
 import { usePatientFromURL } from "../hooks/usePatientFromURL";
 import { useMasterData } from "../hooks/useMasterData";
+import { useTimelineSidebar } from "../layouts/DashboardLayout";
 // useScrollVisibility hook removed - no longer needed without Quick Actions section
 import { useAppStore } from "../stores";
 import type { Patient, SessionItem } from "../lib/types";
 import OdontogramDiagnosisSection from "../components/OdontogramDiagnosisSection";
+import { HistoricalSessionsSidebar } from "../components/HistoricalSessionsSidebar";
 
 interface PatientsPageUnifiedProps {
   layoutMode: "tabs" | "vertical";
@@ -97,6 +103,10 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   // Toast notifications
   const toast = useToast();
 
+  // Timeline sidebar state (from DashboardLayout context)
+  const { isTimelineSidebarOpen, setIsTimelineSidebarOpen } =
+    useTimelineSidebar();
+
   // Local UI state
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [paymentsDialogOpen, setPaymentsDialogOpen] = useState(false);
@@ -105,7 +115,9 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   >([]);
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("odontogram");
-  const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(null);
+  const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(
+    null,
+  );
   const [hasManuallyExited, setHasManuallyExited] = useState(false);
   const [isEditingPatient, setIsEditingPatient] = useState(true);
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile>({
@@ -194,7 +206,9 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
         if (d > targetDate) return false;
         return id <= targetId;
       })
-      .sort((a, b) => (a.session.date || "").localeCompare(b.session.date || ""));
+      .sort((a, b) =>
+        (a.session.date || "").localeCompare(b.session.date || ""),
+      );
   }, [sessions, snapshotSessionId]);
 
   const odontogramSessions = isSnapshotMode ? sessionsToRender : sessions;
@@ -204,7 +218,9 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
   // Get session data for print template
   const printSessionData = useMemo(() => {
-    const targetSessionId = isSnapshotMode ? snapshotSessionId : activeSessionId;
+    const targetSessionId = isSnapshotMode
+      ? snapshotSessionId
+      : activeSessionId;
 
     console.log("[PrintSessionData] Computing:", {
       isSnapshotMode,
@@ -219,9 +235,14 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       return null;
     }
 
-    const sessionWithItems = sessions.find((s) => s.session.id === targetSessionId);
+    const sessionWithItems = sessions.find(
+      (s) => s.session.id === targetSessionId,
+    );
     if (!sessionWithItems) {
-      console.log("[PrintSessionData] Session not found for ID:", targetSessionId);
+      console.log(
+        "[PrintSessionData] Session not found for ID:",
+        targetSessionId,
+      );
       return null;
     }
 
@@ -259,7 +280,8 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       toast.success("PDF Guardado", `Archivo guardado en: ${filePath}`);
     } catch (error) {
       console.error("[PDF Download] Error:", error);
-      const errorMessage = error instanceof Error ? error.message : "No se pudo generar el PDF";
+      const errorMessage =
+        error instanceof Error ? error.message : "No se pudo generar el PDF";
 
       // Don't show error toast if user cancelled
       if (!errorMessage.includes("cancelada")) {
@@ -380,7 +402,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
       if (options?.usePreviousItems) {
         return previousSession.items.map((item, index) => {
-          const quantity = options?.resetQuantities ? 0 : item.quantity ?? 0;
+          const quantity = options?.resetQuantities ? 0 : (item.quantity ?? 0);
           return {
             id: -(timestamp + index + 1000),
             name: item.name,
@@ -389,7 +411,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             subtotal: item.unit_price * quantity,
             is_active: options?.resetQuantities
               ? false
-              : item.is_active ?? quantity > 0,
+              : (item.is_active ?? quantity > 0),
             procedure_template_id: item.procedure_template_id,
           };
         });
@@ -461,7 +483,11 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   // Auto snapshot to última sesión guardada cuando se carga un paciente
   // But only if user hasn't manually exited snapshot mode
   useEffect(() => {
-    if (!hasManuallyExited && snapshotSessionId === null && latestSavedSessionId) {
+    if (
+      !hasManuallyExited &&
+      snapshotSessionId === null &&
+      latestSavedSessionId
+    ) {
       setSnapshotSessionId(latestSavedSessionId);
     }
   }, [latestSavedSessionId, snapshotSessionId, hasManuallyExited]);
@@ -554,53 +580,38 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
           onSelectPatient={handleSelectPatientWrapper}
         />
 
-        {/* Quick actions section removed - all actions now in MacOSDock only */}
-
-        {/* Snapshot banner */}
-        {isSnapshotMode && (
-          <Alert variant="info" className="mb-4 flex items-center justify-between">
-            <div>
-              <div className="font-semibold">
-                Modo histórico: sesión #{snapshotSessionOrdinal ?? "?"}
-              </div>
-              <div className="text-sm text-[hsl(var(--muted-foreground))]">
-                Vista solo lectura. Los campos están deshabilitados hasta salir.
-              </div>
+        {/* Historical Mode Container */}
+        <div className={isSnapshotMode ? "historical-mode" : ""}>
+          {/* Patient data */}
+          <Section
+            title="Datos del Paciente"
+            icon={<User size={20} />}
+            right={
+              hasAllergy && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg sticky top-4 z-40">
+                  <AlertTriangle size={20} className="animate-pulse" />
+                  ALERGIA
+                </div>
+              )
+            }
+          >
+            <div className={isSnapshotMode ? "pointer-events-none" : ""}>
+              <PatientForm
+                value={patient}
+                onChange={setPatient}
+                showSummaryOnly={showPatientSummaryOnly}
+                onEditSummary={() => setIsEditingPatient(true)}
+              />
+              {!hasPatientData && (
+                <Alert variant="warning" className="mt-4">
+                  Por favor completa al menos el nombre y cédula del paciente
+                  para poder guardar.
+                </Alert>
+              )}
             </div>
-          </Alert>
-        )}
+          </Section>
 
-        {/* Patient data */}
-        <Section
-          title="Datos del Paciente"
-          icon={<User size={20} />}
-          right={
-            hasAllergy && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg sticky top-4 z-40">
-                <AlertTriangle size={20} className="animate-pulse" />
-                ALERGIA
-              </div>
-            )
-          }
-        >
-        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-          <PatientForm
-            value={patient}
-            onChange={setPatient}
-            showSummaryOnly={showPatientSummaryOnly}
-            onEditSummary={() => setIsEditingPatient(true)}
-          />
-          {!hasPatientData && (
-            <Alert variant="warning" className="mt-4">
-              Por favor completa al menos el nombre y cédula del paciente para
-              poder guardar.
-            </Alert>
-          )}
-        </div>
-      </Section>
-
-      {/* Odontogram */}
-      <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
+          {/* Odontogram */}
           <OdontogramDiagnosisSection
             toothDx={toothDx}
             onToothDxChange={handleToothDxChange}
@@ -614,78 +625,308 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             lastSavedSession={latestSavedSession}
             lastSavedOrdinal={latestSavedSessionOrdinal}
           />
-      </div>
-      {/* Sessions */}
-      <Section
-        title="Evolución y Procedimientos"
-        icon={<Activity size={20} />}
-      >
-        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-          <SessionsTable
-            sessions={sessionsToRender}
-            onSessionsChange={isSnapshotMode ? () => {} : setSessions}
-            procedureTemplates={procedureTemplates}
-            onUpdateTemplates={updateProcedureTemplates}
-            signers={signers}
-            onSignersChange={reloadSigners}
-            reasonTypes={reasonTypes}
-            paymentMethods={paymentMethods}
-            onReasonTypesChange={handleReasonTypesChange}
-            onCreateSession={handleCreateDraftSession}
-            activeId={activeSessionId}
-            onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
-            onViewReadOnly={handleOpenSnapshot}
-          />
-        </div>
-      </Section>
-
-      {/* Financial history */}
-      {(() => {
-        const savedSessions = sessionsToRender.filter(
-          (s) => s.session.is_saved === true,
-        );
-
-        return patient.id && savedSessions.length > 0 ? (
-          <Section icon={<Wallet size={20} />} title="Historial Financiero">
-            <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-              <FinancialHistoryBlock
-                sessions={savedSessions}
-                onQuickPayment={() => {
-                  if (isSnapshotMode) return;
-                  setQuickPaymentOpen(true);
-                }}
-              />
-            </div>
+          {/* Sessions */}
+          <Section
+            title="Evolución y Procedimientos"
+            icon={<Activity size={20} />}
+          >
+            <SessionsTable
+              sessions={sessionsToRender}
+              onSessionsChange={isSnapshotMode ? () => {} : setSessions}
+              procedureTemplates={procedureTemplates}
+              onUpdateTemplates={updateProcedureTemplates}
+              signers={signers}
+              onSignersChange={reloadSigners}
+              reasonTypes={reasonTypes}
+              paymentMethods={paymentMethods}
+              onReasonTypesChange={handleReasonTypesChange}
+              onCreateSession={handleCreateDraftSession}
+              activeId={activeSessionId}
+              onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
+              onViewReadOnly={handleOpenSnapshot}
+              isSnapshotMode={isSnapshotMode}
+            />
           </Section>
-        ) : null;
-      })()}
 
-        {/* Quick Payment Modal */}
+          {/* Financial history */}
+          {(() => {
+            const savedSessions = sessionsToRender.filter(
+              (s) => s.session.is_saved === true,
+            );
+
+            return patient.id && savedSessions.length > 0 ? (
+              <Section icon={<Wallet size={20} />} title="Historial Financiero">
+                <div className={isSnapshotMode ? "pointer-events-none" : ""}>
+                  <FinancialHistoryBlock
+                    sessions={savedSessions}
+                    onQuickPayment={() => {
+                      if (isSnapshotMode) return;
+                      setQuickPaymentOpen(true);
+                    }}
+                  />
+                </div>
+              </Section>
+            ) : null;
+          })()}
+
+          {/* Quick Payment Modal */}
+          {patient.id && (
+            <QuickPaymentModal
+              open={quickPaymentOpen}
+              onOpenChange={setQuickPaymentOpen}
+              patientId={patient.id}
+              paymentMethods={paymentMethods}
+              onSave={handleQuickPaymentWrapper}
+            />
+          )}
+
+          {/* Attachments */}
+          <Section
+            title="Adjuntos (Radiografías, Fotos, Documentos)"
+            icon={<Paperclip size={20} />}
+          >
+            <Attachments
+              files={attachments}
+              onFilesChange={isSnapshotMode ? () => {} : setAttachments}
+              onFileDelete={
+                isSnapshotMode
+                  ? () => Promise.resolve()
+                  : handleDeleteAttachment
+              }
+              patientName={patient.full_name}
+              defaultSessionId={activeSavedSessionId}
+              readOnly={isSnapshotMode}
+            />
+          </Section>
+
+          {/* Action buttons removed - all actions now via MacOSDock only */}
+
+          {/* macOS Dock */}
+          <MacOSDock
+            visible={!quickPaymentOpen}
+            onNewRecord={handleNewWrapper}
+            onSearch={() => setSearchDialogOpen(true)}
+            onNewSession={handleNewSessionFromDock}
+            onPrint={handlePreview}
+            onDownloadPDF={handleDownloadPDF}
+            onSave={handleSaveWrapper}
+            onPendingPayments={() => setPaymentsDialogOpen(true)}
+            hasChanges={hasAnyChanges}
+            changesCount={changesCount}
+            saveDisabled={!canSave}
+            isSnapshotMode={isSnapshotMode}
+          />
+
+          {/* Print Template - Hidden, only visible when printing */}
+          {printSessionData && patient.id && (
+            <PrintTemplate
+              patient={patient}
+              session={printSessionData.session}
+              sessionItems={printSessionData.items}
+              doctorProfile={doctorProfile}
+            />
+          )}
+        </div>
+        {/* End Historical Mode Container */}
+
+        {/* Historical Sessions Sidebar (Timeline) */}
         {patient.id && (
-          <QuickPaymentModal
-            open={quickPaymentOpen}
-            onOpenChange={setQuickPaymentOpen}
-            patientId={patient.id}
-            paymentMethods={paymentMethods}
-            onSave={handleQuickPaymentWrapper}
+          <HistoricalSessionsSidebar
+            isOpen={isTimelineSidebarOpen}
+            onClose={() => setIsTimelineSidebarOpen(false)}
+            sessions={sessions}
+            currentSnapshotId={snapshotSessionId}
+            onSelectSession={handleOpenSnapshot}
           />
         )}
+      </>
+    );
+  }
 
-      {/* Attachments */}
-      <Section
-        title="Adjuntos (Radiografías, Fotos, Documentos)"
-        icon={<Paperclip size={20} />}
-      >
-        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-          <Attachments
-            files={attachments}
-            onFilesChange={isSnapshotMode ? () => {} : setAttachments}
-            onFileDelete={isSnapshotMode ? () => Promise.resolve() : handleDeleteAttachment}
-            patientName={patient.full_name}
-            defaultSessionId={activeSavedSessionId}
-          />
-        </div>
-      </Section>
+  // Render tabbed layout
+  return (
+    <>
+      {/* Dialogs */}
+      <PatientSearchDialog
+        open={searchDialogOpen}
+        onOpenChange={setSearchDialogOpen}
+        patients={patientsForDialogs}
+        onSelectPatient={handleSelectPatientWrapper}
+      />
+      <PendingPaymentsDialog
+        open={paymentsDialogOpen}
+        onOpenChange={setPaymentsDialogOpen}
+        onSelectPatient={handleSelectPatientWrapper}
+      />
+
+      {/* Historical Mode Container */}
+      <div className={isSnapshotMode ? "historical-mode" : ""}>
+        {/* Patient data or card */}
+        <Section
+          title="Datos del Paciente"
+          icon={<User size={20} />}
+          right={
+            hasAllergy && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg">
+                <AlertTriangle size={20} className="animate-pulse" />
+                ALERGIA
+              </div>
+            )
+          }
+        >
+          <div className={isSnapshotMode ? "pointer-events-none" : ""}>
+            {/* Always show PatientForm for consistency with vertical layout */}
+            <PatientForm
+              value={patient}
+              onChange={setPatient}
+              showSummaryOnly={showPatientSummaryOnly}
+              onEditSummary={() => setIsEditingPatient(true)}
+            />
+            {!hasPatientData && (
+              <Alert variant="warning" className="mt-4">
+                Por favor completa al menos el nombre y cédula del paciente para
+                poder guardar.
+              </Alert>
+            )}
+          </div>
+        </Section>
+
+        {/* Tabs system */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="w-full justify-start mb-6 bg-[hsl(var(--surface))] p-2">
+            <TabsTrigger value="odontogram" className="flex items-center gap-2">
+              <Activity size={18} />
+              Odontograma
+            </TabsTrigger>
+            <TabsTrigger value="procedures" className="flex items-center gap-2">
+              <Stethoscope size={18} />
+              Procedimientos
+            </TabsTrigger>
+            <TabsTrigger value="financial" className="flex items-center gap-2">
+              <Wallet size={18} />
+              Historial Financiero
+            </TabsTrigger>
+            <TabsTrigger
+              value="attachments"
+              className="flex items-center gap-2"
+            >
+              <Paperclip size={18} />
+              Adjuntos
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tab 1: Odontogram + Diagnosis */}
+          <TabsContent value="odontogram">
+            <OdontogramDiagnosisSection
+              toothDx={toothDx}
+              onToothDxChange={handleToothDxChange}
+              diagnosisFromTeeth={diagnosisFromTeeth}
+              manualDiagnosis={manualDiagnosis}
+              onManualDiagnosisChange={handleManualDiagnosisChange}
+              readOnly={isSnapshotMode}
+              activeSessionId={odontogramActiveSessionId}
+              sessions={odontogramSessions}
+              onSessionChange={handleOdontogramSessionChange}
+              lastSavedSession={latestSavedSession}
+              lastSavedOrdinal={latestSavedSessionOrdinal}
+            />
+          </TabsContent>
+
+          {/* Tab 2: Sessions */}
+          <TabsContent value="procedures">
+            <Section
+              title="Evolución y Procedimientos"
+              icon={<Activity size={20} />}
+            >
+              <SessionsTable
+                sessions={sessionsToRender}
+                onSessionsChange={isSnapshotMode ? () => {} : setSessions}
+                procedureTemplates={procedureTemplates}
+                onUpdateTemplates={updateProcedureTemplates}
+                signers={signers}
+                onSignersChange={reloadSigners}
+                reasonTypes={reasonTypes}
+                paymentMethods={paymentMethods}
+                onReasonTypesChange={handleReasonTypesChange}
+                onCreateSession={handleCreateDraftSession}
+                activeId={activeSessionId}
+                onOpenSession={
+                  isSnapshotMode ? undefined : handleSessionChange
+                }
+                onViewReadOnly={handleOpenSnapshot}
+                isSnapshotMode={isSnapshotMode}
+              />
+            </Section>
+          </TabsContent>
+
+          {/* Tab 3: Financial history */}
+          <TabsContent value="financial">
+            {(() => {
+              const savedSessions = sessionsToRender.filter(
+                (s) => s.session.is_saved === true,
+              );
+
+              return patient.id && savedSessions.length > 0 ? (
+                <Section
+                  icon={<Wallet size={20} />}
+                  title="Historial Financiero"
+                >
+                  <div className={isSnapshotMode ? "pointer-events-none" : ""}>
+                    <FinancialHistoryBlock
+                      sessions={savedSessions}
+                      onQuickPayment={() => {
+                        if (isSnapshotMode) return;
+                        setQuickPaymentOpen(true);
+                      }}
+                    />
+                  </div>
+                </Section>
+              ) : (
+                <Section
+                  icon={<Wallet size={20} />}
+                  title="Historial Financiero"
+                >
+                  <Alert variant="info">
+                    No hay historial financiero disponible. Guarda al menos una
+                    sesión para ver el historial.
+                  </Alert>
+                </Section>
+              );
+            })()}
+
+            {/* Quick Payment Modal */}
+            {patient.id && (
+              <QuickPaymentModal
+                open={quickPaymentOpen}
+                onOpenChange={setQuickPaymentOpen}
+                patientId={patient.id}
+                paymentMethods={paymentMethods}
+                onSave={handleQuickPaymentWrapper}
+              />
+            )}
+          </TabsContent>
+
+          {/* Tab 4: Attachments */}
+          <TabsContent value="attachments">
+            <Section
+              title="Adjuntos (Radiografías, Fotos, Documentos)"
+              icon={<Paperclip size={20} />}
+            >
+              <Attachments
+                files={attachments}
+                onFilesChange={isSnapshotMode ? () => {} : setAttachments}
+                onFileDelete={
+                  isSnapshotMode
+                    ? () => Promise.resolve()
+                    : handleDeleteAttachment
+                }
+                patientName={patient.full_name}
+                defaultSessionId={activeSavedSessionId}
+                readOnly={isSnapshotMode}
+              />
+            </Section>
+          </TabsContent>
+        </Tabs>
 
         {/* Action buttons removed - all actions now via MacOSDock only */}
 
@@ -714,223 +955,17 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             doctorProfile={doctorProfile}
           />
         )}
-      </>
-    );
-  }
+      </div>
+      {/* End Historical Mode Container */}
 
-  // Render tabbed layout
-  return (
-    <>
-      {/* Dialogs */}
-      <PatientSearchDialog
-        open={searchDialogOpen}
-        onOpenChange={setSearchDialogOpen}
-        patients={patientsForDialogs}
-        onSelectPatient={handleSelectPatientWrapper}
-      />
-      <PendingPaymentsDialog
-        open={paymentsDialogOpen}
-        onOpenChange={setPaymentsDialogOpen}
-        onSelectPatient={handleSelectPatientWrapper}
-      />
-
-      {/* Quick actions section removed - all actions now in MacOSDock only */}
-
-      {/* Snapshot banner */}
-      {isSnapshotMode && (
-        <Alert variant="info" className="mb-4 flex items-center justify-between">
-          <div>
-            <div className="font-semibold">
-              Modo histórico: sesión #{snapshotSessionOrdinal ?? "?"}
-            </div>
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">
-              Vista solo lectura. Los campos están deshabilitados hasta salir.
-            </div>
-          </div>
-        </Alert>
-      )}
-
-      {/* Patient data or card */}
-      <Section
-        title="Datos del Paciente"
-        icon={<User size={20} />}
-        right={
-          hasAllergy && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full text-base font-bold shadow-lg">
-              <AlertTriangle size={20} className="animate-pulse" />
-              ALERGIA
-            </div>
-          )
-        }
-      >
-        <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-          {/* Always show PatientForm for consistency with vertical layout */}
-          <PatientForm
-            value={patient}
-            onChange={setPatient}
-            showSummaryOnly={showPatientSummaryOnly}
-            onEditSummary={() => setIsEditingPatient(true)}
-          />
-          {!hasPatientData && (
-            <Alert variant="warning" className="mt-4">
-              Por favor completa al menos el nombre y cédula del paciente para
-              poder guardar.
-            </Alert>
-          )}
-        </div>
-      </Section>
-
-      {/* Tabs system */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start mb-6 bg-[hsl(var(--surface))] p-2">
-          <TabsTrigger value="odontogram" className="flex items-center gap-2">
-            <Activity size={18} />
-            Odontograma
-          </TabsTrigger>
-          <TabsTrigger value="procedures" className="flex items-center gap-2">
-            <Stethoscope size={18} />
-            Procedimientos
-          </TabsTrigger>
-          <TabsTrigger value="financial" className="flex items-center gap-2">
-            <Wallet size={18} />
-            Historial Financiero
-          </TabsTrigger>
-          <TabsTrigger value="attachments" className="flex items-center gap-2">
-            <Paperclip size={18} />
-            Adjuntos
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Tab 1: Odontogram + Diagnosis */}
-        <TabsContent value="odontogram">
-          <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-            <OdontogramDiagnosisSection
-              toothDx={toothDx}
-              onToothDxChange={handleToothDxChange}
-              diagnosisFromTeeth={diagnosisFromTeeth}
-              manualDiagnosis={manualDiagnosis}
-              onManualDiagnosisChange={handleManualDiagnosisChange}
-              readOnly={isSnapshotMode}
-              activeSessionId={odontogramActiveSessionId}
-              sessions={odontogramSessions}
-              onSessionChange={handleOdontogramSessionChange}
-              lastSavedSession={latestSavedSession}
-              lastSavedOrdinal={latestSavedSessionOrdinal}
-            />
-          </div>
-        </TabsContent>
-
-        {/* Tab 2: Sessions */}
-        <TabsContent value="procedures">
-          <Section
-            title="Evolución y Procedimientos"
-            icon={<Activity size={20} />}
-          >
-            <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-              <SessionsTable
-                sessions={sessionsToRender}
-                onSessionsChange={isSnapshotMode ? () => {} : setSessions}
-                procedureTemplates={procedureTemplates}
-                onUpdateTemplates={updateProcedureTemplates}
-                signers={signers}
-                onSignersChange={reloadSigners}
-                reasonTypes={reasonTypes}
-                paymentMethods={paymentMethods}
-                onReasonTypesChange={handleReasonTypesChange}
-                onCreateSession={handleCreateDraftSession}
-                activeId={activeSessionId}
-                onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
-                onViewReadOnly={handleOpenSnapshot}
-              />
-            </div>
-          </Section>
-        </TabsContent>
-
-        {/* Tab 3: Financial history */}
-        <TabsContent value="financial">
-          {(() => {
-            const savedSessions = sessionsToRender.filter(
-              (s) => s.session.is_saved === true,
-            );
-
-            return patient.id && savedSessions.length > 0 ? (
-              <Section icon={<Wallet size={20} />} title="Historial Financiero">
-                <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-                  <FinancialHistoryBlock
-                    sessions={savedSessions}
-                    onQuickPayment={() => {
-                      if (isSnapshotMode) return;
-                      setQuickPaymentOpen(true);
-                    }}
-                  />
-                </div>
-              </Section>
-            ) : (
-              <Section icon={<Wallet size={20} />} title="Historial Financiero">
-                <Alert variant="info">
-                  No hay historial financiero disponible. Guarda al menos una
-                  sesión para ver el historial.
-                </Alert>
-              </Section>
-            );
-          })()}
-
-          {/* Quick Payment Modal */}
-          {patient.id && (
-            <QuickPaymentModal
-              open={quickPaymentOpen}
-              onOpenChange={setQuickPaymentOpen}
-              patientId={patient.id}
-              paymentMethods={paymentMethods}
-              onSave={handleQuickPaymentWrapper}
-            />
-          )}
-        </TabsContent>
-
-        {/* Tab 4: Attachments */}
-        <TabsContent value="attachments">
-          <Section
-            title="Adjuntos (Radiografías, Fotos, Documentos)"
-            icon={<Paperclip size={20} />}
-          >
-            <div className={isSnapshotMode ? "pointer-events-none opacity-70 grayscale" : ""}>
-              <Attachments
-                files={attachments}
-                onFilesChange={isSnapshotMode ? () => {} : setAttachments}
-                onFileDelete={isSnapshotMode ? () => Promise.resolve() : handleDeleteAttachment}
-                patientName={patient.full_name}
-                defaultSessionId={activeSavedSessionId}
-              />
-            </div>
-          </Section>
-        </TabsContent>
-      </Tabs>
-
-      {/* Action buttons removed - all actions now via MacOSDock only */}
-
-      {/* macOS Dock */}
-      <MacOSDock
-        visible={!quickPaymentOpen}
-        onNewRecord={handleNewWrapper}
-        onSearch={() => setSearchDialogOpen(true)}
-        onNewSession={handleNewSessionFromDock}
-        onPrint={handlePreview}
-        onDownloadPDF={handleDownloadPDF}
-        onSave={handleSaveWrapper}
-        onPendingPayments={() => setPaymentsDialogOpen(true)}
-        hasChanges={hasAnyChanges}
-        changesCount={changesCount}
-        saveDisabled={!canSave}
-        isSnapshotMode={isSnapshotMode}
-      />
-
-      {/* Print Template - Hidden, only visible when printing */}
-      {printSessionData && patient.id && (
-        <PrintTemplate
-          patient={patient}
-          session={printSessionData.session}
-          sessionItems={printSessionData.items}
-          doctorProfile={doctorProfile}
+      {/* Historical Sessions Sidebar (Timeline) */}
+      {patient.id && (
+        <HistoricalSessionsSidebar
+          isOpen={isTimelineSidebarOpen}
+          onClose={() => setIsTimelineSidebarOpen(false)}
+          sessions={sessions}
+          currentSnapshotId={snapshotSessionId}
+          onSelectSession={handleOpenSnapshot}
         />
       )}
     </>
