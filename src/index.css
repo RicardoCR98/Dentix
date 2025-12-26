@@ -1180,14 +1180,20 @@
 }
 
 /* Historical mode inputs (disabled appearance but readable) */
-.historical-mode input,
-.historical-mode textarea,
-.historical-mode select {
+/* Exclude tabs from blocking */
+.historical-mode input:not([role="tab"]),
+.historical-mode textarea:not([role="tab"]),
+.historical-mode select:not([role="tab"]) {
     background: hsl(var(--historical-surface) / 0.5) !important;
     border-color: hsl(var(--historical-border) / 0.5) !important;
     color: hsl(var(--foreground) / var(--historical-text-opacity)) !important;
     cursor: not-allowed !important;
     pointer-events: none !important;
+}
+
+/* Don't block tab-related buttons */
+.historical-mode button:not([role="tab"]):not([aria-label*="Ver"]):not([title*="Ver"]):not([title*="Vista previa"]):not([title*="Expandir"]):not([title*="Contraer"]) {
+    /* General buttons blocked by specific rules below */
 }
 
 /* Historical mode buttons - hide edit actions, show only view actions */
@@ -1200,6 +1206,48 @@
 }
 
 /* Allow specific interactions in historical mode */
+
+/* Allow ALL tabs to be fully interactive (highest priority) */
+.historical-mode [role="tablist"],
+.historical-mode [role="tablist"] *,
+.historical-mode [role="tab"],
+.historical-mode button[role="tab"],
+.historical-mode [data-state="active"],
+.historical-mode [data-state="inactive"],
+.historical-mode [role="tabpanel"] [role="tablist"],
+.historical-mode [role="tabpanel"] [role="tablist"] *,
+.historical-mode .card [role="tablist"],
+.historical-mode .card [role="tablist"] *,
+.historical-mode .card [role="tab"] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+
+/* Specifically enable tabs in Attachments and Odontogram sections */
+.historical-mode [role="tablist"] button,
+.historical-mode [data-radix-collection-item] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+
+/* Override any blocking on tab elements - highest priority */
+/* These rules have higher specificity than .card button rules */
+.historical-mode .card button[role="tab"],
+.historical-mode .card button[role="tab"] *,
+.historical-mode .card [role="tablist"] button,
+.historical-mode .card [role="tablist"] button *,
+.historical-mode .card [data-radix-tabs-trigger],
+.historical-mode button[role="tab"]:not([class*="delete"]):not([class*="save"]):not([class*="edit"]):not([class*="add"]),
+.historical-mode button[role="tab"] *,
+.historical-mode [role="tablist"] > *,
+.historical-mode [data-radix-tabs-trigger] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+
 /* Allow eye buttons (view/preview) */
 .historical-mode button[title*="Vista previa"],
 .historical-mode button[title*="Ver"],
@@ -1208,14 +1256,6 @@
     pointer-events: auto !important;
     cursor: pointer !important;
     opacity: 1 !important;
-}
-
-/* Allow tabs to be clickable */
-.historical-mode [role="tab"],
-.historical-mode [data-state="active"],
-.historical-mode [data-state="inactive"] {
-    pointer-events: auto !important;
-    cursor: pointer !important;
 }
 
 /* Allow expand/collapse buttons (chevrons) */
@@ -1228,7 +1268,7 @@
 }
 
 /* Disable most other interactions in cards */
-.historical-mode .card button:not([title*="Ver"]):not([title*="Vista previa"]):not([title*="Expandir"]):not([title*="Contraer"]),
+.historical-mode .card button:not([role="tab"]):not([title*="Ver"]):not([title*="Vista previa"]):not([title*="Expandir"]):not([title*="Contraer"]),
 .historical-mode .card input:not([type="hidden"]),
 .historical-mode .card textarea,
 .historical-mode .card select {
