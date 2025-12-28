@@ -15,6 +15,7 @@ import type {
   ReasonType,
   PaymentMethod,
 } from "../../lib/types";
+import type { TemplateContext } from "../../lib/templates/templateProcessor";
 
 interface SessionsTableProps {
   sessions: VisitWithProcedures[];
@@ -38,6 +39,7 @@ interface SessionsTableProps {
   onOpenSession?: (sessionId: number) => void;
   onViewReadOnly?: (sessionId: number, visitId?: number) => void;
   isSnapshotMode?: boolean;
+  templateContext?: TemplateContext;
 }
 
 const SessionsTable = memo(function SessionsTable({
@@ -56,6 +58,7 @@ const SessionsTable = memo(function SessionsTable({
   onOpenSession,
   onViewReadOnly,
   isSnapshotMode = false,
+  templateContext,
 }: SessionsTableProps) {
   // Estado interno para IDs expandidos (múltiples cards pueden estar expandidas)
   // In snapshot mode, start with all cards collapsed
@@ -619,6 +622,7 @@ const SessionsTable = memo(function SessionsTable({
                   onProcedureRemove={(itemIdx) =>
                     removeProcedure(idxReal, itemIdx)
                   }
+                  templateContext={templateContext}
                 />
               );
             })}

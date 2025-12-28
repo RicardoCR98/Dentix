@@ -8,6 +8,7 @@ import type {
   PaymentMethod,
   Session,
   SessionWithItems,
+  TextTemplate,
 } from "../types";
 
 /** Fila reducida para listar sesiones de un paciente (histórico) */
@@ -827,8 +828,12 @@ export class TauriSqliteRepository {
   }
 
   async deleteReasonType(id: number): Promise<void> {
-    console.warn("deleteReasonType: Not implemented in Rust backend yet");
-    throw new Error("deleteReasonType not implemented yet");
+    try {
+      await invoke("delete_reason_type", { id });
+    } catch (error) {
+      console.error("Error en deleteReasonType:", error);
+      throw error;
+    }
   }
 
   async deleteSetting(key: string): Promise<void> {
@@ -935,6 +940,71 @@ export class TauriSqliteRepository {
       });
     } catch (error) {
       console.error("Error marking patient contacted:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // TEXT TEMPLATES OPERATIONS
+  // ============================================================================
+
+  async getTextTemplatesByKind(kind: string): Promise<TextTemplate[]> {
+    try {
+      return await invoke<TextTemplate[]>("get_text_templates_by_kind", {
+        kind,
+      });
+    } catch (error) {
+      console.error("Error getting text templates:", error);
+      throw error;
+    }
+  }
+
+  async updateTextTemplate(
+    id: number,
+    body: string,
+  ): Promise<void> {
+    try {
+      await invoke("update_text_template", {
+        id,
+        body,
+      });
+    } catch (error) {
+      console.error("Error updating text template:", error);
+      throw error;
+    }
+  }
+
+  async createTextTemplate(
+    kind: string,
+    title: string,
+    body: string,
+  ): Promise<number> {
+    try {
+      return await invoke<number>("create_text_template", {
+        kind,
+        title,
+        body,
+      });
+    } catch (error) {
+      console.error("Error creating text template:", error);
+      throw error;
+    }
+  }
+
+  async deleteTextTemplate(id: number): Promise<void> {
+    try {
+      await invoke("delete_text_template", { id });
+    } catch (error) {
+      console.error("Error deleting text template:", error);
+      throw error;
+    }
+  }
+
+  async cleanDuplicateTemplates(): Promise<number> {
+    try {
+      return await invoke<number>("clean_duplicate_templates");
+    } catch (error) {
+      console.error("Error cleaning duplicate templates:", error);
       throw error;
     }
   }

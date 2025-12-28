@@ -30,6 +30,7 @@ import type {
   PaymentMethod,
 } from "../../lib/types";
 import { DebouncedReasonTextarea } from "./DebouncedReasonTextarea";
+import type { TemplateContext } from "../../lib/templates/templateProcessor";
 
 interface SessionCardProps {
   session: SessionWithItems;
@@ -73,6 +74,8 @@ interface SessionCardProps {
   onProcedureQtyChange: (itemIdx: number, value: string) => void;
   onProcedureActiveChange: (itemIdx: number, value: boolean) => void;
   onProcedureRemove: (itemIdx: number) => void;
+
+  templateContext?: TemplateContext;
 }
 
 export const SessionCard = memo(
@@ -115,6 +118,8 @@ export const SessionCard = memo(
     onProcedureQtyChange,
     onProcedureActiveChange,
     onProcedureRemove,
+
+    templateContext,
   }: SessionCardProps) => {
     const activeProcs = session.items.filter((it) => it.quantity > 0);
 
@@ -207,15 +212,6 @@ export const SessionCard = memo(
 
               {/* Metadata badges */}
               <div className="flex flex-wrap items-center gap-2 mt-3">
-                {session.session.clinical_notes && (
-                  <Badge
-                    variant="info"
-                    className="rounded-full px-2.5 py-0.5 text-[10px] font-medium"
-                  >
-                    Pieza {session.session.clinical_notes}
-                  </Badge>
-                )}
-
                 {session.session.signer && (
                   <Badge
                     variant="default"
@@ -342,6 +338,7 @@ export const SessionCard = memo(
                       value={session.session.reason_detail || ""}
                       onChange={onReasonDetailChange}
                       disabled={!isEditable}
+                      templateContext={templateContext}
                     />
                   </div>
                 </div>
@@ -457,6 +454,7 @@ export const SessionCard = memo(
                           onPaymentChange={onPaymentChange}
                           onPaymentMethodChange={onPaymentMethodChange}
                           onPaymentNotesChange={onPaymentNotesChange}
+                          templateContext={templateContext}
                         />
                       )}
 
@@ -500,6 +498,7 @@ export const SessionCard = memo(
                                 value={session.session.clinical_notes || ""}
                                 onChange={onClinicalNotesChange}
                                 disabled={!isEditable}
+                                templateContext={templateContext}
                               />
                             </div>
                           </div>

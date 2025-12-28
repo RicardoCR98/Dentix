@@ -1217,6 +1217,30 @@ pub async fn save_diagnosis_options(
 ) -> Result<(), String> {
     let pool = db_pool.0.lock().await;
 
+    // Obtener IDs actuales en la base de datos
+    let current_ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM diagnosis_options")
+        .fetch_all(&*pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Obtener IDs que queremos mantener
+    let keep_ids: Vec<i64> = options
+        .iter()
+        .filter_map(|opt| opt.id.map(|id| id as i64))
+        .collect();
+
+    // Eliminar opciones que ya no están en la lista
+    for id in current_ids {
+        if !keep_ids.contains(&id) {
+            sqlx::query("DELETE FROM diagnosis_options WHERE id = ?1")
+                .bind(id)
+                .execute(&*pool)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    // Actualizar o insertar las opciones restantes
     for option in options {
         if let Some(id) = option.id {
             sqlx::query(
@@ -1373,6 +1397,22 @@ pub async fn create_reason_type(
     .map_err(|e| e.to_string())?;
 
     Ok(result.last_insert_rowid())
+}
+
+#[tauri::command]
+pub async fn delete_reason_type(
+    db_pool: State<'_, DbPool>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    sqlx::query("DELETE FROM reason_types WHERE id = ?1")
+        .bind(id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 // =========================
@@ -2231,4 +2271,147 @@ pub async fn generate_pdf_with_dialog(
     Ok(GeneratePdfResponse {
         file_path: file_path.to_string_lossy().to_string(),
     })
+}
+
+// ============================================================================
+// TEXT TEMPLATES
+// ============================================================================
+
+#[derive(serde::Serialize)]
+pub struct TextTemplate {
+    pub id: i64,
+    pub kind: String,
+    pub title: String,
+    pub body: String,
+    pub tags: Option<String>,
+    pub source: String,
+    pub is_favorite: i64,
+    pub active: i64,
+    pub sort_order: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[tauri::command]
+pub async fn get_text_templates_by_kind(
+    db_pool: State<'_, DbPool>,
+    kind: String,
+) -> Result<Vec<TextTemplate>, String> {
+    let pool = db_pool.0.lock().await;
+
+    let rows = sqlx::query(
+        "SELECT id, kind, title, body, tags, source, is_favorite, active, sort_order, created_at, updated_at
+         FROM text_templates
+         WHERE kind = ? AND active = 1
+         ORDER BY sort_order ASC"
+    )
+    .bind(&kind)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    let templates: Vec<TextTemplate> = rows
+        .iter()
+        .map(|row| TextTemplate {
+            id: row.get("id"),
+            kind: row.get("kind"),
+            title: row.get("title"),
+            body: row.get("body"),
+            tags: row.get("tags"),
+            source: row.get("source"),
+            is_favorite: row.get("is_favorite"),
+            active: row.get("active"),
+            sort_order: row.get("sort_order"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+        .collect();
+
+    Ok(templates)
+}
+
+#[tauri::command]
+pub async fn update_text_template(
+    db_pool: State<'_, DbPool>,
+    id: i64,
+    body: String,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    sqlx::query(
+        "UPDATE text_templates
+         SET body = ?
+         WHERE id = ?"
+    )
+    .bind(&body)
+    .bind(id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to update template: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clean_duplicate_templates(
+    db_pool: State<'_, DbPool>,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+
+    // Delete duplicates, keeping only the one with the lowest ID for each (kind, title) pair
+    let result = sqlx::query(
+        "DELETE FROM text_templates
+         WHERE id NOT IN (
+             SELECT MIN(id)
+             FROM text_templates
+             GROUP BY kind, title
+         )"
+    )
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to clean duplicates: {}", e))?;
+
+    Ok(result.rows_affected() as i64)
+}
+
+#[tauri::command]
+pub async fn create_text_template(
+    db_pool: State<'_, DbPool>,
+    kind: String,
+    title: String,
+    body: String,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+
+    let result = sqlx::query(
+        "INSERT INTO text_templates (kind, title, body, source, active)
+         VALUES (?, ?, ?, 'user', 1)"
+    )
+    .bind(&kind)
+    .bind(&title)
+    .bind(&body)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to create template: {}", e))?;
+
+    Ok(result.last_insert_rowid())
+}
+
+#[tauri::command]
+pub async fn delete_text_template(
+    db_pool: State<'_, DbPool>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    sqlx::query(
+        "DELETE FROM text_templates
+         WHERE id = ?"
+    )
+    .bind(id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to delete template: {}", e))?;
+
+    Ok(())
 }

@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "../../lib/cn";
+import { useDockVisibility } from "../../contexts/DockVisibilityContext";
 
 interface DialogProps {
   open: boolean;
@@ -23,6 +24,22 @@ export function Dialog({
   spotlight = false,
 }: DialogProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const { hideForModal, showAfterModal } = useDockVisibility();
+
+  // Notify dock visibility context when modal opens/closes
+  useEffect(() => {
+    if (open) {
+      hideForModal();
+    } else {
+      showAfterModal();
+    }
+
+    return () => {
+      if (open) {
+        showAfterModal();
+      }
+    };
+  }, [open, hideForModal, showAfterModal]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

@@ -9,6 +9,7 @@ import PendingPaymentsDialog from "../components/PendingPaymentsDialog";
 import { MacOSDock } from "../components/MacOSDock";
 import { Button } from "../components/ui/Button";
 import { Alert } from "../components/ui/Alert";
+import { useDockVisibility } from "../contexts/DockVisibilityContext";
 import {
   Tabs,
   TabsList,
@@ -127,6 +128,12 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   });
 
   // Quick actions visibility removed - using MacOSDock only
+
+  // Get global dock visibility from context (hides for any modal across the app)
+  const { isDockVisible: isDockVisibleGlobal } = useDockVisibility();
+
+  // Calculate dock visibility - hide when any local modal/dialog is open OR global modals
+  const dockVisible = isDockVisibleGlobal && !searchDialogOpen && !paymentsDialogOpen && !quickPaymentOpen;
 
   // Calculate total changes for badge
   const changesCount =
@@ -289,6 +296,60 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
       }
     }
   }, [printSessionData, patient, doctorProfile, toast]);
+
+  // Build template context for text templates
+  const buildTemplateContext = useCallback((overrides?: Partial<{ tooth: string; procedure: string; amount: string }>) => {
+    const calculateAge = (dateOfBirth: string): number => {
+      const today = new Date();
+      const birthDate = new Date(dateOfBirth);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    const formatDate = (): string => {
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const year = today.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    const formatTime = (): string => {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    };
+
+    // Extraer primer diente seleccionado del odontograma (si existe)
+    const firstTooth = overrides?.tooth || (() => {
+      const teeth = Object.keys(toothDx).filter(t => toothDx[t] && toothDx[t].length > 0);
+      return teeth.length > 0 ? teeth.join(', ') : '';
+    })();
+
+    return {
+      patient: {
+        name: patient.full_name || '',
+        age: patient.date_of_birth ? calculateAge(patient.date_of_birth) : 0,
+        doc_id: patient.doc_id || '',
+        phone: patient.phone || '',
+      },
+      date: {
+        today: formatDate(),
+        time: formatTime(),
+      },
+      doctor: {
+        name: doctorProfile.name || '',
+      },
+      tooth: firstTooth,
+      procedure: overrides?.procedure,
+      amount: overrides?.amount,
+    };
+  }, [patient, doctorProfile, toothDx]);
 
   const handleSelectPatientWrapper = useCallback(
     async (selectedPatient: Patient) => {
@@ -624,6 +685,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             onSessionChange={handleOdontogramSessionChange}
             lastSavedSession={latestSavedSession}
             lastSavedOrdinal={latestSavedSessionOrdinal}
+            templateContext={buildTemplateContext()}
           />
           {/* Sessions */}
           <Section
@@ -645,6 +707,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
               onViewReadOnly={handleOpenSnapshot}
               isSnapshotMode={isSnapshotMode}
+              templateContext={buildTemplateContext()}
             />
           </Section>
 
@@ -703,7 +766,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
           {/* macOS Dock */}
           <MacOSDock
-            visible={!quickPaymentOpen}
+            visible={dockVisible}
             onNewRecord={handleNewWrapper}
             onSearch={() => setSearchDialogOpen(true)}
             onNewSession={handleNewSessionFromDock}
@@ -829,6 +892,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               onSessionChange={handleOdontogramSessionChange}
               lastSavedSession={latestSavedSession}
               lastSavedOrdinal={latestSavedSessionOrdinal}
+              templateContext={buildTemplateContext()}
             />
           </TabsContent>
 
@@ -855,6 +919,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
                 }
                 onViewReadOnly={handleOpenSnapshot}
                 isSnapshotMode={isSnapshotMode}
+                templateContext={buildTemplateContext()}
               />
             </Section>
           </TabsContent>
@@ -932,7 +997,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
 
         {/* macOS Dock */}
         <MacOSDock
-          visible={!quickPaymentOpen}
+          visible={dockVisible}
           onNewRecord={handleNewWrapper}
           onSearch={() => setSearchDialogOpen(true)}
           onNewSession={handleNewSessionFromDock}

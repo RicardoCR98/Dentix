@@ -1,18 +1,21 @@
 // src/components/sessions/ObservationsTextarea.tsx
-import { useState, useRef, useEffect, memo } from "react";
+import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { Textarea } from "../ui/Textarea";
+import { TemplateButton } from "../templates/TemplateButton";
+import type { TemplateContext } from "../../lib/templates/templateProcessor";
 
 interface ObservationsTextareaProps {
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
+  templateContext?: TemplateContext;
 }
 
 /**
  * Componente optimizado para el textarea de observaciones con debounce
  */
 export const ObservationsTextarea = memo(
-  ({ value, onChange, disabled }: ObservationsTextareaProps) => {
+  ({ value, onChange, disabled, templateContext }: ObservationsTextareaProps) => {
     const [localValue, setLocalValue] = useState(value);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -36,6 +39,14 @@ export const ObservationsTextarea = memo(
       }, 500);
     };
 
+    const handleTemplateInsert = useCallback(
+      (text: string) => {
+        setLocalValue(text);
+        onChange(text);
+      },
+      [onChange],
+    );
+
     // Limpiar timeout al desmontar
     useEffect(() => {
       return () => {
@@ -46,12 +57,23 @@ export const ObservationsTextarea = memo(
     }, []);
 
     return (
-      <Textarea
-        value={localValue}
-        onChange={handleChange}
-        placeholder="Notas adicionales sobre esta sesión..."
-        disabled={disabled}
-      />
+      <div className="relative">
+        <Textarea
+          value={localValue}
+          onChange={handleChange}
+          placeholder="Notas adicionales sobre esta sesión..."
+          disabled={disabled}
+          className="pr-10"
+        />
+        {!disabled && templateContext && (
+          <TemplateButton
+            kind="clinical_notes"
+            onInsert={handleTemplateInsert}
+            context={templateContext}
+            className="absolute top-2 right-2"
+          />
+        )}
+      </div>
     );
   },
 );

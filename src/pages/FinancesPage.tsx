@@ -36,8 +36,9 @@ import {
   DropdownMenuItem,
 } from "../components/ui/DropdownMenu";
 import { QuickPaymentModal } from "../components/QuickPaymentModal";
+import { WhatsAppPreviewModal } from "../components/WhatsAppPreviewModal";
 import { cn } from "../lib/cn";
-import type { PatientDebtSummary } from "../lib/types";
+import type { PatientDebtSummary, TextTemplate } from "../lib/types";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogFooter } from "../components/ui/Dialog";
 import { useMasterData } from "../hooks/useMasterData";
@@ -60,7 +61,12 @@ export function FinancesPage() {
     { id: "days_overdue", desc: true },
   ]);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [patientToArchive, setPatientToArchive] = useState<PatientDebtSummary | null>(null);
+  const [patientToArchive, setPatientToArchive] =
+    useState<PatientDebtSummary | null>(null);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [selectedPatientForWhatsapp, setSelectedPatientForWhatsapp] =
+    useState<PatientDebtSummary | null>(null);
+  const [whatsappTemplates, setWhatsappTemplates] = useState<TextTemplate[]>([]);
 
   const navigate = useNavigate();
   const { paymentMethods } = useMasterData();
@@ -84,10 +90,21 @@ export function FinancesPage() {
     (async () => {
       try {
         const repo = await getRepository();
+
+        // Clean duplicate templates
+        const cleaned = await repo.cleanDuplicateTemplates();
+        if (cleaned > 0) {
+          console.log(`🧹 Cleaned ${cleaned} duplicate templates`);
+        }
+
         const fixed = await repo.repairDebtOpenedDates();
         if (fixed > 0) {
           console.log(`🔧 Repaired debt_opened_at for ${fixed} patients`);
         }
+
+        // Load WhatsApp templates
+        const templates = await repo.getTextTemplatesByKind("whatsapp_message");
+        setWhatsappTemplates(templates);
       } catch (error) {
         console.error("Error running debt repair:", error);
       }
@@ -96,12 +113,13 @@ export function FinancesPage() {
   }, []);
 
   // Financial calculations
-  const totalDebt = patientsWithDebt.reduce((sum, p) => sum + p.current_balance, 0);
+  const totalDebt = patientsWithDebt.reduce(
+    (sum, p) => sum + p.current_balance,
+    0,
+  );
 
   // Urgent patients (+90 days overdue)
-  const urgentPatients = patientsWithDebt.filter(
-    (p) => p.days_overdue > 90,
-  );
+  const urgentPatients = patientsWithDebt.filter((p) => p.days_overdue > 90);
 
   // Not contacted patients
   const notContactedPatients = patientsWithDebt.filter(
@@ -116,7 +134,9 @@ export function FinancesPage() {
     if (filterStatus === "not_contacted") {
       filtered = filtered.filter((p) => p.contact_status === "not_contacted");
     } else if (filterStatus === "recently_contacted") {
-      filtered = filtered.filter((p) => p.contact_status === "recently_contacted");
+      filtered = filtered.filter(
+        (p) => p.contact_status === "recently_contacted",
+      );
     } else if (filterStatus === "long_ago") {
       filtered = filtered.filter((p) => p.contact_status === "long_ago");
     }
@@ -207,9 +227,7 @@ export function FinancesPage() {
             <span
               className={cn(
                 "font-bold text-lg",
-                patient.days_overdue > 90
-                  ? "text-red-600"
-                  : "text-orange-600",
+                patient.days_overdue > 90 ? "text-red-600" : "text-orange-600",
               )}
             >
               {formatCurrency(info.getValue())}
@@ -246,7 +264,8 @@ export function FinancesPage() {
           }
 
           // Línea 1: "X días de mora"
-          const mainText = days === 1 ? "1 día de mora" : `${days} días de mora`;
+          const mainText =
+            days === 1 ? "1 día de mora" : `${days} días de mora`;
 
           // Línea 2: Estado de contacto (del backend)
           let contextText = "Aún no contactado";
@@ -274,23 +293,11 @@ export function FinancesPage() {
         cell: (info) => {
           const patient = info.row.original;
 
-          const handleWhatsApp = async (e: React.MouseEvent) => {
+          const handleWhatsApp = (e: React.MouseEvent) => {
             e.stopPropagation();
             if (patient.phone) {
-              const phone = patient.phone.replace(/\D/g, ""); // Remove non-digits
-              const message = `Hola ${patient.full_name}. Te escribo de la clínica por tu saldo pendiente de ${formatCurrency(patient.current_balance)}. Actualmente tiene ${patient.days_overdue} días de mora. ¿Podemos coordinar el pago hoy?`;
-              const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-              window.open(url, "_blank");
-
-              // Marcar como contactado inmediatamente
-              try {
-                const repo = await getRepository();
-                await repo.markPatientContacted(patient.patient_id, "whatsapp");
-                // Recargar datos para reflejar el cambio
-                await loadFinancialData();
-              } catch (error) {
-                console.error("Error marcando contacto:", error);
-              }
+              setSelectedPatientForWhatsapp(patient);
+              setWhatsappModalOpen(true);
             }
           };
 
@@ -413,7 +420,10 @@ export function FinancesPage() {
             <div className="p-3 bg-blue-500/10 rounded-xl">
               <Wallet className="text-blue-600" size={24} />
             </div>
-            <Badge variant="default" className="text-xs bg-blue-500/20 text-blue-700">
+            <Badge
+              variant="default"
+              className="text-xs bg-blue-500/20 text-blue-700"
+            >
               Total
             </Badge>
           </div>
@@ -451,7 +461,8 @@ export function FinancesPage() {
             </p>
             <p className="text-xs text-[hsl(var(--muted-foreground))] flex items-center gap-1">
               <Users size={12} />
-              paciente{notContactedPatients.length !== 1 ? "s" : ""} sin contactar
+              paciente{notContactedPatients.length !== 1 ? "s" : ""} sin
+              contactar
             </p>
           </div>
         </div>
@@ -591,14 +602,18 @@ export function FinancesPage() {
                         <td colSpan={4} className="px-6 py-16">
                           <div className="flex flex-col items-center justify-center text-center gap-4">
                             <div className="w-20 h-20 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center">
-                              <Filter size={32} className="text-[hsl(var(--muted-foreground))]" />
+                              <Filter
+                                size={32}
+                                className="text-[hsl(var(--muted-foreground))]"
+                              />
                             </div>
                             <div className="space-y-2">
                               <h3 className="text-lg font-semibold text-[hsl(var(--foreground))]">
                                 No se encontraron pacientes
                               </h3>
                               <p className="text-sm text-[hsl(var(--muted-foreground))] max-w-md">
-                                Intenta cambiar los términos de búsqueda o limpiar los filtros
+                                Intenta cambiar los términos de búsqueda o
+                                limpiar los filtros
                               </p>
                             </div>
                           </div>
@@ -608,7 +623,9 @@ export function FinancesPage() {
                       table.getRowModel().rows.map((row, index) => (
                         <tr
                           key={row.id}
-                          onClick={() => handleRowClick(row.original.patient_id)}
+                          onClick={() =>
+                            handleRowClick(row.original.patient_id)
+                          }
                           className="hover:bg-[hsl(var(--muted))]/30 transition-all duration-150 group cursor-pointer"
                           role="button"
                           tabIndex={0}
@@ -718,18 +735,23 @@ export function FinancesPage() {
               const repo = await getRepository();
 
               // 1. Get patient data
-              const patient = await repo.findPatientById(selectedPatient.patient_id);
+              const patient = await repo.findPatientById(
+                selectedPatient.patient_id,
+              );
               if (!patient) {
                 throw new Error("Paciente no encontrado");
               }
 
               // 2. Get last cumulative balance
-              const sessions = await repo.getSessionsByPatientList(selectedPatient.patient_id);
+              const sessions = await repo.getSessionsByPatientList(
+                selectedPatient.patient_id,
+              );
               const lastSession = sessions.length > 0 ? sessions[0] : null;
               const previousCumulativeBalance = selectedPatient.current_balance;
 
               // 3. Calculate new cumulative balance
-              const newCumulativeBalance = previousCumulativeBalance - payment.amount;
+              const newCumulativeBalance =
+                previousCumulativeBalance - payment.amount;
 
               // 4. Create payment session
               const reasonDetail = `Sistema: Abono de ${payment.amount} a cuenta`;
@@ -832,7 +854,7 @@ export function FinancesPage() {
                     // Reload data
                     await loadFinancialData();
                   } catch (error) {
-                    console.error('Error archivando deuda:', error);
+                    console.error("Error archivando deuda:", error);
                     // TODO: Show error toast
                   }
                 }}
@@ -842,6 +864,28 @@ export function FinancesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* WhatsApp Preview Modal */}
+      {selectedPatientForWhatsapp && (
+        <WhatsAppPreviewModal
+          open={whatsappModalOpen}
+          onOpenChange={setWhatsappModalOpen}
+          patientName={selectedPatientForWhatsapp.full_name}
+          patientPhone={selectedPatientForWhatsapp.phone || ""}
+          saldo={selectedPatientForWhatsapp.current_balance}
+          diasMora={selectedPatientForWhatsapp.days_overdue}
+          templates={whatsappTemplates}
+          onSend={async () => {
+            try {
+              const repo = await getRepository();
+              await repo.markPatientContacted(selectedPatientForWhatsapp.patient_id, "whatsapp");
+              await loadFinancialData();
+            } catch (error) {
+              console.error("Error marcando contacto:", error);
+            }
+          }}
+        />
       )}
     </div>
   );

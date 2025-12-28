@@ -175,6 +175,20 @@ export type UserSetting = {
   updated_at?: string;
 };
 
+export type TextTemplate = {
+  id?: number;
+  kind: string; // 'diagnosis' | 'clinical_notes' | 'reason_detail' | 'procedure_notes' | 'whatsapp_message'
+  title: string;
+  body: string;
+  tags?: string;
+  source?: "system" | "user";
+  is_favorite?: boolean;
+  active?: boolean;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
 // -------- TELEMETRY & OBSERVABILITY --------
 
 export type TelemetryEvent = {

@@ -10,6 +10,8 @@ import {
   SelectItem,
 } from "../ui/Select";
 import type { Visit, PaymentMethod } from "../../lib/types";
+import type { TemplateContext } from "../../lib/templates/templateProcessor";
+import { TemplateButton } from "../templates/TemplateButton";
 
 interface FinancialSectionProps {
   visit: Visit;
@@ -21,6 +23,7 @@ interface FinancialSectionProps {
   onPaymentChange: (value: number) => void;
   onPaymentMethodChange: (value: number | undefined) => void;
   onPaymentNotesChange: (value: string) => void;
+  templateContext?: TemplateContext;
 }
 
 /**
@@ -37,6 +40,7 @@ export const FinancialSection = memo(
     onPaymentChange,
     onPaymentMethodChange,
     onPaymentNotesChange,
+    templateContext,
   }: FinancialSectionProps) => {
     return (
       <div className="border-t-2 @[1000px]:border-t-0 @[1000px]:border-l-2 border-blue-200 flex flex-col">
@@ -133,13 +137,23 @@ export const FinancialSection = memo(
               <label className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1 block">
                 Notas de pago
               </label>
-              <Textarea
-                value={visit.payment_notes || ""}
-                onChange={(e) => onPaymentNotesChange(e.target.value)}
-                disabled={!isEditable}
-                placeholder="Detalles del pago..."
-                className="h-16 text-xs resize-none"
-              />
+              <div className="relative">
+                <Textarea
+                  value={visit.payment_notes || ""}
+                  onChange={(e) => onPaymentNotesChange(e.target.value)}
+                  disabled={!isEditable}
+                  placeholder="Detalles del pago..."
+                  className="h-16 text-xs resize-none pr-10"
+                />
+                {!isEditable || !templateContext ? null : (
+                  <TemplateButton
+                    kind="payment_notes"
+                    onInsert={(text) => onPaymentNotesChange(text)}
+                    context={templateContext}
+                    className="absolute top-2 right-2"
+                  />
+                )}
+              </div>
             </div>
 
             {/* Saldo de esta sesión */}

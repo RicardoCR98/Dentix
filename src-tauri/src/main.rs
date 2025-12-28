@@ -97,6 +97,7 @@ fn main() {
             // Reason Types commands
             get_reason_types,
             create_reason_type,
+            delete_reason_type,
             // Payment Methods commands (NEW)
             get_payment_methods,
             create_payment_method,
@@ -107,6 +108,12 @@ fn main() {
             get_all_settings,
             save_setting,
             reset_all_settings,
+            // Text Templates commands
+            get_text_templates_by_kind,
+            update_text_template,
+            create_text_template,
+            delete_text_template,
+            clean_duplicate_templates,
             // Complex command
             save_visit_with_sessions,
             // Reports

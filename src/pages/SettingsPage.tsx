@@ -1,16 +1,18 @@
 // src/pages/SettingsPage.tsx
 import { useState, useEffect } from "react";
-import { Settings, FileText, User } from "lucide-react";
+import { Settings, FileText, User, Edit } from "lucide-react";
 import Section from "../components/Section";
 import { Button } from "../components/ui/Button";
 import { tauriSqliteRepository } from "../lib/storage/TauriSqliteRepository";
 import { useToast } from "../hooks/useToast";
+import { TemplatesManagerModal } from "../components/TemplatesManagerModal";
 import type { DoctorProfile } from "../lib/types";
 
 export function SettingsPage() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
   const [profile, setProfile] = useState<DoctorProfile>({
     doctor_id: crypto.randomUUID(),
     name: "",
@@ -30,6 +32,13 @@ export function SettingsPage() {
   const loadProfile = async () => {
     try {
       setLoading(true);
+
+      // Clean duplicates first
+      const cleaned = await tauriSqliteRepository.cleanDuplicateTemplates();
+      if (cleaned > 0) {
+        console.log(`🧹 Cleaned ${cleaned} duplicate templates`);
+      }
+
       const data = await tauriSqliteRepository.getDoctorProfile();
       if (data) {
         setProfile(data);
@@ -246,6 +255,23 @@ export function SettingsPage() {
         </div>
       </Section>
 
+      {/* Text Templates */}
+      <Section title="Plantillas de Texto" icon={<FileText size={20} />}>
+        <div className="space-y-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            Gestiona las plantillas de texto para mensajes de WhatsApp, diagnósticos, notas clínicas y más.
+          </p>
+          <Button
+            variant="primary"
+            className="gap-2"
+            onClick={() => setTemplatesModalOpen(true)}
+          >
+            <Edit size={16} />
+            Gestionar plantillas
+          </Button>
+        </div>
+      </Section>
+
       {/* System Info */}
       <Section title="Datos del Sistema" icon={<Settings size={20} />}>
         <div className="space-y-3 text-[hsl(var(--muted-foreground))]">
@@ -285,6 +311,12 @@ export function SettingsPage() {
           </div>
         </div>
       </Section>
+
+      {/* Templates Manager Modal */}
+      <TemplatesManagerModal
+        open={templatesModalOpen}
+        onOpenChange={setTemplatesModalOpen}
+      />
     </div>
   );
 }

@@ -84,8 +84,7 @@ const Odontogram = memo(function Odontogram({
       const repo = await getRepository();
       await repo.saveDiagnosisOptions(
         editingOptions.map((opt, idx) => ({
-          label: opt.label,
-          color: "info",
+          ...opt, // Preservar todos los campos incluido el id
           sort_order: idx + 1,
         })),
       );

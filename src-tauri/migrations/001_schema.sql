@@ -311,7 +311,7 @@ END;
 -- =========================
 CREATE TABLE IF NOT EXISTS text_templates (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  kind         TEXT NOT NULL,                -- diagnosis | clinical_notes | reason_detail | procedure_notes
+  kind         TEXT NOT NULL,                -- diagnosis | clinical_notes | reason_detail | procedure_notes | payment_notes
   title        TEXT NOT NULL,
   body         TEXT NOT NULL,
   tags         TEXT,
@@ -443,10 +443,47 @@ INSERT OR IGNORE INTO user_settings (key, value, category) VALUES
   ('layoutMode', 'vertical', 'appearance');
 
 -- Seeds mínimos de text_templates
-INSERT OR IGNORE INTO text_templates (kind, title, body, source, sort_order) VALUES
-  ('diagnosis', 'Caries extensa', 'Se observa caries extensa en pieza dental, requiere tratamiento de endodoncia', 'system', 1),
-  ('diagnosis', 'Fractura coronaria', 'Fractura coronaria severa. Se recomienda extracción y posterior rehabilitación protésica', 'system', 2),
-  ('clinical_notes', 'Procedimiento rutinario', 'Procedimiento realizado sin complicaciones. Paciente tolera bien la intervención', 'system', 1),
-  ('clinical_notes', 'Recomendaciones post-operatorias', 'Se dan indicaciones de cuidados post-operatorios. Control en 7 días', 'system', 2),
-  ('reason_detail', 'Dolor agudo', 'Paciente refiere dolor agudo en cuadrante superior derecho, intensidad 8/10', 'system', 1),
-  ('procedure_notes', 'Anestesia aplicada', 'Se aplica anestesia local. Paciente responde favorablemente', 'system', 1);
+-- reason_detail
+INSERT OR IGNORE INTO text_templates (kind, title, body, is_favorite, source, sort_order) VALUES
+  ('reason_detail', 'Dolor agudo', 'Paciente {nombre} refiere dolor agudo en zona {pieza}, intensidad 8/10. Inicio hace 24h. No toma analgésicos actualmente.', 1, 'system', 1),
+  ('reason_detail', 'Control de rutina', 'Control de rutina. Paciente no refiere molestias. Última visita hace 6 meses.', 1, 'system', 2),
+  ('reason_detail', 'Emergencia - fractura', 'Emergencia por fractura dental traumática. Paciente refiere golpe hace 2h. Dolor moderado.', 0, 'system', 3),
+  ('reason_detail', 'Sensibilidad dental', 'Paciente refiere sensibilidad dental a estímulos fríos y calientes. Molestia intermitente desde hace 1 semana.', 0, 'system', 4),
+  ('reason_detail', 'Inflamación gingival', 'Paciente presenta inflamación y sangrado de encías. Refiere molestia al cepillado.', 0, 'system', 5);
+
+-- diagnosis
+INSERT OR IGNORE INTO text_templates (kind, title, body, is_favorite, source, sort_order) VALUES
+  ('diagnosis', 'Caries profunda', 'Se observa caries profunda en pieza {pieza}. Requiere tratamiento de conducto y posterior rehabilitación protésica.', 1, 'system', 1),
+  ('diagnosis', 'Pulpitis irreversible', 'Diagnóstico: Pulpitis irreversible en pieza {pieza}. Respuesta positiva a pruebas térmicas. Se recomienda endodoncia.', 1, 'system', 2),
+  ('diagnosis', 'Periodontitis crónica', 'Periodontitis crónica moderada. Sondaje promedio 5mm. Sangrado al sondaje positivo. Plan: raspado y alisado radicular.', 0, 'system', 3),
+  ('diagnosis', 'Fractura coronaria', 'Fractura coronaria en pieza {pieza}. Compromiso pulpar. Se recomienda endodoncia y corona.', 0, 'system', 4),
+  ('diagnosis', 'Absceso periapical', 'Absceso periapical agudo en pieza {pieza}. Tumefacción presente. Requiere drenaje y tratamiento de conducto.', 0, 'system', 5),
+  ('diagnosis', 'Necrosis pulpar', 'Necrosis pulpar en pieza {pieza}. Sin respuesta a pruebas de vitalidad. Radiografía muestra lesión periapical.', 0, 'system', 6);
+
+-- clinical_notes
+INSERT OR IGNORE INTO text_templates (kind, title, body, is_favorite, source, sort_order) VALUES
+  ('clinical_notes', 'Primera consulta', 'Paciente: {nombre} ({edad} años). Fecha: {fecha}. Primera consulta. Se realiza examen clínico completo y se explica plan de tratamiento. Paciente comprende y acepta. Se programa próxima cita.', 1, 'system', 1),
+  ('clinical_notes', 'Consentimiento obtenido', 'Se explican riesgos y beneficios del procedimiento. Paciente comprende y firma consentimiento informado. Se resuelven dudas.', 1, 'system', 2),
+  ('clinical_notes', 'Control post-operatorio', 'Control post-operatorio. Paciente evoluciona favorablemente. No refiere dolor ni complicaciones. Se dan indicaciones de cuidado. Próximo control en 7 días.', 1, 'system', 3),
+  ('clinical_notes', 'Procedimiento sin complicaciones', 'Procedimiento realizado sin complicaciones. Paciente tolera bien la intervención. Se dan indicaciones post-operatorias.', 0, 'system', 4),
+  ('clinical_notes', 'Seguimiento de tratamiento', 'Paciente en seguimiento de tratamiento iniciado el {fecha}. Evolución favorable. Se continúa según plan establecido.', 0, 'system', 5);
+
+-- procedure_notes
+INSERT OR IGNORE INTO text_templates (kind, title, body, is_favorite, source, sort_order) VALUES
+  ('procedure_notes', 'Endodoncia estándar', 'Endodoncia en pieza {pieza}. Anestesia local. Aislamiento con dique de goma. Instrumentación y obturación de conductos. Paciente tolera bien el procedimiento. Se dan indicaciones post-operatorias.', 1, 'system', 1),
+  ('procedure_notes', 'Resina compuesta', 'Resina compuesta en pieza {pieza}. Anestesia local. Remoción de tejido careado. Restauración con resina A3. Ajuste oclusal. Resultado estético satisfactorio.', 1, 'system', 2),
+  ('procedure_notes', 'Extracción simple', 'Extracción simple de pieza {pieza}. Anestesia local efectiva. Extracción sin complicaciones. Hemostasia adecuada. Se dan indicaciones post-operatorias: frío local, analgésicos, dieta blanda.', 1, 'system', 3),
+  ('procedure_notes', 'Limpieza dental', 'Profilaxis completa. Remoción de cálculo supra y subgingival. Pulido con pasta profiláctica. Se refuerzan técnicas de higiene oral.', 0, 'system', 4),
+  ('procedure_notes', 'Corona provisional', 'Preparación de pieza {pieza} para corona. Tallado conservador. Toma de impresión. Colocación de corona provisional. Cita para prueba de metal.', 0, 'system', 5),
+  ('procedure_notes', 'Curetaje periodontal', 'Raspado y alisado radicular en sextante {pieza}. Anestesia local. Remoción de cálculo subgingival. Irrigación con clorhexidina. Control en 2 semanas.', 0, 'system', 6);
+
+-- payment_notes
+INSERT OR IGNORE INTO text_templates (kind, title, body, is_favorite, source, sort_order) VALUES
+  ('payment_notes', 'Pago en efectivo', 'Pago recibido en efectivo. Monto: {monto}. Fecha: {fecha}.', 1, 'system', 1),
+  ('payment_notes', 'Transferencia bancaria', 'Pago recibido vía transferencia bancaria. Monto: {monto}. Referencia: [pendiente]. Fecha: {fecha}.', 1, 'system', 2),
+  ('payment_notes', 'Tarjeta débito/crédito', 'Pago recibido con tarjeta. Monto: {monto}. Últimos 4 dígitos: [pendiente]. Fecha: {fecha}.', 1, 'system', 3);
+
+-- whatsapp_message
+INSERT OR IGNORE INTO text_templates (kind, title, body, is_favorite, source, sort_order) VALUES
+  ('whatsapp_message', 'Mensaje estándar', 'Hola {nombre}. Te escribo de la clínica por tu saldo pendiente. ¿Podemos coordinar el pago?', 1, 'system', 1),
+  ('whatsapp_message', 'Recordatorio amable', 'Hola {nombre}, buen día. Te recuerdo que tienes un saldo pendiente. ¿Conversamos sobre las opciones de pago?', 1, 'system', 2);

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { ToastProvider } from "./components/ToastProvider";
+import { DockVisibilityProvider } from "./contexts/DockVisibilityContext";
 import { getRepository } from "./lib/storage/TauriSqliteRepository";
 import SplashScreen from "./components/SplashScreen";
 import ErrorScreen from "./components/ErrorScreen";
@@ -122,7 +123,8 @@ function AppRoot() {
       return (
         <ThemeProvider>
           <ToastProvider>
-            <BrowserRouter>
+            <DockVisibilityProvider>
+              <BrowserRouter>
               <Routes>
                 <Route
                   path="/"
@@ -157,7 +159,8 @@ function AppRoot() {
                   />
                 </Route>
               </Routes>
-            </BrowserRouter>
+              </BrowserRouter>
+            </DockVisibilityProvider>
           </ToastProvider>
         </ThemeProvider>
       );
