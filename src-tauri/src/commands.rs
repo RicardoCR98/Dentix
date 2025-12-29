@@ -207,6 +207,12 @@ pub struct PatientListItem {
     pub status: Option<String>,
     pub last_visit_date: Option<String>,
     pub pending_balance: f64,
+    // Next appointment information
+    pub next_appointment_id: Option<i64>,
+    pub next_appointment_starts_at: Option<String>,
+    pub next_appointment_procedure: Option<String>,
+    pub next_appointment_status: Option<String>,
+    pub appointments_count: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -282,7 +288,50 @@ pub async fn get_all_patients_list(
             p.allergy_detail,
             p.status,
             MAX(s.date) as last_visit_date,
-            COALESCE(CAST(SUM(CASE WHEN s.is_saved = 1 THEN s.balance ELSE 0 END) AS REAL), 0.0) as pending_balance
+            COALESCE(CAST(SUM(CASE WHEN s.is_saved = 1 THEN s.balance ELSE 0 END) AS REAL), 0.0) as pending_balance,
+            (
+                SELECT id
+                FROM appointments
+                WHERE patient_id = p.id
+                  AND starts_at >= datetime('now')
+                  AND status IN ('scheduled', 'confirmed')
+                ORDER BY starts_at ASC
+                LIMIT 1
+            ) as next_appointment_id,
+            (
+                SELECT starts_at
+                FROM appointments
+                WHERE patient_id = p.id
+                  AND starts_at >= datetime('now')
+                  AND status IN ('scheduled', 'confirmed')
+                ORDER BY starts_at ASC
+                LIMIT 1
+            ) as next_appointment_starts_at,
+            (
+                SELECT procedure
+                FROM appointments
+                WHERE patient_id = p.id
+                  AND starts_at >= datetime('now')
+                  AND status IN ('scheduled', 'confirmed')
+                ORDER BY starts_at ASC
+                LIMIT 1
+            ) as next_appointment_procedure,
+            (
+                SELECT status
+                FROM appointments
+                WHERE patient_id = p.id
+                  AND starts_at >= datetime('now')
+                  AND status IN ('scheduled', 'confirmed')
+                ORDER BY starts_at ASC
+                LIMIT 1
+            ) as next_appointment_status,
+            (
+                SELECT COALESCE(COUNT(*), 0)
+                FROM appointments
+                WHERE patient_id = p.id
+                  AND starts_at >= datetime('now')
+                  AND status IN ('scheduled', 'confirmed')
+            ) as appointments_count
          FROM patients p
          LEFT JOIN sessions s ON s.patient_id = p.id
          WHERE p.status = 'active'
@@ -304,6 +353,11 @@ pub async fn get_all_patients_list(
             status: row.get("status"),
             last_visit_date: row.get("last_visit_date"),
             pending_balance: row.get("pending_balance"),
+            next_appointment_id: row.get("next_appointment_id"),
+            next_appointment_starts_at: row.get("next_appointment_starts_at"),
+            next_appointment_procedure: row.get("next_appointment_procedure"),
+            next_appointment_status: row.get("next_appointment_status"),
+            appointments_count: row.get("appointments_count"),
         })
         .collect();
 
@@ -2412,6 +2466,557 @@ pub async fn delete_text_template(
     .execute(&*pool)
     .await
     .map_err(|e| format!("Failed to delete template: {}", e))?;
+
+    Ok(())
+}
+
+// ============================================================================
+// APPOINTMENTS MODULE
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Appointment {
+    pub id: Option<i64>,
+    pub patient_id: i64,
+    pub starts_at: String,  // ISO 8601 datetime
+    pub ends_at: String,    // ISO 8601 datetime
+    pub procedure: String,
+    pub notes: Option<String>,
+    pub status: String,     // 'scheduled' | 'confirmed' | 'cancelled' | 'no_show' | 'completed'
+    pub confirmed_at: Option<String>,
+    pub reminder_1d_sent_at: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MessageQueueItem {
+    pub id: Option<i64>,
+    pub patient_id: i64,
+    pub appointment_id: Option<i64>,
+    pub r#type: String,      // 'reminder_1d' | 'availability' | 'custom'
+    pub message_text: String,
+    pub status: String,       // 'pending' | 'sent' | 'skipped'
+    pub sent_at: Option<String>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AvailableSlot {
+    pub starts_at: String,
+    pub ends_at: String,
+}
+
+// =========================
+// APPOINTMENT CRUD COMMANDS
+// =========================
+
+#[tauri::command]
+pub async fn create_appointment(
+    db_pool: State<'_, DbPool>,
+    appointment: Appointment,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+
+    // Validate: status must be valid
+    if !matches!(
+        appointment.status.as_str(),
+        "scheduled" | "confirmed" | "cancelled" | "no_show" | "completed"
+    ) {
+        return Err(format!("Invalid status: {}", appointment.status));
+    }
+
+    // Validate: starts_at must be before ends_at
+    if appointment.starts_at >= appointment.ends_at {
+        return Err("starts_at must be before ends_at".to_string());
+    }
+
+    // Check for overlaps (exclude cancelled appointments)
+    let overlap_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)
+         FROM appointments
+         WHERE status NOT IN ('cancelled', 'no_show', 'completed')
+           AND (
+             (starts_at < ?2 AND ends_at > ?1)  -- Overlap condition
+           )"
+    )
+    .bind(&appointment.starts_at)
+    .bind(&appointment.ends_at)
+    .fetch_one(&*pool)
+    .await
+    .map_err(|e| format!("Failed to check overlap: {}", e))?;
+
+    if overlap_count > 0 {
+        return Err("Appointment overlaps with an existing appointment".to_string());
+    }
+
+    // Insert appointment
+    let result = sqlx::query(
+        "INSERT INTO appointments (patient_id, starts_at, ends_at, procedure, notes, status, confirmed_at, reminder_1d_sent_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"
+    )
+    .bind(appointment.patient_id)
+    .bind(&appointment.starts_at)
+    .bind(&appointment.ends_at)
+    .bind(&appointment.procedure)
+    .bind(&appointment.notes)
+    .bind(&appointment.status)
+    .bind(&appointment.confirmed_at)
+    .bind(&appointment.reminder_1d_sent_at)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to create appointment: {}", e))?;
+
+    Ok(result.last_insert_rowid())
+}
+
+#[tauri::command]
+pub async fn update_appointment(
+    db_pool: State<'_, DbPool>,
+    id: i64,
+    appointment: Appointment,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    // Validate: status must be valid
+    if !matches!(
+        appointment.status.as_str(),
+        "scheduled" | "confirmed" | "cancelled" | "no_show" | "completed"
+    ) {
+        return Err(format!("Invalid status: {}", appointment.status));
+    }
+
+    // Validate: starts_at must be before ends_at
+    if appointment.starts_at >= appointment.ends_at {
+        return Err("starts_at must be before ends_at".to_string());
+    }
+
+    // Check for overlaps (exclude self and cancelled appointments)
+    let overlap_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)
+         FROM appointments
+         WHERE id != ?1
+           AND status NOT IN ('cancelled', 'no_show', 'completed')
+           AND (
+             (starts_at < ?3 AND ends_at > ?2)  -- Overlap condition
+           )"
+    )
+    .bind(id)
+    .bind(&appointment.starts_at)
+    .bind(&appointment.ends_at)
+    .fetch_one(&*pool)
+    .await
+    .map_err(|e| format!("Failed to check overlap: {}", e))?;
+
+    if overlap_count > 0 {
+        return Err("Appointment overlaps with an existing appointment".to_string());
+    }
+
+    // Update appointment
+    sqlx::query(
+        "UPDATE appointments
+         SET patient_id = ?1, starts_at = ?2, ends_at = ?3, procedure = ?4,
+             notes = ?5, status = ?6, confirmed_at = ?7, reminder_1d_sent_at = ?8
+         WHERE id = ?9"
+    )
+    .bind(appointment.patient_id)
+    .bind(&appointment.starts_at)
+    .bind(&appointment.ends_at)
+    .bind(&appointment.procedure)
+    .bind(&appointment.notes)
+    .bind(&appointment.status)
+    .bind(&appointment.confirmed_at)
+    .bind(&appointment.reminder_1d_sent_at)
+    .bind(id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to update appointment: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_appointment(
+    db_pool: State<'_, DbPool>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    sqlx::query("DELETE FROM appointments WHERE id = ?1")
+        .bind(id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| format!("Failed to delete appointment: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_appointments(
+    db_pool: State<'_, DbPool>,
+    range_start: String,
+    range_end: String,
+) -> Result<Vec<Appointment>, String> {
+    let pool = db_pool.0.lock().await;
+
+    let rows = sqlx::query(
+        "SELECT id, patient_id, starts_at, ends_at, procedure, notes, status,
+                confirmed_at, reminder_1d_sent_at, created_at, updated_at
+         FROM appointments
+         WHERE starts_at < ?2 AND ends_at > ?1
+         ORDER BY starts_at ASC"
+    )
+    .bind(&range_start)
+    .bind(&range_end)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to list appointments: {}", e))?;
+
+    let appointments = rows
+        .into_iter()
+        .map(|row| Appointment {
+            id: row.get("id"),
+            patient_id: row.get("patient_id"),
+            starts_at: row.get("starts_at"),
+            ends_at: row.get("ends_at"),
+            procedure: row.get("procedure"),
+            notes: row.get("notes"),
+            status: row.get("status"),
+            confirmed_at: row.get("confirmed_at"),
+            reminder_1d_sent_at: row.get("reminder_1d_sent_at"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+        .collect();
+
+    Ok(appointments)
+}
+
+#[tauri::command]
+pub async fn list_upcoming_appointments(
+    db_pool: State<'_, DbPool>,
+    days: i64,
+) -> Result<Vec<Appointment>, String> {
+    let pool = db_pool.0.lock().await;
+
+    // Calculate date range for next N days
+    let rows = sqlx::query(
+        "SELECT id, patient_id, starts_at, ends_at, procedure, notes, status,
+                confirmed_at, reminder_1d_sent_at, created_at, updated_at
+         FROM appointments
+         WHERE starts_at >= datetime('now')
+           AND starts_at < datetime('now', '+' || ?1 || ' days')
+           AND status NOT IN ('cancelled', 'completed')
+         ORDER BY starts_at ASC"
+    )
+    .bind(days)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to list upcoming appointments: {}", e))?;
+
+    let appointments = rows
+        .into_iter()
+        .map(|row| Appointment {
+            id: row.get("id"),
+            patient_id: row.get("patient_id"),
+            starts_at: row.get("starts_at"),
+            ends_at: row.get("ends_at"),
+            procedure: row.get("procedure"),
+            notes: row.get("notes"),
+            status: row.get("status"),
+            confirmed_at: row.get("confirmed_at"),
+            reminder_1d_sent_at: row.get("reminder_1d_sent_at"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+        .collect();
+
+    Ok(appointments)
+}
+
+// =========================
+// AVAILABLE SLOTS GENERATION
+// =========================
+
+#[tauri::command]
+pub async fn generate_available_slots(
+    db_pool: State<'_, DbPool>,
+    days: i64,
+    slot_minutes: i64,
+    work_start_hour: i64,  // e.g. 9 for 9am
+    work_end_hour: i64,    // e.g. 18 for 6pm
+) -> Result<Vec<AvailableSlot>, String> {
+    let pool = db_pool.0.lock().await;
+
+    // Validate parameters
+    if days < 1 || days > 14 {
+        return Err("days must be between 1 and 14".to_string());
+    }
+    if slot_minutes < 15 || slot_minutes > 240 {
+        return Err("slot_minutes must be between 15 and 240".to_string());
+    }
+    if work_start_hour < 0 || work_start_hour > 23 || work_end_hour < 0 || work_end_hour > 23 {
+        return Err("work hours must be between 0 and 23".to_string());
+    }
+    if work_start_hour >= work_end_hour {
+        return Err("work_start_hour must be before work_end_hour".to_string());
+    }
+
+    // Get all appointments in range
+    let rows = sqlx::query(
+        "SELECT starts_at, ends_at
+         FROM appointments
+         WHERE starts_at >= datetime('now')
+           AND starts_at < datetime('now', '+' || ?1 || ' days')
+           AND status NOT IN ('cancelled', 'completed', 'no_show')
+         ORDER BY starts_at ASC"
+    )
+    .bind(days)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to fetch appointments: {}", e))?;
+
+    let booked_appointments: Vec<(String, String)> = rows
+        .into_iter()
+        .map(|row| {
+            let start: String = row.get("starts_at");
+            let end: String = row.get("ends_at");
+            (start, end)
+        })
+        .collect();
+
+    // Generate candidate slots
+    let mut available_slots = Vec::new();
+
+    use chrono::{Local, Duration, Timelike};
+
+    for day_offset in 0..days {
+        let mut current_date = Local::now() + Duration::days(day_offset);
+
+        // Set to work start hour
+        current_date = current_date
+            .with_hour(work_start_hour as u32)
+            .unwrap()
+            .with_minute(0)
+            .unwrap()
+            .with_second(0)
+            .unwrap()
+            .with_nanosecond(0)
+            .unwrap();
+
+        let end_of_day = current_date
+            .with_hour(work_end_hour as u32)
+            .unwrap();
+
+        while current_date < end_of_day {
+            let slot_end = current_date + Duration::minutes(slot_minutes);
+
+            if slot_end > end_of_day {
+                break;
+            }
+
+            // Check if slot overlaps with any booked appointment
+            let slot_start_str = current_date.to_rfc3339();
+            let slot_end_str = slot_end.to_rfc3339();
+
+            let is_available = !booked_appointments.iter().any(|(booked_start, booked_end)| {
+                // Check overlap: (start1 < end2) AND (end1 > start2)
+                slot_start_str < *booked_end && slot_end_str > *booked_start
+            });
+
+            if is_available {
+                available_slots.push(AvailableSlot {
+                    starts_at: slot_start_str,
+                    ends_at: slot_end_str,
+                });
+            }
+
+            // Move to next slot
+            current_date = current_date + Duration::minutes(slot_minutes);
+        }
+    }
+
+    // Limit to first 8 slots
+    available_slots.truncate(8);
+
+    Ok(available_slots)
+}
+
+// =========================
+// MESSAGE QUEUE COMMANDS
+// =========================
+
+#[tauri::command]
+pub async fn list_pending_messages(
+    db_pool: State<'_, DbPool>,
+) -> Result<Vec<MessageQueueItem>, String> {
+    let pool = db_pool.0.lock().await;
+
+    let rows = sqlx::query(
+        "SELECT id, patient_id, appointment_id, type, message_text, status, sent_at, created_at
+         FROM message_queue
+         WHERE status = 'pending'
+         ORDER BY created_at ASC"
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to list pending messages: {}", e))?;
+
+    let messages = rows
+        .into_iter()
+        .map(|row| MessageQueueItem {
+            id: row.get("id"),
+            patient_id: row.get("patient_id"),
+            appointment_id: row.get("appointment_id"),
+            r#type: row.get("type"),
+            message_text: row.get("message_text"),
+            status: row.get("status"),
+            sent_at: row.get("sent_at"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+
+    Ok(messages)
+}
+
+#[tauri::command]
+pub async fn mark_message_as_sent(
+    db_pool: State<'_, DbPool>,
+    message_id: i64,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    sqlx::query(
+        "UPDATE message_queue
+         SET status = 'sent', sent_at = datetime('now')
+         WHERE id = ?1"
+    )
+    .bind(message_id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to mark message as sent: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn create_message(
+    db_pool: State<'_, DbPool>,
+    patient_id: i64,
+    appointment_id: Option<i64>,
+    r#type: String,
+    message_text: String,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+
+    let result = sqlx::query(
+        "INSERT INTO message_queue (patient_id, appointment_id, type, message_text, status)
+         VALUES (?1, ?2, ?3, ?4, 'pending')"
+    )
+    .bind(patient_id)
+    .bind(appointment_id)
+    .bind(&r#type)
+    .bind(&message_text)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to create message: {}", e))?;
+
+    Ok(result.last_insert_rowid())
+}
+
+// =========================
+// REMINDER SCHEDULER
+// =========================
+
+/// Scans for appointments 24-48h from now that haven't received a reminder yet.
+/// Creates pending messages in message_queue and marks reminder_1d_sent_at.
+#[tauri::command]
+pub async fn generate_1d_reminders(
+    db_pool: State<'_, DbPool>,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+
+    // Find appointments tomorrow (24-48h window) without reminder
+    let rows = sqlx::query(
+        "SELECT a.id as appointment_id, a.patient_id, a.starts_at, a.procedure, p.full_name
+         FROM appointments a
+         JOIN patients p ON a.patient_id = p.id
+         WHERE a.starts_at >= datetime('now', '+24 hours')
+           AND a.starts_at < datetime('now', '+48 hours')
+           AND a.status IN ('scheduled', 'confirmed')
+           AND a.reminder_1d_sent_at IS NULL"
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to fetch appointments for reminders: {}", e))?;
+
+    let mut count = 0i64;
+
+    for row in rows {
+        let appointment_id: i64 = row.get("appointment_id");
+        let patient_id: i64 = row.get("patient_id");
+        let starts_at: String = row.get("starts_at");
+        let procedure: String = row.get("procedure");
+        let full_name: String = row.get("full_name");
+
+        // Parse datetime for display
+        let formatted_time = starts_at.split('T').nth(1)
+            .map(|t| t.split(':').take(2).collect::<Vec<_>>().join(":"))
+            .unwrap_or_else(|| "hora programada".to_string());
+
+        // Generate message
+        let message_text = format!(
+            "Hola {}. Te recuerdo que tienes tu cita de {} mañana a las {}. ¡Te esperamos!",
+            full_name, procedure, formatted_time
+        );
+
+        // Create message in queue
+        sqlx::query(
+            "INSERT INTO message_queue (patient_id, appointment_id, type, message_text, status)
+             VALUES (?1, ?2, 'reminder_1d', ?3, 'pending')"
+        )
+        .bind(patient_id)
+        .bind(appointment_id)
+        .bind(&message_text)
+        .execute(&*pool)
+        .await
+        .map_err(|e| format!("Failed to create reminder message: {}", e))?;
+
+        // Mark reminder as sent
+        sqlx::query(
+            "UPDATE appointments
+             SET reminder_1d_sent_at = datetime('now')
+             WHERE id = ?1"
+        )
+        .bind(appointment_id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| format!("Failed to update reminder timestamp: {}", e))?;
+
+        count += 1;
+    }
+
+    println!("✅ Generated {} reminder messages", count);
+
+    Ok(count)
+}
+
+// ============================================================================
+// UTILITY COMMANDS
+// ============================================================================
+
+/// Opens a URL or deep link (e.g. whatsapp://) using the system default application
+#[tauri::command]
+pub async fn open_url(
+    app_handle: tauri::AppHandle,
+    url: String,
+) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    app_handle
+        .opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| format!("Failed to open URL: {}", e))?;
 
     Ok(())
 }

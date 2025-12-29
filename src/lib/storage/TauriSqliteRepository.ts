@@ -1008,6 +1008,147 @@ export class TauriSqliteRepository {
       throw error;
     }
   }
+
+  // ============================================================================
+  // APPOINTMENTS OPERATIONS
+  // ============================================================================
+
+  async createAppointment(appointment: import("../types").Appointment): Promise<number> {
+    try {
+      return await invoke<number>("create_appointment", { appointment });
+    } catch (error) {
+      console.error("Error creating appointment:", error);
+      throw error;
+    }
+  }
+
+  async updateAppointment(
+    id: number,
+    appointment: import("../types").Appointment
+  ): Promise<void> {
+    try {
+      await invoke("update_appointment", { id, appointment });
+    } catch (error) {
+      console.error("Error updating appointment:", error);
+      throw error;
+    }
+  }
+
+  async deleteAppointment(id: number): Promise<void> {
+    try {
+      await invoke("delete_appointment", { id });
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      throw error;
+    }
+  }
+
+  async listAppointments(
+    rangeStart: string,
+    rangeEnd: string
+  ): Promise<import("../types").Appointment[]> {
+    try {
+      return await invoke<import("../types").Appointment[]>("list_appointments", {
+        rangeStart,
+        rangeEnd,
+      });
+    } catch (error) {
+      console.error("Error listing appointments:", error);
+      throw error;
+    }
+  }
+
+  async listUpcomingAppointments(
+    days: number = 7
+  ): Promise<import("../types").Appointment[]> {
+    try {
+      return await invoke<import("../types").Appointment[]>(
+        "list_upcoming_appointments",
+        { days }
+      );
+    } catch (error) {
+      console.error("Error listing upcoming appointments:", error);
+      throw error;
+    }
+  }
+
+  async generateAvailableSlots(options: {
+    days?: number;
+    slotMinutes?: number;
+    workStartHour?: number;
+    workEndHour?: number;
+  }): Promise<import("../types").AvailableSlot[]> {
+    try {
+      return await invoke<import("../types").AvailableSlot[]>(
+        "generate_available_slots",
+        {
+          days: options.days ?? 7,
+          slotMinutes: options.slotMinutes ?? 30,
+          workStartHour: options.workStartHour ?? 9,
+          workEndHour: options.workEndHour ?? 18,
+        }
+      );
+    } catch (error) {
+      console.error("Error generating available slots:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // MESSAGE QUEUE OPERATIONS
+  // ============================================================================
+
+  async listPendingMessages(): Promise<import("../types").MessageQueueItem[]> {
+    try {
+      return await invoke<import("../types").MessageQueueItem[]>(
+        "list_pending_messages"
+      );
+    } catch (error) {
+      console.error("Error listing pending messages:", error);
+      throw error;
+    }
+  }
+
+  async markMessageAsSent(messageId: number): Promise<void> {
+    try {
+      await invoke("mark_message_as_sent", { messageId });
+    } catch (error) {
+      console.error("Error marking message as sent:", error);
+      throw error;
+    }
+  }
+
+  async createMessage(
+    patientId: number,
+    appointmentId: number | undefined,
+    type: string,
+    messageText: string
+  ): Promise<number> {
+    try {
+      return await invoke<number>("create_message", {
+        patientId,
+        appointmentId: appointmentId ?? null,
+        type,
+        messageText,
+      });
+    } catch (error) {
+      console.error("Error creating message:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // REMINDER SCHEDULER
+  // ============================================================================
+
+  async generate1dReminders(): Promise<number> {
+    try {
+      return await invoke<number>("generate_1d_reminders");
+    } catch (error) {
+      console.error("Error generating reminders:", error);
+      throw error;
+    }
+  }
 }
 
 // Singleton instance

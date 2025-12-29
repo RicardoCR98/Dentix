@@ -1,4 +1,5 @@
 // src/pages/PatientsListPage.tsx
+import * as React from "react";
 import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,7 +14,9 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageCircle,
+  MoreVertical,
   Plus,
+  Eye,
 } from "lucide-react";
 import {
   useReactTable,
@@ -30,13 +33,32 @@ import type { PatientListItem } from "../lib/types";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Card, CardContent } from "../components/ui/Card";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "../components/ui/DropdownMenu";
+import { AppointmentDialog } from "../components/appointments/AppointmentDialog";
+import type { Appointment } from "../lib/types";
 
 const columnHelper = createColumnHelper<PatientListItem>();
 
 export function PatientsListPage() {
   const navigate = useNavigate();
-  const { data, loading, error, globalFilter, setGlobalFilter } =
+  const { data, loading, error, globalFilter, setGlobalFilter, refresh } =
     usePatientsTable();
+
+  // Appointment dialog state
+  const [appointmentDialogOpen, setAppointmentDialogOpen] =
+    React.useState(false);
+  const [selectedPatientId, setSelectedPatientId] = React.useState<
+    number | null
+  >(null);
+  const [editingAppointment, setEditingAppointment] = React.useState<
+    Appointment | undefined
+  >(undefined);
 
   // Helper function to get days since last visit
   const getDaysSinceLastVisit = useCallback(
@@ -125,11 +147,113 @@ export function PatientsListPage() {
     return `https://wa.me/${digits}?text=${defaultMessage}`;
   }, []);
 
-  const handleNewSessionShortcut = useCallback(
-    (patientId: number) => {
-      navigate(`/registro-clinico?patientId=${patientId}&newSession=1`);
+  // Helper: Format appointment date with relative labels
+  const formatAppointmentDate = useCallback((dateStr: string): string => {
+    const appointmentDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const appointmentDay = new Date(appointmentDate);
+    appointmentDay.setHours(0, 0, 0, 0);
+
+    const diffTime = appointmentDay.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return "Hoy";
+    } else if (diffDays === 1) {
+      return "Mañana";
+    } else if (diffDays > 1 && diffDays <= 7) {
+      return `En ${diffDays} días`;
+    } else {
+      return appointmentDate.toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "short",
+      });
+    }
+  }, []);
+
+  // Helper: Format appointment time
+  const formatAppointmentTime = useCallback((dateStr: string): string => {
+    const appointmentDate = new Date(dateStr);
+    return appointmentDate.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }, []);
+
+  // Helper: Check if appointment is urgent (today or tomorrow)
+  const isAppointmentUrgent = useCallback((dateStr: string): boolean => {
+    const appointmentDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const appointmentDay = new Date(appointmentDate);
+    appointmentDay.setHours(0, 0, 0, 0);
+
+    const diffTime = appointmentDay.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return diffDays >= 0 && diffDays <= 1;
+  }, []);
+
+  // Helper: Get appointment status badge variant
+  const getAppointmentStatusVariant = useCallback(
+    (
+      status:
+        | "scheduled"
+        | "confirmed"
+        | "cancelled"
+        | "no_show"
+        | "completed"
+        | null,
+    ): "default" | "success" | "warning" | "danger" | "info" => {
+      switch (status) {
+        case "confirmed":
+          return "success";
+        case "cancelled":
+        case "no_show":
+          return "danger";
+        case "completed":
+          return "info";
+        case "scheduled":
+        default:
+          return "default";
+      }
     },
-    [navigate],
+    [],
+  );
+
+  // Helper: Get appointment status label
+  const getAppointmentStatusLabel = useCallback(
+    (
+      status:
+        | "scheduled"
+        | "confirmed"
+        | "cancelled"
+        | "no_show"
+        | "completed"
+        | null,
+    ): string => {
+      switch (status) {
+        case "confirmed":
+          return "Confirmada";
+        case "cancelled":
+          return "Cancelada";
+        case "no_show":
+          return "No asistió";
+        case "completed":
+          return "Completada";
+        case "scheduled":
+        default:
+          return "Programada";
+      }
+    },
+    [],
   );
 
   // Column definitions
@@ -213,15 +337,114 @@ export function PatientsListPage() {
           );
         },
       }),
-      columnHelper.accessor("allergy_detail", {
-        id: "allergy_detail",
-        header: "Estado",
-        cell: (info) => (
-          <div className="flex items-center">
-            {renderAllergyBadge(info.getValue())}
-          </div>
+      columnHelper.accessor("next_appointment_starts_at", {
+        id: "next_appointment",
+        header: ({ column }) => (
+          <button
+            onClick={() => column.toggleSorting()}
+            className="flex items-center gap-2 hover:text-[hsl(var(--foreground))] transition-colors uppercase"
+          >
+            Próxima cita
+            <ArrowUpDown size={14} />
+          </button>
         ),
+        cell: (info) => {
+          const row = info.row.original;
+          const hasAppointment = Boolean(row.next_appointment_starts_at);
+          const isUrgent =
+            hasAppointment &&
+            isAppointmentUrgent(row.next_appointment_starts_at!);
+
+          if (!hasAppointment) {
+            return (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                  Sin cita programada
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full badge-info"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    setSelectedPatientId(row.id);
+                    setEditingAppointment(undefined);
+                    setAppointmentDialogOpen(true);
+                  }}
+                  title="Programar cita"
+                  aria-label="Programar cita"
+                  type="button"
+                >
+                  <Plus size={14} />
+                </Button>
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex flex-col gap-2">
+              {/* Date and Time */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--foreground))]">
+                  <Calendar size={14} className="text-[hsl(var(--brand))]" />
+                  <span>
+                    {formatAppointmentDate(
+                      row.next_appointment_starts_at || "",
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
+                  <Clock size={12} />
+                  <span>
+                    {formatAppointmentTime(
+                      row.next_appointment_starts_at || "N / A",
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status and Urgency Badges */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {isUrgent && (
+                  <Badge variant="warning" className="gap-1">
+                    <AlertCircle size={12} />
+                    Urgente
+                  </Badge>
+                )}
+                {row.next_appointment_status &&
+                  row.next_appointment_status !== "scheduled" && (
+                    <Badge
+                      variant={getAppointmentStatusVariant(
+                        row.next_appointment_status,
+                      )}
+                      className="gap-1"
+                    >
+                      {getAppointmentStatusLabel(row.next_appointment_status)}
+                    </Badge>
+                  )}
+                {row.appointments_count && row.appointments_count > 1 && (
+                  <Badge variant="info" className="gap-1 text-xs">
+                    +{row.appointments_count - 1} más
+                  </Badge>
+                )}
+              </div>
+            </div>
+          );
+        },
+        sortingFn: (rowA, rowB) => {
+          const dateA = rowA.original.next_appointment_starts_at;
+          const dateB = rowB.original.next_appointment_starts_at;
+
+          // Null values go to the end
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+
+          return new Date(dateA).getTime() - new Date(dateB).getTime();
+        },
       }),
+
       columnHelper.display({
         id: "actions",
         header: "Acciones",
@@ -235,6 +458,7 @@ export function PatientsListPage() {
 
           return (
             <div className="flex items-center gap-2">
+              {/* WhatsApp Button (always visible) */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -262,21 +486,38 @@ export function PatientsListPage() {
                 <MessageCircle size={16} className="text-[#25D366]" />
               </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full badge-default"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  event.preventDefault();
-                  handleNewSessionShortcut(patient.id);
-                }}
-                title="Agregar una nueva sesión para este paciente"
-                aria-label="Agregar nueva sesión"
-                type="button"
-              >
-                <Plus size={16} />
-              </Button>
+              {/* Dropdown Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full badge-default"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                    }}
+                    title="Más acciones"
+                    aria-label="Menú de acciones"
+                    type="button"
+                  >
+                    <MoreVertical size={16} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSelectedPatientId(patient.id);
+                      setEditingAppointment(undefined);
+                      setAppointmentDialogOpen(true);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <Calendar size={16} className="mr-2" />
+                    <span>Programar cita</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           );
         },
@@ -285,8 +526,13 @@ export function PatientsListPage() {
     [
       buildWhatsAppLink,
       getDaysSinceLastVisit,
-      handleNewSessionShortcut,
       renderAllergyBadge,
+      formatAppointmentDate,
+      formatAppointmentTime,
+      isAppointmentUrgent,
+      getAppointmentStatusVariant,
+      getAppointmentStatusLabel,
+      navigate,
     ],
   );
 
@@ -614,6 +860,26 @@ export function PatientsListPage() {
           </div>
         )}
       </div>
+
+      {/* Appointment Dialog */}
+      {selectedPatientId && (
+        <AppointmentDialog
+          open={appointmentDialogOpen}
+          onClose={() => {
+            setAppointmentDialogOpen(false);
+            setSelectedPatientId(null);
+            setEditingAppointment(undefined);
+          }}
+          onSaved={() => {
+            refresh();
+            setAppointmentDialogOpen(false);
+            setSelectedPatientId(null);
+            setEditingAppointment(undefined);
+          }}
+          patientId={selectedPatientId}
+          appointment={editingAppointment}
+        />
+      )}
     </div>
   );
 }

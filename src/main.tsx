@@ -9,6 +9,7 @@ import { getRepository } from "./lib/storage/TauriSqliteRepository";
 import SplashScreen from "./components/SplashScreen";
 import ErrorScreen from "./components/ErrorScreen";
 import { DashboardLayout } from "./layouts/DashboardLayout";
+import { DashboardPage } from "./pages/DashboardPage";
 import { PatientsPageWrapper } from "./pages/PatientsPageWrapper";
 import { PatientsListPage } from "./pages/PatientsListPage";
 import { FinancesPage } from "./pages/FinancesPage";
@@ -135,13 +136,14 @@ function AppRoot() {
                     />
                   }
                 >
-                  {/* Redirect root to /pacientes */}
+                  {/* Redirect root to dashboard */}
                   <Route
                     index
-                    element={<Navigate to="/registro-clinico" replace />}
+                    element={<Navigate to="/dashboard" replace />}
                   />
 
                   {/* Main routes */}
+                  <Route path="dashboard" element={<DashboardPage />} />
                   <Route
                     path="registro-clinico"
                     element={<PatientsPageWrapper />}
@@ -155,7 +157,7 @@ function AppRoot() {
                   {/* Catch-all redirect */}
                   <Route
                     path="*"
-                    element={<Navigate to="/registro-clinico" replace />}
+                    element={<Navigate to="/dashboard" replace />}
                   />
                 </Route>
               </Routes>

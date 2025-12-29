@@ -16,6 +16,7 @@ import { getRepository } from '../lib/storage/TauriSqliteRepository';
 export interface UIState {
   // Layout preferences
   layoutMode: 'tabs' | 'vertical';
+  layoutModeInitialized: boolean; // Flag to track if layout mode has been loaded from DB
   activeTab: string;
 
   // Dialog states
@@ -59,6 +60,7 @@ export interface UIActions {
 export const createUISlice = (set: any, get: any) => ({
   // Initial state
   layoutMode: 'vertical' as const,
+  layoutModeInitialized: false,
   activeTab: 'odontogram',
   searchDialogOpen: false,
   paymentsDialogOpen: false,
@@ -86,11 +88,15 @@ export const createUISlice = (set: any, get: any) => ({
       const savedMode = await repo.getSetting('layoutMode');
 
       if (savedMode === 'tabs' || savedMode === 'vertical') {
-        set({ layoutMode: savedMode });
+        set({ layoutMode: savedMode, layoutModeInitialized: true });
+      } else {
+        // No saved preference, keep default
+        set({ layoutModeInitialized: true });
       }
     } catch (error) {
       console.error('Error loading layout mode from database:', error);
       // Default to 'vertical' on error (already set in initial state)
+      set({ layoutModeInitialized: true });
     }
   },
 

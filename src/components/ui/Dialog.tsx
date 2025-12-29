@@ -71,7 +71,7 @@ export function Dialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4 sm:pt-[15vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
       {/* Backdrop */}
       <div
         className={cn(
@@ -87,7 +87,7 @@ export function Dialog({
       <div
         ref={contentRef}
         className={cn(
-          "relative w-full bg-[hsl(var(--surface))] rounded-2xl shadow-2xl",
+          "relative w-full bg-[hsl(var(--surface))] rounded-2xl shadow-2xl my-8 max-h-[90vh] flex flex-col",
           spotlight &&
             "ring-1 ring-white/20 shadow-[0_0_80px_rgba(255,255,255,0.1)]",
           sizeClasses[size],
@@ -119,7 +119,7 @@ export function Dialog({
         )}
 
         {/* Body */}
-        <div className={cn("px-6", title || description ? "pb-6" : "py-6")}>
+        <div className={cn("px-6 overflow-y-auto", title || description ? "pb-6" : "py-6")}>
           {children}
         </div>
       </div>

@@ -44,12 +44,24 @@ fn main() {
                     .await
                     .expect("Failed to create database pool");
 
-                // Ejecutar migración unificada
+                // Ejecutar migraciones
                 let migration_001 = include_str!("../migrations/001_schema.sql");
                 sqlx::raw_sql(migration_001)
                     .execute(&pool)
                     .await
                     .expect("Failed to run migration 001");
+
+                let migration_002 = include_str!("../migrations/002_appointments.sql");
+                sqlx::raw_sql(migration_002)
+                    .execute(&pool)
+                    .await
+                    .expect("Failed to run migration 002");
+
+                let migration_003 = include_str!("../migrations/003_message_queue.sql");
+                sqlx::raw_sql(migration_003)
+                    .execute(&pool)
+                    .await
+                    .expect("Failed to run migration 003");
 
                 // Configurar WAL mode y otros pragmas para mejor concurrencia
                 sqlx::query("PRAGMA journal_mode = WAL")
@@ -139,6 +151,21 @@ fn main() {
             create_diagnostic_update_session,
             // PDF generation
             generate_pdf_with_dialog,
+            // Appointments commands
+            create_appointment,
+            update_appointment,
+            delete_appointment,
+            list_appointments,
+            list_upcoming_appointments,
+            generate_available_slots,
+            // Message queue commands
+            list_pending_messages,
+            mark_message_as_sent,
+            create_message,
+            // Reminder scheduler
+            generate_1d_reminders,
+            // Utility commands
+            open_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,6 +7,7 @@ import {
   Settings,
   FileText,
   Calendar,
+  LayoutDashboard,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 
@@ -17,6 +18,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  {
+    to: "/dashboard",
+    icon: <LayoutDashboard size={20} />,
+    label: "Dashboard",
+  },
   {
     to: "/registro-clinico",
     icon: <FileText size={20} />,

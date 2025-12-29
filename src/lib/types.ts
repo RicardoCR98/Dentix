@@ -304,7 +304,7 @@ export type PatientDebtSummary = {
 /**
  * PatientListItem: Patient summary for table list view
  * Optimized for display in patients list page
- * Includes last visit date and pending balance
+ * Includes last visit date, pending balance, and next appointment
  */
 export type PatientListItem = {
   id: number;
@@ -315,4 +315,56 @@ export type PatientListItem = {
   status?: "active" | "inactive";
   last_visit_date: string | null;
   pending_balance: number;
+  // Next appointment information
+  next_appointment_id?: number | null;
+  next_appointment_starts_at?: string | null;
+  next_appointment_procedure?: string | null;
+  next_appointment_status?: "scheduled" | "confirmed" | "cancelled" | "no_show" | "completed" | null;
+  appointments_count?: number; // Total upcoming appointments
+};
+
+// =========================
+// APPOINTMENTS MODULE
+// =========================
+
+/**
+ * Appointment: Scheduled appointment for a patient
+ * Separate from Session (clinical records) - this is purely for scheduling
+ */
+export type Appointment = {
+  id?: number;
+  patient_id: number;
+  starts_at: string;  // ISO 8601 datetime string (e.g. "2025-01-15T10:00:00-03:00")
+  ends_at: string;    // ISO 8601 datetime string
+  procedure: string;  // What service is scheduled
+  notes?: string;     // Optional appointment notes
+  status: "scheduled" | "confirmed" | "cancelled" | "no_show" | "completed";
+  confirmed_at?: string;       // When patient confirmed
+  reminder_1d_sent_at?: string; // When 1-day reminder was created
+  created_at?: string;
+  updated_at?: string;
+};
+
+/**
+ * AvailableSlot: A free time slot for booking appointments
+ * Returned by generate_available_slots command
+ */
+export type AvailableSlot = {
+  starts_at: string;  // ISO 8601 datetime
+  ends_at: string;    // ISO 8601 datetime
+};
+
+/**
+ * MessageQueueItem: Pending WhatsApp message to be sent manually
+ * Used for semi-automatic reminders (app generates text, user sends via WhatsApp)
+ */
+export type MessageQueueItem = {
+  id?: number;
+  patient_id: number;
+  appointment_id?: number;  // Optional link to appointment
+  type: "reminder_1d" | "availability" | "custom";
+  message_text: string;     // Pre-generated message ready to send
+  status: "pending" | "sent" | "skipped";
+  sent_at?: string;
+  created_at?: string;
 };

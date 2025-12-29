@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Stethoscope,
   Printer,
+  Calendar,
 } from "lucide-react";
 
 import { FinancialHistoryBlock } from "../components/FinancialHistoryBlock";
@@ -49,9 +50,11 @@ import { useMasterData } from "../hooks/useMasterData";
 import { useTimelineSidebar } from "../layouts/DashboardLayout";
 // useScrollVisibility hook removed - no longer needed without Quick Actions section
 import { useAppStore } from "../stores";
-import type { Patient, SessionItem } from "../lib/types";
+import type { Patient, SessionItem, Appointment } from "../lib/types";
 import OdontogramDiagnosisSection from "../components/OdontogramDiagnosisSection";
 import { HistoricalSessionsSidebar } from "../components/HistoricalSessionsSidebar";
+import { AppointmentDialog } from "../components/appointments/AppointmentDialog";
+import { UpcomingAppointments } from "../components/appointments/UpcomingAppointments";
 
 interface PatientsPageUnifiedProps {
   layoutMode: "tabs" | "vertical";
@@ -116,6 +119,9 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   >([]);
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("odontogram");
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>(undefined);
+  const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
   const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(
     null,
   );
@@ -133,7 +139,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const { isDockVisible: isDockVisibleGlobal } = useDockVisibility();
 
   // Calculate dock visibility - hide when any local modal/dialog is open OR global modals
-  const dockVisible = isDockVisibleGlobal && !searchDialogOpen && !paymentsDialogOpen && !quickPaymentOpen;
+  const dockVisible = isDockVisibleGlobal && !searchDialogOpen && !paymentsDialogOpen && !quickPaymentOpen && !appointmentDialogOpen;
 
   // Calculate total changes for badge
   const changesCount =
@@ -762,6 +768,53 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             />
           </Section>
 
+          {/* Appointments */}
+          {patient.id && (
+            <Section
+              title="Citas"
+              icon={<Calendar size={20} />}
+              right={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingAppointment(undefined);
+                    setAppointmentDialogOpen(true);
+                  }}
+                  disabled={isSnapshotMode}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Programar cita
+                </Button>
+              }
+            >
+              <UpcomingAppointments
+                key={appointmentsRefreshKey}
+                patientId={patient.id}
+                onEdit={(apt) => {
+                  setEditingAppointment(apt);
+                  setAppointmentDialogOpen(true);
+                }}
+                onRefresh={() => setAppointmentsRefreshKey((k) => k + 1)}
+              />
+            </Section>
+          )}
+
+          {/* Appointment Dialog */}
+          {patient.id && (
+            <AppointmentDialog
+              open={appointmentDialogOpen}
+              onClose={() => {
+                setAppointmentDialogOpen(false);
+                setEditingAppointment(undefined);
+              }}
+              onSaved={() => {
+                setAppointmentsRefreshKey((k) => k + 1);
+              }}
+              patientId={patient.id}
+              appointment={editingAppointment}
+            />
+          )}
+
           {/* Action buttons removed - all actions now via MacOSDock only */}
 
           {/* macOS Dock */}
@@ -875,6 +928,10 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             >
               <Paperclip size={18} />
               Adjuntos
+            </TabsTrigger>
+            <TabsTrigger value="appointments" className="flex items-center gap-2">
+              <Calendar size={18} />
+              Citas
             </TabsTrigger>
           </TabsList>
 
@@ -991,7 +1048,60 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               />
             </Section>
           </TabsContent>
+
+          {/* Tab 5: Appointments */}
+          <TabsContent value="appointments">
+            {patient.id ? (
+              <Section
+                title="Citas"
+                icon={<Calendar size={20} />}
+                right={
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingAppointment(undefined);
+                      setAppointmentDialogOpen(true);
+                    }}
+                    disabled={isSnapshotMode}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Programar cita
+                  </Button>
+                }
+              >
+                <UpcomingAppointments
+                  key={appointmentsRefreshKey}
+                  patientId={patient.id}
+                  onEdit={(apt) => {
+                    setEditingAppointment(apt);
+                    setAppointmentDialogOpen(true);
+                  }}
+                  onRefresh={() => setAppointmentsRefreshKey((k) => k + 1)}
+                />
+              </Section>
+            ) : (
+              <Alert variant="info">
+                Selecciona o crea un paciente para gestionar citas
+              </Alert>
+            )}
+          </TabsContent>
         </Tabs>
+
+        {/* Appointment Dialog (shared across tabs and vertical layout) */}
+        {patient.id && (
+          <AppointmentDialog
+            open={appointmentDialogOpen}
+            onClose={() => {
+              setAppointmentDialogOpen(false);
+              setEditingAppointment(undefined);
+            }}
+            onSaved={() => {
+              setAppointmentsRefreshKey((k) => k + 1);
+            }}
+            patientId={patient.id}
+            appointment={editingAppointment}
+          />
+        )}
 
         {/* Action buttons removed - all actions now via MacOSDock only */}
 
