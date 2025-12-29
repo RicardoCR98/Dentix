@@ -9,11 +9,17 @@ import {
   SelectItem,
   SelectTrigger,
 } from "../ui/Select";
-import type { Appointment } from "../../lib/types";
+import type { Appointment, DoctorProfile } from "../../lib/types";
 import { tauriSqliteRepository } from "../../lib/storage/TauriSqliteRepository";
 import { Alert } from "../ui/Alert";
 import { Loader2 } from "lucide-react";
 import { AppointmentPicker } from "../ui/AppointmentPicker";
+
+// Default clinic hours (fallback if not configured)
+const DEFAULT_WORK_START = 8;
+const DEFAULT_WORK_END = 18;
+const DEFAULT_LUNCH_START = 12;
+const DEFAULT_LUNCH_END = 13;
 
 interface AppointmentDialogProps {
   open: boolean;
@@ -45,6 +51,46 @@ export const AppointmentDialog = ({
   >([]);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(true);
+
+  // Clinic hours from doctor profile
+  const [workStartHour, setWorkStartHour] = useState(DEFAULT_WORK_START);
+  const [workEndHour, setWorkEndHour] = useState(DEFAULT_WORK_END);
+  const [lunchStartHour, setLunchStartHour] = useState(DEFAULT_LUNCH_START);
+  const [lunchEndHour, setLunchEndHour] = useState(DEFAULT_LUNCH_END);
+
+  // Load clinic hours from doctor profile
+  useEffect(() => {
+    const loadClinicHours = async () => {
+      try {
+        const profile = await tauriSqliteRepository.getDoctorProfile();
+        if (profile?.clinic_hours) {
+          // Parse JSON clinic hours
+          const hours = JSON.parse(profile.clinic_hours);
+          if (hours.workStart) {
+            const [h] = hours.workStart.split(":");
+            setWorkStartHour(parseInt(h));
+          }
+          if (hours.workEnd) {
+            const [h] = hours.workEnd.split(":");
+            setWorkEndHour(parseInt(h));
+          }
+          if (hours.lunchStart) {
+            const [h] = hours.lunchStart.split(":");
+            setLunchStartHour(parseInt(h));
+          }
+          if (hours.lunchEnd) {
+            const [h] = hours.lunchEnd.split(":");
+            setLunchEndHour(parseInt(h));
+          }
+        }
+      } catch (err) {
+        console.error("Error loading clinic hours:", err);
+        // Keep defaults on error
+      }
+    };
+
+    loadClinicHours();
+  }, []); // Load once on mount
 
   // Fetch booked appointments when dialog opens
   useEffect(() => {
@@ -201,10 +247,10 @@ export const AppointmentDialog = ({
               onSlotSelect={handleSlotSelect}
               selectedSlot={selectedSlot}
               slotDuration={parseInt(durationMinutes)}
-              workStartHour={8}
-              workEndHour={18}
-              lunchStartHour={12}
-              lunchEndHour={13}
+              workStartHour={workStartHour}
+              workEndHour={workEndHour}
+              lunchStartHour={lunchStartHour}
+              lunchEndHour={lunchEndHour}
             />
           </div>
         )}

@@ -1,8 +1,10 @@
 // src/pages/SettingsPage.tsx
 import { useState, useEffect } from "react";
-import { Settings, FileText, User, Edit } from "lucide-react";
+import { Settings, FileText, User, Edit, Clock } from "lucide-react";
 import Section from "../components/Section";
 import { Button } from "../components/ui/Button";
+import { Label } from "../components/ui/Label";
+import { Input } from "../components/ui/Input";
 import { tauriSqliteRepository } from "../lib/storage/TauriSqliteRepository";
 import { useToast } from "../hooks/useToast";
 import { TemplatesManagerModal } from "../components/TemplatesManagerModal";
@@ -25,6 +27,12 @@ export function SettingsPage() {
     agreed_to_terms: true,
   });
 
+  // Working hours (parsed from clinic_hours JSON)
+  const [workStartHour, setWorkStartHour] = useState("08:00");
+  const [workEndHour, setWorkEndHour] = useState("18:00");
+  const [lunchStartHour, setLunchStartHour] = useState("12:00");
+  const [lunchEndHour, setLunchEndHour] = useState("13:00");
+
   useEffect(() => {
     loadProfile();
   }, []);
@@ -42,6 +50,20 @@ export function SettingsPage() {
       const data = await tauriSqliteRepository.getDoctorProfile();
       if (data) {
         setProfile(data);
+
+        // Parse clinic hours if available
+        if (data.clinic_hours) {
+          try {
+            const hours = JSON.parse(data.clinic_hours);
+            if (hours.workStart) setWorkStartHour(hours.workStart);
+            if (hours.workEnd) setWorkEndHour(hours.workEnd);
+            if (hours.lunchStart) setLunchStartHour(hours.lunchStart);
+            if (hours.lunchEnd) setLunchEndHour(hours.lunchEnd);
+          } catch (err) {
+            console.error("Error parsing clinic hours:", err);
+            // Keep defaults on error
+          }
+        }
       }
     } catch (error) {
       console.error("Error loading doctor profile:", error);
@@ -68,7 +90,21 @@ export function SettingsPage() {
 
     try {
       setSaving(true);
-      await tauriSqliteRepository.upsertDoctorProfile(profile);
+
+      // Build clinic hours JSON
+      const clinicHours = JSON.stringify({
+        workStart: workStartHour,
+        workEnd: workEndHour,
+        lunchStart: lunchStartHour,
+        lunchEnd: lunchEndHour,
+      });
+
+      // Save profile with updated clinic hours
+      await tauriSqliteRepository.upsertDoctorProfile({
+        ...profile,
+        clinic_hours: clinicHours,
+      });
+
       toast.success("Guardado exitoso", "El perfil se guardó correctamente");
     } catch (error) {
       console.error("Error saving doctor profile:", error);
@@ -225,21 +261,70 @@ export function SettingsPage() {
               />
             </div>
 
-            {/* Horario */}
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium text-[hsl(var(--muted-foreground))] block mb-2">
-                Horario
-              </label>
-              <input
-                type="text"
-                placeholder="Ej: Lunes a Viernes 9:00 AM - 6:00 PM"
-                value={profile.clinic_hours || ""}
-                onChange={(e) =>
-                  setProfile({ ...profile, clinic_hours: e.target.value })
-                }
-                className="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))]
-                  bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
-                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand))]"
+          </div>
+
+          <Button
+            variant="primary"
+            className="mt-2"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? "Guardando..." : "Guardar cambios"}
+          </Button>
+        </div>
+      </Section>
+
+      {/* Working Hours */}
+      <Section title="Horarios de Atención" icon={<Clock size={20} />}>
+        <div className="space-y-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            Define el horario de atención de tu clínica. Estos horarios se usarán en el calendario de citas.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Work hours */}
+            <div>
+              <Label htmlFor="workStartHour">Hora de Apertura</Label>
+              <Input
+                id="workStartHour"
+                type="time"
+                value={workStartHour}
+                onChange={(e) => setWorkStartHour(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="workEndHour">Hora de Cierre</Label>
+              <Input
+                id="workEndHour"
+                type="time"
+                value={workEndHour}
+                onChange={(e) => setWorkEndHour(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+
+            {/* Lunch hours */}
+            <div>
+              <Label htmlFor="lunchStartHour">Inicio de Almuerzo</Label>
+              <Input
+                id="lunchStartHour"
+                type="time"
+                value={lunchStartHour}
+                onChange={(e) => setLunchStartHour(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="lunchEndHour">Fin de Almuerzo</Label>
+              <Input
+                id="lunchEndHour"
+                type="time"
+                value={lunchEndHour}
+                onChange={(e) => setLunchEndHour(e.target.value)}
+                className="mt-2"
               />
             </div>
           </div>

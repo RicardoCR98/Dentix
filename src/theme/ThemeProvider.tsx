@@ -9,12 +9,10 @@ type ThemeContextType = {
   brandHsl: string;
   font: FontName;
   size: 14 | 16 | 18 | 20 | 22 | 24;
-  layoutMode: LayoutMode;
   setTheme: (t: ThemeName) => void;
   setBrand: (brandHslOrHex: string) => void;
   setFont: (f: FontName) => void;
   setSize: (s: 14 | 16 | 18 | 20 | 22 | 24) => void;
-  setLayoutMode: (mode: LayoutMode) => void;
   saveSettings: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
 };
@@ -59,7 +57,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [brandHsl, setBrandHsl] = useState<string>("172 49% 56%");
   const [font, setFontState] = useState<FontName>("Inter");
   const [size, setSizeState] = useState<14 | 16 | 18 | 20 | 22 | 24>(16);
-  const [layoutMode, setLayoutModeState] = useState<LayoutMode>("vertical");
 
   // Cargar configuración desde la base de datos
   useEffect(() => {
@@ -79,9 +76,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
         if (settings.size) {
           setSizeState(Number(settings.size) as 14 | 16 | 18 | 20 | 22 | 24);
-        }
-        if (settings.layoutMode) {
-          setLayoutModeState(settings.layoutMode as LayoutMode);
         }
       } catch (error) {
         console.error("Error cargando configuración:", error);
@@ -109,13 +103,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         brandHsl: { value: brandHsl, category: "appearance" },
         font: { value: font, category: "appearance" },
         size: { value: String(size), category: "appearance" },
-        layoutMode: { value: layoutMode, category: "appearance" },
       });
     } catch (error) {
       console.error("Error guardando configuración:", error);
       throw error;
     }
-  }, [theme, brandHsl, font, size, layoutMode]);
+  }, [theme, brandHsl, font, size]);
 
   const resetToDefaults = useCallback(async () => {
     try {
@@ -127,7 +120,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setBrandHsl("172 49% 56%");
       setFontState("Inter");
       setSizeState(16);
-      setLayoutModeState("vertical");
     } catch (error) {
       console.error("Error restaurando configuración:", error);
       throw error;
@@ -140,7 +132,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       brandHsl,
       font,
       size,
-      layoutMode,
       setTheme: (t) => setThemeState(t),
       setBrand: (value) => {
         if (value.startsWith("#")) setBrandHsl(hexToHsl(value));
@@ -148,11 +139,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       },
       setFont: (f) => setFontState(f),
       setSize: (s) => setSizeState(s),
-      setLayoutMode: (mode) => setLayoutModeState(mode),
       saveSettings,
       resetToDefaults,
     }),
-    [theme, brandHsl, font, size, layoutMode, saveSettings, resetToDefaults],
+    [theme, brandHsl, font, size, saveSettings, resetToDefaults],
   );
 
   return <ThemeContext.Provider value={api}>{children}</ThemeContext.Provider>;

@@ -8,6 +8,7 @@ import { DockVisibilityProvider } from "./contexts/DockVisibilityContext";
 import { getRepository } from "./lib/storage/TauriSqliteRepository";
 import SplashScreen from "./components/SplashScreen";
 import ErrorScreen from "./components/ErrorScreen";
+import { OnboardingWizard } from "./components/OnboardingWizard";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PatientsPageWrapper } from "./pages/PatientsPageWrapper";
@@ -22,6 +23,7 @@ import { SchedulePage } from "./pages/SchedulePage";
  */
 type AppState =
   | { status: "loading" } // Inicializando BD
+  | { status: "onboarding" } // Mostrar wizard de configuración inicial
   | { status: "ready" } // BD lista, renderizar App
   | { status: "error"; error: Error }; // Error durante inicialización
 
@@ -67,13 +69,19 @@ function AppRoot() {
         });
 
         // Race entre inicialización y timeout
-        await Promise.race([dbInitPromise, timeoutPromise]);
+        const repo = await Promise.race([dbInitPromise, timeoutPromise]);
 
         const endTime = performance.now();
         const dbInitDuration = endTime - startTime;
         console.log(
           `✅ Base de datos inicializada en ${Math.round(dbInitDuration)}ms`,
         );
+
+        // Verificar si existe perfil del doctor
+        console.log("👤 Verificando perfil del doctor...");
+        const doctorProfile = await repo.getDoctorProfile();
+
+        const needsOnboarding = !doctorProfile;
 
         // Asegurar duración mínima del splash (evitar flash visual)
         const remainingTime = MIN_SPLASH_DURATION_MS - dbInitDuration;
@@ -86,8 +94,13 @@ function AppRoot() {
 
         // Solo actualizar estado si el componente aún está montado
         if (isMounted) {
-          console.log("🚀 Renderizando aplicación...");
-          setAppState({ status: "ready" });
+          if (needsOnboarding) {
+            console.log("🎯 Primer inicio - mostrando onboarding...");
+            setAppState({ status: "onboarding" });
+          } else {
+            console.log("🚀 Renderizando aplicación...");
+            setAppState({ status: "ready" });
+          }
         }
       } catch (error) {
         // Type-safe error handling
@@ -112,6 +125,12 @@ function AppRoot() {
     };
   }, []);
 
+  // Handler para cuando el onboarding se completa
+  const handleOnboardingComplete = () => {
+    // Recargar la aplicación después de completar el onboarding
+    window.location.reload();
+  };
+
   // Renderizado condicional basado en estado
   switch (appState.status) {
     case "loading":
@@ -119,6 +138,15 @@ function AppRoot() {
 
     case "error":
       return <ErrorScreen error={appState.error} />;
+
+    case "onboarding":
+      return (
+        <ThemeProvider>
+          <ToastProvider>
+            <OnboardingWizard onComplete={handleOnboardingComplete} />
+          </ToastProvider>
+        </ThemeProvider>
+      );
 
     case "ready":
       return (
