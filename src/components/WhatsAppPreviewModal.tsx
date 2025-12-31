@@ -79,16 +79,23 @@ export function WhatsAppPreviewModal({
     try {
       // Verificar si estamos en Tauri (app de escritorio)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+      const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
       if (isTauri) {
         // En Tauri: usar plugin opener para abrir en navegador externo del sistema
-        const { open } = await import("@tauri-apps/plugin-opener");
-        await open(url);
+        try {
+          const { openUrl } = await import("@tauri-apps/plugin-opener");
+          console.log("Opening WhatsApp URL:", url);
+          await openUrl(url);
+          console.log("WhatsApp URL opened successfully");
 
-        // Solo marcar como contactado en Tauri (donde hay base de datos)
-        if (markAsContacted) {
-          await onSend();
+          // Solo marcar como contactado en Tauri (donde hay base de datos)
+          if (markAsContacted) {
+            await onSend();
+          }
+        } catch (e) {
+          console.error("openUrl failed:", e);
+          throw e; // Re-throw para que el catch externo lo maneje
         }
       } else {
         // En desarrollo web: usar window.open como fallback

@@ -16,7 +16,6 @@ import {
   MessageCircle,
   MoreVertical,
   Plus,
-  Eye,
 } from "lucide-react";
 import {
   useReactTable,
@@ -38,10 +37,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "../components/ui/DropdownMenu";
 import { AppointmentDialog } from "../components/appointments/AppointmentDialog";
-import type { Appointment } from "../lib/types";
+import { WhatsAppPreviewModal } from "../components/WhatsAppPreviewModal";
+import type { Appointment, TextTemplate } from "../lib/types";
+import { getRepository } from "../lib/storage/TauriSqliteRepository";
 
 const columnHelper = createColumnHelper<PatientListItem>();
 
@@ -60,6 +60,26 @@ export function PatientsListPage() {
     Appointment | undefined
   >(undefined);
 
+  // WhatsApp modal state
+  const [whatsappModalOpen, setWhatsappModalOpen] = React.useState(false);
+  const [selectedPatientForWhatsapp, setSelectedPatientForWhatsapp] =
+    React.useState<PatientListItem | null>(null);
+  const [whatsappTemplates, setWhatsappTemplates] = React.useState<TextTemplate[]>([]);
+
+  // Load WhatsApp templates on mount
+  React.useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const repo = await getRepository();
+        const templates = await repo.getTextTemplatesByKind("whatsapp_message");
+        setWhatsappTemplates(templates);
+      } catch (error) {
+        console.error("Error loading WhatsApp templates:", error);
+      }
+    };
+    loadTemplates();
+  }, []);
+
   // Helper function to get days since last visit
   const getDaysSinceLastVisit = useCallback(
     (dateStr: string | null): number | null => {
@@ -72,44 +92,6 @@ export function PatientsListPage() {
     },
     [],
   );
-
-  // Helper function to get visit status badge
-  const getVisitStatusBadge = (dateStr: string | null) => {
-    if (!dateStr) {
-      return (
-        <Badge variant="default" className="gap-1">
-          <AlertCircle size={12} />
-          Sin visitas
-        </Badge>
-      );
-    }
-
-    const days = getDaysSinceLastVisit(dateStr);
-    if (days === null) return null;
-
-    if (days <= 30) {
-      return (
-        <Badge variant="success" className="gap-1">
-          <CheckCircle2 size={12} />
-          Reciente
-        </Badge>
-      );
-    } else if (days <= 90) {
-      return (
-        <Badge variant="info" className="gap-1">
-          <Clock size={12} />
-          Activo
-        </Badge>
-      );
-    } else {
-      return (
-        <Badge variant="warning" className="gap-1">
-          <Clock size={12} />
-          Inactivo
-        </Badge>
-      );
-    }
-  };
 
   const renderAllergyBadge = useCallback((allergyDetail?: string | null) => {
     const hasAllergies = Boolean(allergyDetail && allergyDetail.trim());
@@ -137,14 +119,6 @@ export function PatientsListPage() {
         Sin alergias
       </Badge>
     );
-  }, []);
-
-  const buildWhatsAppLink = useCallback((phone: string, fullName: string) => {
-    const digits = phone.replace(/\D/g, "");
-    if (!digits) return null;
-
-    const defaultMessage = encodeURIComponent(`Hola ${fullName},`);
-    return `https://wa.me/${digits}?text=${defaultMessage}`;
   }, []);
 
   // Helper: Format appointment date with relative labels
@@ -451,10 +425,6 @@ export function PatientsListPage() {
         enableSorting: false,
         cell: ({ row }) => {
           const patient = row.original;
-          const whatsappLink = buildWhatsAppLink(
-            patient.phone,
-            patient.full_name,
-          );
 
           return (
             <div className="flex items-center gap-2">
@@ -466,18 +436,19 @@ export function PatientsListPage() {
                 onClick={(event) => {
                   event.stopPropagation();
                   event.preventDefault();
-                  if (whatsappLink) {
-                    window.open(whatsappLink, "_blank", "noopener,noreferrer");
+                  if (patient.phone) {
+                    setSelectedPatientForWhatsapp(patient);
+                    setWhatsappModalOpen(true);
                   }
                 }}
-                disabled={!whatsappLink}
+                disabled={!patient.phone}
                 title={
-                  whatsappLink
+                  patient.phone
                     ? `Abrir chat de WhatsApp con ${patient.full_name}`
                     : "Agrega un número válido para WhatsApp"
                 }
                 aria-label={
-                  whatsappLink
+                  patient.phone
                     ? `Contactar a ${patient.full_name} por WhatsApp`
                     : "WhatsApp no disponible"
                 }
@@ -524,7 +495,6 @@ export function PatientsListPage() {
       }),
     ],
     [
-      buildWhatsAppLink,
       getDaysSinceLastVisit,
       renderAllergyBadge,
       formatAppointmentDate,
@@ -878,6 +848,23 @@ export function PatientsListPage() {
           }}
           patientId={selectedPatientId}
           appointment={editingAppointment}
+        />
+      )}
+
+      {/* WhatsApp Preview Modal */}
+      {selectedPatientForWhatsapp && (
+        <WhatsAppPreviewModal
+          open={whatsappModalOpen}
+          onOpenChange={setWhatsappModalOpen}
+          patientName={selectedPatientForWhatsapp.full_name}
+          patientPhone={selectedPatientForWhatsapp.phone || ""}
+          saldo={0}
+          diasMora={0}
+          templates={whatsappTemplates}
+          onSend={async () => {
+            // No need to mark as contacted in patients list
+            console.log("WhatsApp message sent");
+          }}
         />
       )}
     </div>

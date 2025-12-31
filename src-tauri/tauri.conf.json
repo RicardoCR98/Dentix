@@ -10,15 +10,16 @@
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
-    "security": { "csp": null },
+    "security": { "csp": null, "capabilities": ["app", "default"] },
     "windows": [
       {
         "label": "main",
-        "title": "odonto",
+        "title": "Oklus",
         "width": 1200,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true
       }
     ]
   },

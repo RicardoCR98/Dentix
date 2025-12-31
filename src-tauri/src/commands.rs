@@ -3020,3 +3020,121 @@ pub async fn open_url(
 
     Ok(())
 }
+
+
+// ============================================================================
+// TELEMETRY COMMANDS
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TelemetryStats {
+    pub total_patients: i64,
+    pub total_visits: i64,
+    pub total_sessions: i64,
+}
+
+/// Queue a telemetry event for later sending
+#[tauri::command]
+pub async fn queue_telemetry_event(
+    db_pool: State<'_, DbPool>,
+    doctor_id: String,
+    event_type: String,
+    event_data: String,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+
+    let result = sqlx::query(
+        "INSERT INTO telemetry_events (doctor_id, event_type, event_data, timestamp, sent)
+         VALUES (?1, ?2, ?3, datetime('now'), 0)"
+    )
+    .bind(&doctor_id)
+    .bind(&event_type)
+    .bind(&event_data)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to queue telemetry event: {}", e))?;
+
+    Ok(result.last_insert_rowid())
+}
+
+/// Get pending telemetry events (not sent yet)
+#[tauri::command]
+pub async fn get_pending_telemetry_events(
+    db_pool: State<'_, DbPool>,
+) -> Result<Vec<TelemetryEvent>, String> {
+    let pool = db_pool.0.lock().await;
+
+    let rows = sqlx::query_as::<_, (i64, String, String, String, String, i64, Option<String>)>(
+        "SELECT id, doctor_id, event_type, event_data, timestamp, sent, sent_at
+         FROM telemetry_events
+         WHERE sent = 0
+         ORDER BY id ASC"
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get pending telemetry events: {}", e))?;
+
+    let events = rows.into_iter().map(|(id, doctor_id, event_type, event_data, timestamp, sent, sent_at)| {
+        TelemetryEvent {
+            id: Some(id),
+            doctor_id,
+            event_type,
+            event_data: Some(event_data),
+            timestamp: Some(timestamp),
+            sent: Some(sent != 0),
+            sent_at,
+        }
+    }).collect();
+
+    Ok(events)
+}
+
+/// Mark a telemetry event as sent
+#[tauri::command]
+pub async fn mark_telemetry_event_sent(
+    db_pool: State<'_, DbPool>,
+    event_id: i64,
+) -> Result<(), String> {
+    let pool = db_pool.0.lock().await;
+
+    sqlx::query(
+        "UPDATE telemetry_events
+         SET sent = 1, sent_at = datetime('now')
+         WHERE id = ?1"
+    )
+    .bind(event_id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to mark telemetry event as sent: {}", e))?;
+
+    Ok(())
+}
+
+/// Get telemetry statistics (patient, visit, session counts)
+#[tauri::command]
+pub async fn get_telemetry_stats(
+    db_pool: State<'_, DbPool>,
+) -> Result<TelemetryStats, String> {
+    let pool = db_pool.0.lock().await;
+
+    let total_patients: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM patients")
+        .fetch_one(&*pool)
+        .await
+        .map_err(|e| format!("Failed to count patients: {}", e))?;
+
+    let total_visits: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM visits")
+        .fetch_one(&*pool)
+        .await
+        .map_err(|e| format!("Failed to count visits: {}", e))?;
+
+    let total_sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
+        .fetch_one(&*pool)
+        .await
+        .map_err(|e| format!("Failed to count sessions: {}", e))?;
+
+    Ok(TelemetryStats {
+        total_patients,
+        total_visits,
+        total_sessions,
+    })
+}

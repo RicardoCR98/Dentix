@@ -22,7 +22,26 @@
 
     "opener:default",
     "opener:allow-open-path",
-    "opener:allow-open-url",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://wa.me/**"
+        },
+        {
+          "url": "https://**"
+        },
+        {
+          "url": "http://**"
+        },
+        {
+          "url": "mailto:*"
+        },
+        {
+          "url": "tel:*"
+        }
+      ]
+    },
     "opener:allow-reveal-item-in-dir",
 
     "log:default",

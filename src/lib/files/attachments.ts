@@ -26,7 +26,7 @@ export function getAttachmentsRoot(): string {
 const getAllRoots = () => [ATTACHMENTS_ROOT, ...LEGACY_ROOTS];
 const isTauri = () =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  typeof (window as any).__TAURI__ !== "undefined";
+  typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
 export async function saveAttachmentFile(
   file: File,
@@ -75,13 +75,13 @@ export async function resolveAttachmentPath(storage_key: string) {
 export async function openWithOS(path: string) {
   if (isTauri()) {
     try {
-      // Tipamos explícitamente el módulo para que TS “vea” .open
-      type Opener = typeof import("@tauri-apps/plugin-opener");
-      const mod = (await import("@tauri-apps/plugin-opener")) as Opener;
-      await mod.open(path);
+      const { openPath } = await import("@tauri-apps/plugin-opener");
+      console.log("Opening path:", path);
+      await openPath(path);
+      console.log("Path opened successfully");
       return;
     } catch (err) {
-      console.error("opener plugin failed:", err);
+      console.error("openPath failed:", err);
       // seguimos al fallback
     }
   }
@@ -94,14 +94,13 @@ export async function openWithOS(path: string) {
 export async function revealInOS(path: string) {
   if (isTauri()) {
     try {
-      type Opener = typeof import("@tauri-apps/plugin-opener");
-      const mod = (await import("@tauri-apps/plugin-opener")) as Opener;
-      if (typeof mod.reveal === "function") {
-        await mod.reveal(path);
-        return;
-      }
+      const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
+      console.log("Revealing path:", path);
+      await revealItemInDir(path);
+      console.log("Path revealed successfully");
+      return;
     } catch (err) {
-      console.error("opener reveal failed:", err);
+      console.error("revealItemInDir failed:", err);
     }
   }
 

@@ -8,7 +8,8 @@ export type DockButtonVariant =
   | "danger"
   | "info"
   | "success"
-  | "warning";
+  | "warning"
+  | "purple";
 
 export interface MacOSDockButtonProps {
   icon: LucideIcon;
@@ -31,6 +32,7 @@ const variantColors: Record<DockButtonVariant, string> = {
   info: "hsl(var(--info))",
   success: "hsl(var(--success))",
   warning: "hsl(var(--warning))",
+  purple: "hsl(var(--purple))",
 };
 
 export function MacOSDockButton({
@@ -98,12 +100,12 @@ export function MacOSDockButton({
         disabled={disabled}
         aria-label={label}
         aria-disabled={disabled}
-        className="relative rounded-[20px] flex items-center justify-center transition-all duration-[400ms] outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent will-change-transform"
+        className="relative rounded-[20px] flex items-center justify-center transition-all duration-[200ms] outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent will-change-transform"
         style={{
           width: `${scaledSize}px`,
           height: `${scaledSize}px`,
           backgroundColor: variantColors[variant],
-          transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)", // Elastic easing
+          transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
           transform: `scale(${magnification}) translateY(${magnification > 1.0 ? -(magnification - 1.0) * 16 : 0}px)`,
           opacity: disabled ? 0.4 : 1,
           cursor: disabled ? "not-allowed" : "pointer",
@@ -119,16 +121,17 @@ export function MacOSDockButton({
         />
 
         {/* Badge for unsaved changes or count */}
-        {!disabled && (hasChanges || (badgeCount !== undefined && badgeCount > 0)) && (
-          <div
-            className="absolute -top-1 -right-1 min-w-[20px] h-[20px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md animate-pulse-subtle"
-            style={{
-              backgroundColor: "hsl(var(--danger))",
-            }}
-          >
-            {badgeCount !== undefined && badgeCount > 0 ? badgeCount : ""}
-          </div>
-        )}
+        {!disabled &&
+          (hasChanges || (badgeCount !== undefined && badgeCount > 0)) && (
+            <div
+              className="absolute -top-1 -right-1 min-w-[20px] h-[20px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md animate-pulse-subtle"
+              style={{
+                backgroundColor: "hsl(var(--danger))",
+              }}
+            >
+              {badgeCount !== undefined && badgeCount > 0 ? badgeCount : ""}
+            </div>
+          )}
 
         {/* Active indicator dot (when has changes) */}
         {!disabled && hasChanges && (

@@ -210,7 +210,7 @@ const Attachments = memo(function Attachments({
             );
             // Usar convertFileSrc de Tauri para convertir ruta a URL
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+            const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
             if (isTauri) {
               const { convertFileSrc } = await import("@tauri-apps/api/core");
               const url = convertFileSrc(fullPath);
@@ -229,7 +229,7 @@ const Attachments = memo(function Attachments({
         try {
           const fullPath = await resolveAttachmentPath(file.storage_key);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+          const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
           if (isTauri) {
             const { convertFileSrc } = await import("@tauri-apps/api/core");
             return convertFileSrc(fullPath);

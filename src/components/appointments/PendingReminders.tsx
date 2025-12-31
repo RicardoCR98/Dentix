@@ -86,11 +86,18 @@ export const PendingReminders = () => {
 
       // Use Tauri opener plugin
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+      const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
       if (isTauri) {
-        const { open } = await import("@tauri-apps/plugin-opener");
-        await open(whatsappUrl);
+        try {
+          const { openUrl } = await import("@tauri-apps/plugin-opener");
+          console.log("Opening WhatsApp URL:", whatsappUrl);
+          await openUrl(whatsappUrl);
+          console.log("WhatsApp URL opened successfully");
+        } catch (e) {
+          console.error("openUrl failed:", e);
+          throw e; // Re-throw para que el catch externo lo maneje
+        }
       } else {
         window.open(whatsappUrl, "_blank");
       }

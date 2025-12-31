@@ -1,21 +1,17 @@
 // src/lib/os/openWithOS.ts
 export async function openWithOS(path: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+  const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
   if (isTauri) {
     try {
-      // IMPORTACIÓN ESTÁTICA (evita el error de tipos)
-      // Si te da warning de "import is unused" en web, ignóralo: este bloque sólo corre en Tauri.
-      const mod = await import("@tauri-apps/plugin-opener");
-      // Cast suave para contentar a TS si no detecta los tipos
-      const { open } = mod as unknown as {
-        open: (target: string, opts?: { application?: string; withArguments?: string[] }) => Promise<void>;
-      };
-      await open(path);
+      const { openPath } = await import("@tauri-apps/plugin-opener");
+      console.log("Opening path:", path);
+      await openPath(path);
+      console.log("Path opened successfully");
       return;
     } catch (err) {
-      console.error("opener plugin failed:", err);
+      console.error("openPath failed:", err);
       // continúa al fallback
     }
   }
@@ -32,18 +28,17 @@ export async function openWithOS(path: string) {
 /** Opcional: revelar en el explorador (si quieres mostrar la carpeta contenedora) */
 export async function revealInOS(path: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+  const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
   if (isTauri) {
     try {
-      const mod = await import("@tauri-apps/plugin-opener");
-      const { reveal } = mod as unknown as {
-        reveal: (target: string) => Promise<void>;
-      };
-      await reveal(path);
+      const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
+      console.log("Revealing path:", path);
+      await revealItemInDir(path);
+      console.log("Path revealed successfully");
       return;
     } catch (err) {
-      console.error("opener reveal failed:", err);
+      console.error("revealItemInDir failed:", err);
     }
   }
   // Fallback

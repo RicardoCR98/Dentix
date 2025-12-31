@@ -3,7 +3,12 @@ import { useState, useCallback, useMemo } from "react";
 import { Plus, Search, Printer, Save, Wallet, FileDown } from "lucide-react";
 import { MacOSDockButton } from "./MacOSDockButton";
 
-export type SaveButtonState = "no-changes" | "has-changes" | "saving" | "saved" | "error";
+export type SaveButtonState =
+  | "no-changes"
+  | "has-changes"
+  | "saving"
+  | "saved"
+  | "error";
 
 export interface MacOSDockProps {
   visible: boolean;
@@ -42,21 +47,32 @@ export function MacOSDock({
   const [saveState, setSaveState] = useState<SaveButtonState>("no-changes");
 
   // Calculate magnification for each button based on hover state
-  const getMagnification = useCallback((index: number): number => {
-    if (hoveredIndex === null) return BASE_MAGNIFICATION;
+  const getMagnification = useCallback(
+    (index: number): number => {
+      if (hoveredIndex === null) return BASE_MAGNIFICATION;
 
-    const distance = Math.abs(index - hoveredIndex);
+      const distance = Math.abs(index - hoveredIndex);
 
-    if (distance === 0) {
-      return MAX_MAGNIFICATION; // 1.25x - hovered button
-    } else if (distance === 1) {
-      return BASE_MAGNIFICATION + (MAX_MAGNIFICATION - BASE_MAGNIFICATION) * MAGNIFICATION_STRENGTH; // 1.12x - adjacent ±1
-    } else if (distance === 2) {
-      return BASE_MAGNIFICATION + (MAX_MAGNIFICATION - BASE_MAGNIFICATION) * MAGNIFICATION_STRENGTH * 0.2; // 1.05x - adjacent ±2
-    }
+      if (distance === 0) {
+        return MAX_MAGNIFICATION; // 1.25x - hovered button
+      } else if (distance === 1) {
+        return (
+          BASE_MAGNIFICATION +
+          (MAX_MAGNIFICATION - BASE_MAGNIFICATION) * MAGNIFICATION_STRENGTH
+        ); // 1.12x - adjacent ±1
+      } else if (distance === 2) {
+        return (
+          BASE_MAGNIFICATION +
+          (MAX_MAGNIFICATION - BASE_MAGNIFICATION) *
+            MAGNIFICATION_STRENGTH *
+            0.2
+        ); // 1.05x - adjacent ±2
+      }
 
-    return BASE_MAGNIFICATION;
-  }, [hoveredIndex]);
+      return BASE_MAGNIFICATION;
+    },
+    [hoveredIndex],
+  );
 
   // Handle save with state management
   const handleSave = useCallback(async () => {
@@ -84,7 +100,11 @@ export function MacOSDock({
 
   // Update save state based on hasChanges prop
   useMemo(() => {
-    if (saveState === "saving" || saveState === "saved" || saveState === "error") {
+    if (
+      saveState === "saving" ||
+      saveState === "saved" ||
+      saveState === "error"
+    ) {
       return; // Don't override transient states
     }
 
@@ -140,7 +160,8 @@ export function MacOSDock({
           background: "rgba(255, 255, 255, 0.15)",
           backdropFilter: "blur(50px) saturate(200%)",
           WebkitBackdropFilter: "blur(50px) saturate(200%)",
-          boxShadow: "0 16px 64px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
+          boxShadow:
+            "0 16px 64px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
         }}
       >
         {/* Nueva Historia */}
@@ -169,6 +190,19 @@ export function MacOSDock({
           onLeave={() => setHoveredIndex(null)}
         />
 
+        {/* Imprimir - Always enabled even in snapshot mode */}
+        <MacOSDockButton
+          icon={Printer}
+          label="Imprimir"
+          shortcut="Ctrl+P"
+          variant="warning"
+          onClick={onPrint}
+          disabled={false} // Always enabled
+          magnification={getMagnification(printIndex)}
+          onHover={() => setHoveredIndex(printIndex)}
+          onLeave={() => setHoveredIndex(null)}
+        />
+
         {showNewSessionButton && (
           <MacOSDockButton
             icon={Plus}
@@ -182,19 +216,6 @@ export function MacOSDock({
             onLeave={() => setHoveredIndex(null)}
           />
         )}
-
-        {/* Imprimir - Always enabled even in snapshot mode */}
-        <MacOSDockButton
-          icon={Printer}
-          label="Imprimir"
-          shortcut="Ctrl+P"
-          variant="warning"
-          onClick={onPrint}
-          disabled={false} // Always enabled
-          magnification={getMagnification(printIndex)}
-          onHover={() => setHoveredIndex(printIndex)}
-          onLeave={() => setHoveredIndex(null)}
-        />
 
         {/* Descargar PDF - Always enabled even in snapshot mode */}
         <MacOSDockButton

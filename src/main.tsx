@@ -9,6 +9,8 @@ import { getRepository } from "./lib/storage/TauriSqliteRepository";
 import SplashScreen from "./components/SplashScreen";
 import ErrorScreen from "./components/ErrorScreen";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { TelemetryWrapper } from "./components/TelemetryWrapper";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PatientsPageWrapper } from "./pages/PatientsPageWrapper";
@@ -141,58 +143,66 @@ function AppRoot() {
 
     case "onboarding":
       return (
-        <ThemeProvider>
-          <ToastProvider>
-            <OnboardingWizard onComplete={handleOnboardingComplete} />
-          </ToastProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <ToastProvider>
+              <DockVisibilityProvider>
+                <OnboardingWizard onComplete={handleOnboardingComplete} />
+              </DockVisibilityProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       );
 
     case "ready":
       return (
-        <ThemeProvider>
-          <ToastProvider>
-            <DockVisibilityProvider>
-              <BrowserRouter>
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <DashboardLayout
-                      clinicName="Oklus"
-                      slogan="Magic in your smile"
-                    />
-                  }
-                >
-                  {/* Redirect root to dashboard */}
-                  <Route
-                    index
-                    element={<Navigate to="/dashboard" replace />}
-                  />
+        <ErrorBoundary>
+          <ThemeProvider>
+            <ToastProvider>
+              <DockVisibilityProvider>
+                <TelemetryWrapper>
+                  <BrowserRouter>
+                  <Routes>
+                    <Route
+                      path="/"
+                      element={
+                        <DashboardLayout
+                          clinicName="Oklus"
+                          slogan="Magic in your smile"
+                        />
+                      }
+                    >
+                      {/* Redirect root to dashboard */}
+                      <Route
+                        index
+                        element={<Navigate to="/dashboard" replace />}
+                      />
 
-                  {/* Main routes */}
-                  <Route path="dashboard" element={<DashboardPage />} />
-                  <Route
-                    path="registro-clinico"
-                    element={<PatientsPageWrapper />}
-                  />
-                  <Route path="pacientes" element={<PatientsListPage />} />
-                  <Route path="Agenda" element={<SchedulePage />} />
-                  <Route path="finanzas" element={<FinancesPage />} />
-                  <Route path="reportes" element={<ReportsPage />} />
-                  <Route path="configuracion" element={<SettingsPage />} />
+                      {/* Main routes */}
+                      <Route path="dashboard" element={<DashboardPage />} />
+                      <Route
+                        path="registro-clinico"
+                        element={<PatientsPageWrapper />}
+                      />
+                      <Route path="pacientes" element={<PatientsListPage />} />
+                      <Route path="Agenda" element={<SchedulePage />} />
+                      <Route path="finanzas" element={<FinancesPage />} />
+                      <Route path="reportes" element={<ReportsPage />} />
+                      <Route path="configuracion" element={<SettingsPage />} />
 
-                  {/* Catch-all redirect */}
-                  <Route
-                    path="*"
-                    element={<Navigate to="/dashboard" replace />}
-                  />
-                </Route>
-              </Routes>
-              </BrowserRouter>
-            </DockVisibilityProvider>
-          </ToastProvider>
-        </ThemeProvider>
+                      {/* Catch-all redirect */}
+                      <Route
+                        path="*"
+                        element={<Navigate to="/dashboard" replace />}
+                      />
+                    </Route>
+                  </Routes>
+                  </BrowserRouter>
+                </TelemetryWrapper>
+              </DockVisibilityProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       );
   }
 }
