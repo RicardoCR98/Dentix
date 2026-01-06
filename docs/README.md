@@ -1,316 +1,108 @@
+# 📚 Oklus - Documentación
+
+> **Sistema de gestión dental profesional**: Todo lo que necesitas saber para desarrollar, mantener y extender Oklus.
+
+---
+
+## 🚀 Empieza Aquí
+
+**¿Nuevo en el proyecto?** Lee estos documentos en orden:
+
+1. [**ARCHITECTURE.md**](ARCHITECTURE.md) - Entiende cómo funciona el sistema
+2. [**CODEBASE_GUIDE.md**](CODEBASE_GUIDE.md) - Navega el código como un pro
+3. [**CODING_STANDARDS.md**](CODING_STANDARDS.md) - Escribe código consistente
+
+**¿Listo para desarrollar?** Usa estos como referencia:
+
+- [**STATE_MANAGEMENT.md**](STATE_MANAGEMENT.md) - Cómo manejamos el estado
+- [**CUSTOM_HOOKS_GUIDE.md**](CUSTOM_HOOKS_GUIDE.md) - Hooks que ya existen
+- [**ERD.md**](ERD.md) - Modelo de datos completo
+
+---
+
+## 📖 Documentación por Categoría
+
+### 🏗️ Arquitectura
+Todo sobre cómo está construido Oklus.
+
+| Documento | ¿Qué encontrarás? |
+|-----------|-------------------|
+| [**ARCHITECTURE.md**](ARCHITECTURE.md) | Diagramas C4, decisiones técnicas, flujos de datos |
+| [**STATE_MANAGEMENT.md**](STATE_MANAGEMENT.md) | Zustand + Custom Hooks: cómo funcionan juntos |
+| [**ERD.md**](ERD.md) | Todas las tablas SQLite y sus relaciones |
+| [**DATABASE_LOCKS.md**](DATABASE_LOCKS.md) | Por qué usamos WAL mode y cómo evitar locks |
+
+### 💻 Desarrollo
+Guías prácticas para escribir código.
+
+| Documento | ¿Qué encontrarás? |
+|-----------|-------------------|
+| [**CODEBASE_GUIDE.md**](CODEBASE_GUIDE.md) | Dónde está cada cosa + patrones comunes |
+| [**CODING_STANDARDS.md**](CODING_STANDARDS.md) | Convenciones de código + buenas prácticas |
+| [**CUSTOM_HOOKS_GUIDE.md**](CUSTOM_HOOKS_GUIDE.md) | Hooks personalizados: cuándo y cómo usarlos |
+
+### 🎨 Diseño & UX
+Especificaciones de diseño y refactorización.
+
+| Documento | ¿Qué encontrarás? |
+|-----------|-------------------|
+| [**FAB_DESIGN.md**](FAB_DESIGN.md) | Diseño del botón flotante de guardado |
+| [**FINANCES_REFACTOR.md**](FINANCES_REFACTOR.md) | Arquitectura del módulo de finanzas |
+
+### 🧪 Testing & Calidad
+Cómo asegurar que todo funcione.
+
+| Documento | ¿Qué encontrarás? |
+|-----------|-------------------|
+| [**TESTING_CHECKLIST.md**](TESTING_CHECKLIST.md) | Qué probar antes de hacer commit |
+| [**TELEMETRY_TESTING.md**](TELEMETRY_TESTING.md) | Cómo verificar que la telemetría funcione |
+
+---
+
+## 🛠️ Guías Especiales
+
+### Para Mantenimiento
+- [**AUTO_UPDATE_GUIDE.md**](../AUTO_UPDATE_GUIDE.md) - Configura actualizaciones automáticas
+
+### Para AI/Claude
+- [**CLAUDE.md**](../CLAUDE.md) - Instrucciones para Claude Code (este archivo guía a la IA)
+
+---
+
+## 💡 Tips Rápidos
+
+**¿Buscas algo específico?**
+- 🔍 **Modelo de datos** → `ERD.md`
+- 🎨 **Cómo se ve el código** → `CODING_STANDARDS.md`
+- 🧩 **Dónde está X componente** → `CODEBASE_GUIDE.md`
+- 🏛️ **Por qué decidimos Y** → `ARCHITECTURE.md`
+- ⚡ **Hooks existentes** → `CUSTOM_HOOKS_GUIDE.md`
+
+**¿Vas a agregar algo nuevo?**
+1. Lee `ARCHITECTURE.md` para entender dónde encaja
+2. Revisa `CODING_STANDARDS.md` para seguir las convenciones
+3. Consulta `CUSTOM_HOOKS_GUIDE.md` para reutilizar lógica existente
+
+---
+
+## 🎯 Estructura en 30 Segundos
+
+```
+docs/
+├── 🏗️  Arquitectura        → ARCHITECTURE.md, STATE_MANAGEMENT.md, ERD.md
+├── 💻  Desarrollo          → CODEBASE_GUIDE.md, CODING_STANDARDS.md
+├── 🎨  Diseño              → FAB_DESIGN.md, FINANCES_REFACTOR.md
+├── 🧪  Testing             → TESTING_CHECKLIST.md
+└── 📸  img/ screenshots/   → Diagramas y capturas
+```
+
+---
+
 <div align="center">
 
-# Oklus
+**¿Tienes dudas?** Abre un issue en GitHub
+**¿Encontraste un error?** Envía un PR con la corrección
 
-Sistema de gestion dental profesional
-
-Solucion de escritorio para la administracion de clinicas odontologicas.
-
-[![Tauri](https://img.shields.io/badge/Tauri-2.8.0-24C8DB?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
-[![React](https://img.shields.io/badge/React-19.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.1-06B6D4?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-
-[Descripcion](#descripcion) | [Caracteristicas](#caracteristicas) | [Instalacion](#instalacion) | [Uso](#uso) | [Documentacion](#documentacion)
+Última actualización: **2026-01-07**
 
 </div>
-
----
-
-## Descripcion
-
-**Oklus** es una aplicacion de escritorio multiplataforma para la gestion integral de clinicas dentales. Construida con React, TypeScript y Tauri, ofrece una experiencia rapida y estable, pensada para operar sin conexion.
-
-**Por que Oklus?**
-- Rendimiento nativo con Tauri.
-- Datos locales en SQLite con migraciones y WAL.
-- Funcionamiento 100% offline.
-- UI moderna con Tailwind CSS y Radix UI.
-- Configuracion y temas personalizables.
-
----
-
-## Caracteristicas
-
-### Gestion de pacientes
-- Registro de datos demograficos y contacto.
-- Busqueda rapida y filtros.
-- Historial medico, alergias y alertas.
-- Adjuntos (radiografias, fotos, documentos).
-
-### Odontograma interactivo
-- Denticion permanente (11-48) y decidua (51-85).
-- Seleccion visual de dientes.
-- Diagnosticos por diente con texto automatico.
-
-### Visitas y sesiones
-- Registro de consultas con motivo y diagnostico.
-- Historial completo por paciente.
-- Plantillas de procedimientos reutilizables.
-
-### Finanzas
-- Presupuestos, descuentos y saldos.
-- Control de pagos pendientes.
-- Paginacion para grandes volumenes.
-
-### Configuracion y personalizacion
-- Temas y tipografias configurables.
-- Tamano de fuente ajustable.
-- Preferencias persistentes.
-
----
-
-## Capturas de pantalla
-
-Agrega capturas en `docs/screenshots/` y actualiza los enlaces.
-
-<details>
-<summary>Ver capturas</summary>
-
-### Dashboard
-![Dashboard](docs/screenshots/dashboard.png)
-
-### Odontograma
-![Odontograma](docs/screenshots/odontogram.png)
-
-### Pacientes
-![Pacientes](docs/screenshots/patients.png)
-
-### Temas
-![Temas](docs/screenshots/themes.png)
-
-</details>
-
----
-
-## Tecnologias
-
-### Frontend
-| Tecnologia | Version | Uso |
-|------------|---------|-----|
-| React | 19.1.1 | UI |
-| TypeScript | 5.9 | Tipado |
-| Vite | 7.1 | Build |
-| Tailwind CSS | 4.1 | Estilos |
-| Radix UI | Latest | Componentes accesibles |
-| Zustand | 5.0 | Estado global |
-| TanStack Virtual | 3.13 | Virtualizacion |
-| Lucide React | 0.545 | Iconos |
-
-### Desktop/Backend
-| Tecnologia | Version | Uso |
-|------------|---------|-----|
-| Tauri | 2.8 | Desktop shell |
-| Rust | 1.77+ | Backend nativo |
-| SQLite | Latest | Base de datos |
-| tauri-plugin-sql | 2.3 | Acceso a SQLite |
-| tauri-plugin-fs | 2.4 | Sistema de archivos |
-| tauri-plugin-opener | 2.5 | Apertura de archivos |
-
----
-
-## Requisitos previos
-
-- Node.js >= 18
-- pnpm >= 8
-- Rust >= 1.77 (via rustup)
-- Dependencias de Tauri segun tu sistema operativo:
-
-### Linux
-```bash
-sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libssl-dev \
-  libgtk-3-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev
-```
-
-### macOS
-```bash
-xcode-select --install
-```
-
-### Windows
-- Instala Microsoft Visual Studio C++ Build Tools.
-- Instala WebView2 si no esta presente.
-
----
-
-## Instalacion
-
-### 1. Clonar el repositorio
-```bash
-git clone https://github.com/tu-usuario/oklus.git
-cd oklus
-```
-
-### 2. Instalar dependencias
-```bash
-pnpm install
-```
-
-### 3. Compilar dependencias de Rust (opcional la primera vez)
-```bash
-cd src-tauri
-cargo build
-cd ..
-```
-
-La base de datos SQLite se crea automaticamente al ejecutar la app por primera vez.
-
----
-
-## Uso
-
-### Desarrollo
-```bash
-pnpm tauri:dev
-```
-
-### Solo frontend (UI)
-```bash
-pnpm dev
-```
-
-### Build de produccion
-```bash
-pnpm tauri:build
-```
-
-Los ejecutables se generan en `src-tauri/target/release/bundle/`.
-
----
-
-## Scripts disponibles
-
-| Comando | Descripcion |
-|---------|-------------|
-| `pnpm dev` | Inicia Vite en modo desarrollo |
-| `pnpm build` | Compila el frontend |
-| `pnpm lint` | Ejecuta ESLint |
-| `pnpm preview` | Previsualiza el build |
-| `pnpm tauri:dev` | Ejecuta la app Tauri en desarrollo |
-| `pnpm tauri:build` | Compila la app completa |
-
----
-
-## Estructura del proyecto
-
-```
-oklus/
-  src/
-    components/         # UI (Radix/Tailwind)
-    pages/              # Rutas
-    hooks/
-    stores/             # Zustand
-    theme/              # Tokens y temas
-    assets/
-    main.tsx
-  src-tauri/
-    migrations/
-    src/
-    tauri.conf.json
-  public/
-  docs/
-  package.json
-```
-
----
-
-## Base de datos
-
-Oklus usa SQLite en modo WAL con migraciones en `src-tauri/migrations/`.
-
-Esquema principal:
-```
-patients
-  visits
-    sessions
-      session_items
-    tooth_dx
-  attachments
-
-procedure_templates
-signers
-diagnosis_options
-```
-
----
-
-## Temas personalizados
-
-Edita `src/theme/theme.ts` para agregar o ajustar temas:
-
-```ts
-export const themes = {
-  myTheme: {
-    light: {
-      "--background": "0 0% 100%",
-      "--foreground": "222.2 84% 4.9%"
-    }
-  }
-};
-```
-
----
-
-## Documentacion
-
-- Guias y runbooks en `docs/`.
-- Contexto adicional en los `*.md` de la raiz.
-
----
-
-## Roadmap
-
-### En desarrollo
-- Sistema de tests (Vitest + React Testing Library).
-- Refactor de componentes grandes.
-- Validacion de formularios (Zod).
-
-### Planificado
-- Reportes y estadisticas.
-- Exportacion a PDF.
-- Recordatorios de citas.
-- Backup automatico.
-
----
-
-## Contribuir
-
-1. Haz un fork del proyecto.
-2. Crea una rama: `git checkout -b feature/mi-cambio`.
-3. Commit con prefijos `add:`, `fix:` o `update:`.
-4. Ejecuta `pnpm lint`.
-5. Abre un Pull Request con proposito, resumen y notas de prueba manual.
-
----
-
-## Licencia
-
-MIT. Ver `LICENSE`.
-
----
-
-## Contacto
-
-Desarrollador principal: [Tu Nombre]
-
-- Website: https://tu-sitio.com
-- Email: tu-email@ejemplo.com
-- GitHub: https://github.com/tu-usuario
-
----
-
-## Agradecimientos
-
-- Tauri
-- React
-- Radix UI
-- Tailwind CSS
-- Lucide

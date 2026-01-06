@@ -28,3 +28,9 @@ dist-ssr
 # Tauri signing keys (should never be in the repo)
 *.key
 .tauri/
+
+.claude/
+agents/
+
+AGENTS.md
+CLAUDE.md
