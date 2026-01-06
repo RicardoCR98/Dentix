@@ -162,41 +162,47 @@ function AppRoot() {
               <DockVisibilityProvider>
                 <TelemetryWrapper>
                   <BrowserRouter>
-                  <Routes>
-                    <Route
-                      path="/"
-                      element={
-                        <DashboardLayout
-                          clinicName="Oklus"
-                          slogan="Magic in your smile"
+                    <Routes>
+                      <Route
+                        path="/"
+                        element={
+                          <DashboardLayout
+                            clinicName="Oklus"
+                            slogan="Magic in your smile"
+                          />
+                        }
+                      >
+                        {/* Redirect root to dashboard */}
+                        <Route
+                          index
+                          element={<Navigate to="/registro-clinico" replace />}
                         />
-                      }
-                    >
-                      {/* Redirect root to dashboard */}
-                      <Route
-                        index
-                        element={<Navigate to="/dashboard" replace />}
-                      />
 
-                      {/* Main routes */}
-                      <Route path="dashboard" element={<DashboardPage />} />
-                      <Route
-                        path="registro-clinico"
-                        element={<PatientsPageWrapper />}
-                      />
-                      <Route path="pacientes" element={<PatientsListPage />} />
-                      <Route path="Agenda" element={<SchedulePage />} />
-                      <Route path="finanzas" element={<FinancesPage />} />
-                      <Route path="reportes" element={<ReportsPage />} />
-                      <Route path="configuracion" element={<SettingsPage />} />
+                        {/* Main routes */}
+                        <Route path="dashboard" element={<DashboardPage />} />
+                        <Route
+                          path="registro-clinico"
+                          element={<PatientsPageWrapper />}
+                        />
+                        <Route
+                          path="pacientes"
+                          element={<PatientsListPage />}
+                        />
+                        <Route path="Agenda" element={<SchedulePage />} />
+                        <Route path="finanzas" element={<FinancesPage />} />
+                        {/*<Route path="reportes" element={<ReportsPage />} />*/}
+                        <Route
+                          path="configuracion"
+                          element={<SettingsPage />}
+                        />
 
-                      {/* Catch-all redirect */}
-                      <Route
-                        path="*"
-                        element={<Navigate to="/dashboard" replace />}
-                      />
-                    </Route>
-                  </Routes>
+                        {/* Catch-all redirect */}
+                        <Route
+                          path="*"
+                          element={<Navigate to="/registro-clinico" replace />}
+                        />
+                      </Route>
+                    </Routes>
                   </BrowserRouter>
                 </TelemetryWrapper>
               </DockVisibilityProvider>

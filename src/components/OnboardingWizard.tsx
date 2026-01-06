@@ -406,26 +406,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </p>
         </div>
 
-        {/* Progress Bar */}
-        {step <= 5 && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-                Paso {step} de {totalSteps}
-              </span>
-              <span className="text-sm font-medium text-[hsl(var(--brand))]">
-                {Math.round(progressPercentage)}%
-              </span>
-            </div>
-            <div className="h-2 bg-[hsl(var(--muted))] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[hsl(var(--brand))] transition-all duration-300"
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Progress Indicator (Steps) */}
         {step <= 5 && (
           <div className="flex items-center justify-center gap-2 mb-8">
@@ -569,12 +549,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </p>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className=" p-4 rounded-lg border badge-info">
               <h3 className="text-base font-semibold mb-2">
                 📊 Sobre la Telemetría
               </h3>
               <p className="text-sm text-[hsl(var(--muted-foreground))] mb-2">
-                Oklus recopila datos técnicos anónimos para mejorar la aplicación:
+                Oklus recopila datos técnicos anónimos para mejorar la
+                aplicación:
               </p>
               <ul className="text-sm text-[hsl(var(--muted-foreground))] space-y-1 ml-4">
                 <li>✅ Estadísticas de uso (cantidad de pacientes, visitas)</li>
@@ -582,7 +563,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <li>✅ Información del sistema (versión, plataforma)</li>
               </ul>
               <p className="text-sm font-semibold text-red-600 dark:text-red-400 mt-3">
-                ❌ NUNCA recopilamos: nombres de pacientes, diagnósticos, datos médicos
+                ❌ NUNCA recopilamos: nombres de pacientes, diagnósticos, datos
+                médicos
               </p>
             </div>
 
@@ -1117,12 +1099,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 onClick={async () => {
                   try {
                     await telemetryService.initialize();
-                    await telemetryService.trackEvent("installation_completed", {
-                      doctor_name: doctorName,
-                      clinic_name: clinicName,
-                      country: "Ecuador",
-                    });
-                    console.log("✅ installation_completed event sent (manual click)");
+                    await telemetryService.trackEvent(
+                      "installation_completed",
+                      {
+                        doctor_name: doctorName,
+                        clinic_name: clinicName,
+                        country: "Ecuador",
+                      },
+                    );
+                    console.log(
+                      "✅ installation_completed event sent (manual click)",
+                    );
                   } catch (error) {
                     console.error("❌ Error sending telemetry:", error);
                   } finally {

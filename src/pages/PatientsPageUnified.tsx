@@ -6,6 +6,8 @@ import SessionsTable from "../components/sessions/SessionsTable";
 import Attachments from "../components/Attachments";
 import PatientSearchDialog from "../components/PatientSearchDialog";
 import PendingPaymentsDialog from "../components/PendingPaymentsDialog";
+import { InformedConsentModal } from "../components/InformedConsentModal";
+import { ConsentsList } from "../components/ConsentsList";
 import { MacOSDock } from "../components/MacOSDock";
 import { Button } from "../components/ui/Button";
 import { Alert } from "../components/ui/Alert";
@@ -29,6 +31,7 @@ import {
   Stethoscope,
   Printer,
   Calendar,
+  FileText,
 } from "lucide-react";
 
 import { FinancialHistoryBlock } from "../components/FinancialHistoryBlock";
@@ -120,13 +123,17 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("odontogram");
   const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>(undefined);
+  const [editingAppointment, setEditingAppointment] = useState<
+    Appointment | undefined
+  >(undefined);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
   const [snapshotSessionId, setSnapshotSessionId] = useState<number | null>(
     null,
   );
   const [hasManuallyExited, setHasManuallyExited] = useState(false);
   const [isEditingPatient, setIsEditingPatient] = useState(true);
+  const [consentModalOpen, setConsentModalOpen] = useState(false);
+  const [consentsRefreshKey, setConsentsRefreshKey] = useState(0);
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile>({
     doctor_id: crypto.randomUUID(),
     name: "",
@@ -139,7 +146,12 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   const { isDockVisible: isDockVisibleGlobal } = useDockVisibility();
 
   // Calculate dock visibility - hide when any local modal/dialog is open OR global modals
-  const dockVisible = isDockVisibleGlobal && !searchDialogOpen && !paymentsDialogOpen && !quickPaymentOpen && !appointmentDialogOpen;
+  const dockVisible =
+    isDockVisibleGlobal &&
+    !searchDialogOpen &&
+    !paymentsDialogOpen &&
+    !quickPaymentOpen &&
+    !appointmentDialogOpen;
 
   // Calculate total changes for badge
   const changesCount =
@@ -304,58 +316,70 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
   }, [printSessionData, patient, doctorProfile, toast]);
 
   // Build template context for text templates
-  const buildTemplateContext = useCallback((overrides?: Partial<{ tooth: string; procedure: string; amount: string }>) => {
-    const calculateAge = (dateOfBirth: string): number => {
-      const today = new Date();
-      const birthDate = new Date(dateOfBirth);
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-      return age;
-    };
+  const buildTemplateContext = useCallback(
+    (
+      overrides?: Partial<{ tooth: string; procedure: string; amount: string }>,
+    ) => {
+      const calculateAge = (dateOfBirth: string): number => {
+        const today = new Date();
+        const birthDate = new Date(dateOfBirth);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (
+          monthDiff < 0 ||
+          (monthDiff === 0 && today.getDate() < birthDate.getDate())
+        ) {
+          age--;
+        }
+        return age;
+      };
 
-    const formatDate = (): string => {
-      const today = new Date();
-      const day = String(today.getDate()).padStart(2, '0');
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const year = today.getFullYear();
-      return `${day}/${month}/${year}`;
-    };
+      const formatDate = (): string => {
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, "0");
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        const year = today.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
 
-    const formatTime = (): string => {
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      return `${hours}:${minutes}`;
-    };
+      const formatTime = (): string => {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        return `${hours}:${minutes}`;
+      };
 
-    // Extraer primer diente seleccionado del odontograma (si existe)
-    const firstTooth = overrides?.tooth || (() => {
-      const teeth = Object.keys(toothDx).filter(t => toothDx[t] && toothDx[t].length > 0);
-      return teeth.length > 0 ? teeth.join(', ') : '';
-    })();
+      // Extraer primer diente seleccionado del odontograma (si existe)
+      const firstTooth =
+        overrides?.tooth ||
+        (() => {
+          const teeth = Object.keys(toothDx).filter(
+            (t) => toothDx[t] && toothDx[t].length > 0,
+          );
+          return teeth.length > 0 ? teeth.join(", ") : "";
+        })();
 
-    return {
-      patient: {
-        name: patient.full_name || '',
-        age: patient.date_of_birth ? calculateAge(patient.date_of_birth) : 0,
-        doc_id: patient.doc_id || '',
-        phone: patient.phone || '',
-      },
-      date: {
-        today: formatDate(),
-        time: formatTime(),
-      },
-      doctor: {
-        name: doctorProfile.name || '',
-      },
-      tooth: firstTooth,
-      procedure: overrides?.procedure,
-      amount: overrides?.amount,
-    };
-  }, [patient, doctorProfile, toothDx]);
+      return {
+        patient: {
+          name: patient.full_name || "",
+          age: patient.date_of_birth ? calculateAge(patient.date_of_birth) : 0,
+          doc_id: patient.doc_id || "",
+          phone: patient.phone || "",
+        },
+        date: {
+          today: formatDate(),
+          time: formatTime(),
+        },
+        doctor: {
+          name: doctorProfile.name || "",
+        },
+        tooth: firstTooth,
+        procedure: overrides?.procedure,
+        amount: overrides?.amount,
+      };
+    },
+    [patient, doctorProfile, toothDx],
+  );
 
   const handleSelectPatientWrapper = useCallback(
     async (selectedPatient: Patient) => {
@@ -414,6 +438,14 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
     },
     [handleQuickPayment],
   );
+
+  const handleConsentCreated = useCallback(() => {
+    setConsentsRefreshKey((prev) => prev + 1);
+    toast.success(
+      "Consentimiento guardado",
+      "El consentimiento informado se guardó correctamente",
+    );
+  }, [toast]);
 
   const handleManualDiagnosisChange = useCallback(
     (next: string) => {
@@ -671,8 +703,8 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               />
               {!hasPatientData && (
                 <Alert variant="warning" className="mt-4">
-                  Por favor completa al menos el nombre y cédula del paciente
-                  para poder guardar.
+                  Por favor completa los cambios obligatorios del paciente para
+                  poder guardar.
                 </Alert>
               )}
             </div>
@@ -767,6 +799,29 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               readOnly={isSnapshotMode}
             />
           </Section>
+
+          {/* Informed Consents */}
+          {patient.id && (
+            <Section
+              title="Consentimientos Informados"
+              icon={<FileText size={20} />}
+              right={
+                <Button
+                  size="sm"
+                  onClick={() => setConsentModalOpen(true)}
+                  disabled={isSnapshotMode}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Consentimiento
+                </Button>
+              }
+            >
+              <ConsentsList
+                patientId={patient.id}
+                refreshTrigger={consentsRefreshKey}
+              />
+            </Section>
+          )}
 
           {/* Appointments */}
           {patient.id && (
@@ -900,7 +955,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             />
             {!hasPatientData && (
               <Alert variant="warning" className="mt-4">
-                Por favor completa al menos el nombre y cédula del paciente para
+                Por favor completa los cambios obligatorios del paciente para
                 poder guardar.
               </Alert>
             )}
@@ -929,9 +984,16 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               <Paperclip size={18} />
               Adjuntos
             </TabsTrigger>
-            <TabsTrigger value="appointments" className="flex items-center gap-2">
+            <TabsTrigger
+              value="appointments"
+              className="flex items-center gap-2"
+            >
               <Calendar size={18} />
               Citas
+            </TabsTrigger>
+            <TabsTrigger value="consents" className="flex items-center gap-2">
+              <FileText size={18} />
+              Consentimientos
             </TabsTrigger>
           </TabsList>
 
@@ -971,9 +1033,7 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
                 onReasonTypesChange={handleReasonTypesChange}
                 onCreateSession={handleCreateDraftSession}
                 activeId={activeSessionId}
-                onOpenSession={
-                  isSnapshotMode ? undefined : handleSessionChange
-                }
+                onOpenSession={isSnapshotMode ? undefined : handleSessionChange}
                 onViewReadOnly={handleOpenSnapshot}
                 isSnapshotMode={isSnapshotMode}
                 templateContext={buildTemplateContext()}
@@ -1085,6 +1145,36 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
               </Alert>
             )}
           </TabsContent>
+
+          {/* Tab 6: Informed Consents */}
+          <TabsContent value="consents">
+            {patient.id ? (
+              <Section
+                title="Consentimientos Informados"
+                icon={<FileText size={20} />}
+                right={
+                  <Button
+                    size="sm"
+                    onClick={() => setConsentModalOpen(true)}
+                    disabled={isSnapshotMode}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nuevo Consentimiento
+                  </Button>
+                }
+              >
+                <ConsentsList
+                  patientId={patient.id}
+                  refreshTrigger={consentsRefreshKey}
+                />
+              </Section>
+            ) : (
+              <Alert variant="info">
+                Selecciona o crea un paciente para gestionar consentimientos
+                informados
+              </Alert>
+            )}
+          </TabsContent>
         </Tabs>
 
         {/* Appointment Dialog (shared across tabs and vertical layout) */}
@@ -1100,6 +1190,17 @@ export function PatientsPageUnified({ layoutMode }: PatientsPageUnifiedProps) {
             }}
             patientId={patient.id}
             appointment={editingAppointment}
+          />
+        )}
+
+        {/* Informed Consent Modal (shared across tabs and vertical layout) */}
+        {patient.id && (
+          <InformedConsentModal
+            open={consentModalOpen}
+            onOpenChange={setConsentModalOpen}
+            patient={patient}
+            visitId={activeSavedSessionId ?? undefined}
+            onConsentCreated={handleConsentCreated}
           />
         )}
 

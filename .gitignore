@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 ./.BUGFIX_SESSION_ITEMS.md
+
+# Tauri signing keys (should never be in the repo)
+*.key
+.tauri/

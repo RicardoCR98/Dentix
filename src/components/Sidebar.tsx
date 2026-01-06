@@ -3,7 +3,6 @@ import { NavLink } from "react-router-dom";
 import {
   User,
   Wallet,
-  BarChart3,
   Settings,
   FileText,
   Calendar,
@@ -31,7 +30,7 @@ const navItems: NavItem[] = [
   { to: "/pacientes", icon: <User size={20} />, label: "Pacientes" },
   { to: "/Agenda", icon: <Calendar size={20} />, label: "Agenda" },
   { to: "/finanzas", icon: <Wallet size={20} />, label: "Finanzas" },
-  { to: "/reportes", icon: <BarChart3 size={20} />, label: "Reportes" },
+  //{ to: "/reportes", icon: <BarChart3 size={20} />, label: "Reportes" },
   {
     to: "/configuracion",
     icon: <Settings size={20} />,

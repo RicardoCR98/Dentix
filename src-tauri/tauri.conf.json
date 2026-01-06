@@ -32,9 +32,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
   },
   "plugins": {
-    "fs": { "requireLiteralLeadingDot": false }
+    "fs": { "requireLiteralLeadingDot": false },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/RicardoCR98/oklus/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNCREFGQjkwREUwMUJEMjMKUldRanZRSGVrUHZhTzV1SEx4dGR3ZE45Q1hkT2lBZnJncDE3UndPQUd1OVRIYm8xTmlaUjZBc3MK"
+    }
   }
 }

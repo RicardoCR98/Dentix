@@ -368,3 +368,41 @@ export type MessageQueueItem = {
   sent_at?: string;
   created_at?: string;
 };
+
+/**
+ * InformedConsent: Consentimiento informado digital con firma
+ * Sistema de protección legal para procedimientos odontológicos
+ */
+export type InformedConsent = {
+  id?: number;
+  patient_id: number;
+  visit_id?: number;
+  procedure_type: string;       // Tipo de procedimiento (extracción, endodoncia, cirugía, etc.)
+  procedure_name?: string;      // Nombre específico del procedimiento
+  consent_template: string;     // Plantilla usada
+  consent_text: string;         // Texto completo del consentimiento
+  signature_data: string;       // Base64 del canvas de firma
+  signed_by: string;            // Nombre del paciente que firma
+  signed_at: string;            // Fecha y hora de firma (ISO 8601)
+  witness_name?: string;        // Nombre del testigo (opcional)
+  witness_signature?: string;   // Firma del testigo (opcional)
+  doctor_name?: string;         // Nombre del doctor
+  notes?: string;               // Notas adicionales
+  created_at?: string;
+  updated_at?: string;
+};
+
+/**
+ * ConsentTemplate: Plantilla predefinida de consentimiento informado
+ * Contiene el texto legal con variables que se reemplazan
+ */
+export type ConsentTemplate = {
+  id?: number;
+  name: string;                 // Nombre de la plantilla
+  procedure_type: string;       // Tipo de procedimiento
+  title: string;                // Título del consentimiento
+  content: string;              // Contenido con variables {paciente}, {fecha}, {procedimiento}
+  is_active?: boolean;          // 1 = activo, 0 = inactivo
+  created_at?: string;
+  updated_at?: string;
+};

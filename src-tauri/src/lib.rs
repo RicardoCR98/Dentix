@@ -20,6 +20,7 @@ pub fn run() {
         .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Obtener el path del app data directory
             let app_data_dir = app
@@ -49,41 +50,12 @@ pub fn run() {
                     .await
                     .expect("Failed to create database pool");
 
-                // Ejecutar migraciones
-                let migration_001 = include_str!("../migrations/001_schema.sql");
-                sqlx::raw_sql(migration_001)
+                // Ejecutar migración unificada (incluye todos los PRAGMAs y esquemas)
+                let unified_schema = include_str!("../migrations/001_unified_schema.sql");
+                sqlx::raw_sql(unified_schema)
                     .execute(&pool)
                     .await
-                    .expect("Failed to run migration 001");
-
-                let migration_002 = include_str!("../migrations/002_appointments.sql");
-                sqlx::raw_sql(migration_002)
-                    .execute(&pool)
-                    .await
-                    .expect("Failed to run migration 002");
-
-                let migration_003 = include_str!("../migrations/003_message_queue.sql");
-                sqlx::raw_sql(migration_003)
-                    .execute(&pool)
-                    .await
-                    .expect("Failed to run migration 003");
-
-                let migration_004 = include_str!("../migrations/004_telemetry_config.sql");
-                sqlx::raw_sql(migration_004)
-                    .execute(&pool)
-                    .await
-                    .expect("Failed to run migration 004");
-
-                // Configurar WAL mode y otros pragmas para mejor concurrencia
-                sqlx::query("PRAGMA journal_mode = WAL")
-                    .execute(&pool)
-                    .await
-                    .expect("Failed to set WAL mode");
-
-                sqlx::query("PRAGMA busy_timeout = 10000")
-                    .execute(&pool)
-                    .await
-                    .expect("Failed to set busy timeout");
+                    .expect("Failed to run unified schema migration");
 
                 // Crear el DbPool y agregarlo al state de Tauri
                 let db_pool = DbPool(Arc::new(Mutex::new(pool)));
@@ -182,6 +154,11 @@ pub fn run() {
             get_telemetry_stats,
             // Utility commands
             open_url,
+            // Informed Consents commands
+            get_consent_templates,
+            get_consents_by_patient,
+            create_informed_consent,
+            get_consent_by_id,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

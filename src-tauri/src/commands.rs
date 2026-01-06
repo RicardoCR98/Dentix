@@ -3138,3 +3138,192 @@ pub async fn get_telemetry_stats(
         total_sessions,
     })
 }
+
+
+// ============================================================================
+// INFORMED CONSENTS COMMANDS
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConsentTemplate {
+    pub id: Option<i64>,
+    pub name: String,
+    pub procedure_type: String,
+    pub title: String,
+    pub content: String,
+    pub is_active: Option<bool>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct InformedConsent {
+    pub id: Option<i64>,
+    pub patient_id: i64,
+    pub visit_id: Option<i64>,
+    pub procedure_type: String,
+    pub procedure_name: Option<String>,
+    pub consent_template: String,
+    pub consent_text: String,
+    pub signature_data: String,        // Base64 canvas image
+    pub signed_by: String,
+    pub signed_at: String,             // ISO 8601
+    pub witness_name: Option<String>,
+    pub witness_signature: Option<String>,
+    pub doctor_name: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+/// Get all active consent templates
+#[tauri::command]
+pub async fn get_consent_templates(
+    db_pool: State<'_, DbPool>,
+) -> Result<Vec<ConsentTemplate>, String> {
+    let pool = db_pool.0.lock().await;
+
+    let rows = sqlx::query_as::<_, (i64, String, String, String, String, i64, String, String)>(
+        "SELECT id, name, procedure_type, title, content, is_active, created_at, updated_at
+         FROM consent_templates
+         WHERE is_active = 1
+         ORDER BY name ASC"
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get consent templates: {}", e))?;
+
+    let templates = rows.into_iter().map(|(id, name, procedure_type, title, content, is_active, created_at, updated_at)| {
+        ConsentTemplate {
+            id: Some(id),
+            name,
+            procedure_type,
+            title,
+            content,
+            is_active: Some(is_active != 0),
+            created_at: Some(created_at),
+            updated_at: Some(updated_at),
+        }
+    }).collect();
+
+    Ok(templates)
+}
+
+/// Get all informed consents for a patient
+#[tauri::command]
+pub async fn get_consents_by_patient(
+    db_pool: State<'_, DbPool>,
+    patient_id: i64,
+) -> Result<Vec<InformedConsent>, String> {
+    let pool = db_pool.0.lock().await;
+
+    let rows = sqlx::query(
+        "SELECT id, patient_id, visit_id, procedure_type, procedure_name, consent_template,
+                consent_text, signature_data, signed_by, signed_at, witness_name, witness_signature,
+                doctor_name, notes, created_at, updated_at
+         FROM informed_consents
+         WHERE patient_id = ?1
+         ORDER BY signed_at DESC"
+    )
+    .bind(patient_id)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get informed consents: {}", e))?;
+
+    let consents = rows.into_iter().map(|row| {
+        InformedConsent {
+            id: row.get("id"),
+            patient_id: row.get("patient_id"),
+            visit_id: row.get("visit_id"),
+            procedure_type: row.get("procedure_type"),
+            procedure_name: row.get("procedure_name"),
+            consent_template: row.get("consent_template"),
+            consent_text: row.get("consent_text"),
+            signature_data: row.get("signature_data"),
+            signed_by: row.get("signed_by"),
+            signed_at: row.get("signed_at"),
+            witness_name: row.get("witness_name"),
+            witness_signature: row.get("witness_signature"),
+            doctor_name: row.get("doctor_name"),
+            notes: row.get("notes"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        }
+    }).collect();
+
+    Ok(consents)
+}
+
+/// Create a new informed consent
+#[tauri::command]
+pub async fn create_informed_consent(
+    db_pool: State<'_, DbPool>,
+    consent: InformedConsent,
+) -> Result<i64, String> {
+    let pool = db_pool.0.lock().await;
+
+    let result = sqlx::query(
+        "INSERT INTO informed_consents
+         (patient_id, visit_id, procedure_type, procedure_name, consent_template, consent_text,
+          signature_data, signed_by, signed_at, witness_name, witness_signature, doctor_name, notes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"
+    )
+    .bind(consent.patient_id)
+    .bind(consent.visit_id)
+    .bind(&consent.procedure_type)
+    .bind(&consent.procedure_name)
+    .bind(&consent.consent_template)
+    .bind(&consent.consent_text)
+    .bind(&consent.signature_data)
+    .bind(&consent.signed_by)
+    .bind(&consent.signed_at)
+    .bind(&consent.witness_name)
+    .bind(&consent.witness_signature)
+    .bind(&consent.doctor_name)
+    .bind(&consent.notes)
+    .execute(&*pool)
+    .await
+    .map_err(|e| format!("Failed to create informed consent: {}", e))?;
+
+    Ok(result.last_insert_rowid())
+}
+
+/// Get a specific informed consent by ID
+#[tauri::command]
+pub async fn get_consent_by_id(
+    db_pool: State<'_, DbPool>,
+    consent_id: i64,
+) -> Result<InformedConsent, String> {
+    let pool = db_pool.0.lock().await;
+
+    let row = sqlx::query(
+        "SELECT id, patient_id, visit_id, procedure_type, procedure_name, consent_template,
+                consent_text, signature_data, signed_by, signed_at, witness_name, witness_signature,
+                doctor_name, notes, created_at, updated_at
+         FROM informed_consents
+         WHERE id = ?1"
+    )
+    .bind(consent_id)
+    .fetch_one(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get informed consent: {}", e))?;
+
+    Ok(InformedConsent {
+        id: row.get("id"),
+        patient_id: row.get("patient_id"),
+        visit_id: row.get("visit_id"),
+        procedure_type: row.get("procedure_type"),
+        procedure_name: row.get("procedure_name"),
+        consent_template: row.get("consent_template"),
+        consent_text: row.get("consent_text"),
+        signature_data: row.get("signature_data"),
+        signed_by: row.get("signed_by"),
+        signed_at: row.get("signed_at"),
+        witness_name: row.get("witness_name"),
+        witness_signature: row.get("witness_signature"),
+        doctor_name: row.get("doctor_name"),
+        notes: row.get("notes"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    })
+}

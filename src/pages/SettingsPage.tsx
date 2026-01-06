@@ -15,6 +15,8 @@ import {
   Loader2,
   Shield,
   Copy,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Label } from "../components/ui/Label";
@@ -49,6 +51,15 @@ export function SettingsPage() {
   const [telemetryEnabled, setTelemetryEnabled] = useState(true);
   const [installationId, setInstallationId] = useState<string | null>(null);
   const [lastHeartbeat, setLastHeartbeat] = useState<string | undefined>();
+
+  // Updater data
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState<{
+    version: string;
+    date: string;
+    body?: string;
+  } | null>(null);
+  const [currentVersion, setCurrentVersion] = useState("0.1.0");
 
   // Profile data
   const [profile, setProfile] = useState<DoctorProfile>({
@@ -165,11 +176,14 @@ export function SettingsPage() {
       setTelemetryEnabled(enabled);
       toast.success(
         "Telemetría actualizada",
-        `La telemetría ha sido ${enabled ? "habilitada" : "deshabilitada"}`
+        `La telemetría ha sido ${enabled ? "habilitada" : "deshabilitada"}`,
       );
     } catch (error) {
       console.error("Error toggling telemetry:", error);
-      toast.error("Error", "No se pudo actualizar la configuración de telemetría");
+      toast.error(
+        "Error",
+        "No se pudo actualizar la configuración de telemetría",
+      );
     }
   };
 
@@ -177,6 +191,59 @@ export function SettingsPage() {
     if (installationId) {
       navigator.clipboard.writeText(installationId);
       toast.success("Copiado", "Installation ID copiado al portapapeles");
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    try {
+      setCheckingUpdate(true);
+      setUpdateAvailable(null);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const isTauri =
+        typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+
+      if (!isTauri) {
+        toast.warning(
+          "No disponible",
+          "Las actualizaciones automáticas solo están disponibles en la versión de escritorio",
+        );
+        return;
+      }
+
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+
+      const update = await check();
+
+      if (update?.available) {
+        toast.info(
+          `Nueva versión disponible: ${update.version}`,
+          "Descargando actualización...",
+        );
+
+        await update.downloadAndInstall();
+
+        toast.success(
+          "Actualización instalada",
+          "La aplicación se reiniciará para aplicar los cambios",
+        );
+
+        await relaunch();
+      } else {
+        toast.success(
+          "Estás actualizado",
+          `Tienes la última versión (${currentVersion})`,
+        );
+      }
+    } catch (error) {
+      console.error("Error checking for updates:", error);
+      toast.error(
+        "Error",
+        "No se pudo verificar las actualizaciones. Inténtalo más tarde.",
+      );
+    } finally {
+      setCheckingUpdate(false);
     }
   };
 
@@ -940,6 +1007,75 @@ export function SettingsPage() {
             </div>
           </Card>
 
+          {/* App Updates Card */}
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-lg bg-[hsl(var(--brand)/0.1)]">
+                <Download className="w-5 h-5 text-[hsl(var(--brand))]" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-[hsl(var(--foreground))]">
+                  Actualizaciones
+                </h3>
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                  Mantén Oklus actualizado con las últimas mejoras
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-3 border border-[hsl(var(--border))] rounded-lg">
+                <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
+                  Versión actual
+                </span>
+                <Badge variant="default">v{currentVersion}</Badge>
+              </div>
+
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-xs mb-3">
+                  <strong>Actualizaciones automáticas:</strong> Oklus puede
+                  descargar e instalar actualizaciones automáticamente para
+                  ofrecerte las últimas mejoras de seguridad y funcionalidades.
+                </p>
+                <Button
+                  onClick={handleCheckUpdates}
+                  disabled={checkingUpdate}
+                  className="w-full"
+                >
+                  {checkingUpdate ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verificando actualizaciones...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Buscar actualizaciones
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {updateAvailable && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                        Nueva versión disponible: v{updateAvailable.version}
+                      </p>
+                      {updateAvailable.body && (
+                        <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                          {updateAvailable.body}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+
           {/* Telemetry & Privacy Card */}
           <Card className="p-6">
             <div className="flex items-start gap-4 mb-6">
@@ -964,7 +1100,9 @@ export function SettingsPage() {
                     Enviar datos de telemetría
                   </p>
                   <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                    Ayúdanos a mejorar Oklus enviando estadísticas de uso anónimas. No recopilamos datos médicos ni información personal.
+                    Ayúdanos a mejorar Oklus enviando estadísticas de uso
+                    anónimas. No recopilamos datos médicos ni información
+                    personal.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4">
@@ -1013,8 +1151,13 @@ export function SettingsPage() {
 
               {/* Privacy Notice */}
               <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-xs text-blue-900 dark:text-blue-100">
-                  <strong>Privacidad garantizada:</strong> Los datos de telemetría son completamente anónimos y NO incluyen información médica de pacientes, nombres, documentos de identidad ni ningún dato personal sensible. Solo recopilamos estadísticas de uso (instalaciones activas, errores críticos, características utilizadas) para mejorar la aplicación.
+                <p className="text-xs">
+                  <strong>Privacidad garantizada:</strong> Los datos de
+                  telemetría son completamente anónimos y NO incluyen
+                  información médica de pacientes, nombres, documentos de
+                  identidad ni ningún dato personal sensible. Solo recopilamos
+                  estadísticas de uso (instalaciones activas, errores críticos,
+                  características utilizadas) para mejorar la aplicación.
                 </p>
               </div>
             </div>
