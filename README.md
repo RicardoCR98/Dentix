@@ -7,9 +7,9 @@
 [![Tauri](https://img.shields.io/badge/Tauri-2.8-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-19.1-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![SQLite](https://img.shields.io/badge/SQLite-3.x-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![License](https://img.shields.io/badge/License-Proprietary-red?style=flat-square)](LICENSE)
 
-[Características](#-características-destacadas) • [Capturas](#-capturas) • [Instalación](#-instalación-rápida) • [Documentación](#-documentación)
+[Características](#-características-destacadas) • [Capturas](#-capturas) • [Instalación](#-instalación) • [Documentación](#-documentación)
 
 </div>
 
@@ -59,40 +59,24 @@ Oklus es una aplicación **nativa de escritorio** diseñada para clínicas denta
 
 ---
 
-## 🚀 Instalación Rápida
+## 🚀 Instalación
 
-### Requisitos Previos
-- **Node.js** 18+ y **pnpm** 8+
-- **Rust** 1.77+ ([rustup](https://rustup.rs/))
-- Dependencias de Tauri según tu SO:
-  - **Windows**: Visual Studio C++ Build Tools + WebView2
-  - **macOS**: `xcode-select --install`
-  - **Linux**: WebKit2GTK, GTK3, libssl
+### Descarga desde GitHub Releases
 
-### Instalación
+1. Ve a la [página de Releases](https://github.com/RicardoCR98/oklus/releases)
+2. Descarga el instalador para tu sistema operativo:
+   - **Windows**: `Oklus_x.x.x_x64-setup.exe`
+   - **macOS**: `Oklus_x.x.x_x64.dmg`
+   - **Linux**: `oklus_x.x.x_amd64.deb` o AppImage
+3. Ejecuta el instalador y sigue las instrucciones
 
-```bash
-# 1. Clonar repositorio
-git clone https://github.com/RicardoCR98/oklus.git
-cd oklus
+### Requisitos del Sistema
+- **Windows 10/11** - WebView2 se instala automáticamente
+- **macOS 10.15+** - Safari WebKit integrado
+- **Linux** - WebKit2GTK, GTK3 (instaladas en la mayoría de distribuciones modernas)
 
-# 2. Instalar dependencias
-pnpm install
-
-# 3. Ejecutar en modo desarrollo
-pnpm tauri:dev
-```
-
-### Build de Producción
-
-```bash
-pnpm tauri:build
-```
-
-Los instaladores se generan en `src-tauri/target/release/bundle/`:
-- **Windows**: `Oklus_x.x.x_x64-setup.exe` (MSI/NSIS)
-- **macOS**: `Oklus_x.x.x_x64.dmg`
-- **Linux**: `oklus_x.x.x_amd64.deb` o AppImage
+### Actualizaciones Automáticas
+Oklus verifica e instala actualizaciones automáticamente. Revisa la configuración en **Ajustes → Sistema**.
 
 ---
 
@@ -179,21 +163,35 @@ Los instaladores se generan en `src-tauri/target/release/bundle/`:
 
 ---
 
-## 🤝 Contribuir
+## 🤝 Desarrollo
 
-Las contribuciones son bienvenidas. Por favor:
+Este es un proyecto **de código cerrado**. El desarrollo está gestionado por el autor.
 
-1. Fork el proyecto
-2. Crea una rama: `git checkout -b feature/mi-mejora`
-3. Commit con prefijos: `add:`, `fix:`, `update:`
-4. Ejecuta `pnpm lint` antes de hacer push
-5. Abre un Pull Request con descripción clara
+Si encuentras un bug o tienes una sugerencia:
+- 🐛 Reporta issues en [GitHub Issues](https://github.com/RicardoCR98/oklus/issues)
+- 💡 Envía sugerencias de mejora
+- 📧 Contacta directamente al autor
+
+**Nota**: Las contribuciones de código requieren autorización previa del autor.
 
 ---
 
 ## 📄 Licencia
 
-MIT License - Ver [LICENSE](LICENSE) para más detalles.
+**Copyright © 2025 Gary Ricardo Campaña Ramírez. Todos los derechos reservados.**
+
+Este software es **propietario y confidencial**. El código fuente no es de código abierto.
+
+### Restricciones
+- ❌ Copiar, modificar o distribuir el código fuente
+- ❌ Uso comercial sin autorización expresa
+- ❌ Ingeniería inversa o descompilación
+- ❌ Redistribución del software
+
+### Uso Autorizado
+✅ Solo para evaluación y uso personal según los términos acordados con el autor.
+
+Ver [LICENSE](LICENSE) para detalles completos de la licencia propietaria.
 
 ---
 
