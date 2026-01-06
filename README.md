@@ -85,14 +85,26 @@ Oklus verifica e instala actualizaciones automáticamente. Revisa la configuraci
 <details>
 <summary>👁️ Ver capturas de pantalla</summary>
 
-### Registro Clínico
+### Dashboard
 ![Dashboard](docs/screenshots/dashboard.png)
 
+### Registro Clínico
+![Registro](docs/screenshots/registro.png)
+
 ### Odontograma Interactivo
-![Odontograma](docs/screenshots/odontogram.png)
+![Odontograma](docs/screenshots/odontograma.png)
+
+### Gestión de Pacientes
+![Pacientes](docs/screenshots/pacientes.png)
+
+### Plantillas
+![Plantillas](docs/screenshots/ws.png)
+
+### Citas y Recordatorios
+![Citas](docs/screenshots/agenda.png)
 
 ### Gestión de Finanzas
-![Finanzas](docs/screenshots/finances.png)
+![Finanzas](docs/screenshots/finanzas.png)
 
 </details>
 
